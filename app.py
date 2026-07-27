@@ -473,7 +473,7 @@ TRANSLATIONS = {
         "login_locked": "Too many failed attempts. Try again in {minutes} minutes.",
         "signed_out": "You are signed out.",
         "invalid_csrf": "Your session expired. Please try again.",
-        "hcaptcha_required": "Complete the hCaptcha verification and try again.",
+        "turnstile_required": "Complete the Cloudflare Turnstile verification and try again.",
         "invalid_username": "Use a username between 2 and 40 characters.",
         "invalid_pin": "PIN must contain exactly 6 digits.",
         "duplicate_username": "That username has already joined this court.",
@@ -888,7 +888,7 @@ TRANSLATIONS = {
         "login_locked": "登入失敗次數過多，請在 {minutes} 分鐘後再試。",
         "signed_out": "你已登出。",
         "invalid_csrf": "工作階段已過期，請再試一次。",
-        "hcaptcha_required": "請完成人機驗證後再試一次。",
+        "turnstile_required": "請完成 Cloudflare Turnstile 人機驗證後再試一次。",
         "invalid_username": "使用者名稱需為 2 至 40 個字元。",
         "invalid_pin": "PIN 碼必須正好為 6 位數字。",
         "duplicate_username": "此使用者名稱已加入該場次。",
@@ -1063,12 +1063,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         ),
         ADMIN_USERNAME=os.environ.get("ADMIN_USERNAME", "admin"),
         ADMIN_PASSWORD=os.environ.get("ADMIN_PASSWORD", "change-me"),
-        HCAPTCHA_SITE_KEY=os.environ.get("HCAPTCHA_SITE_KEY", ""),
-        HCAPTCHA_SECRET_KEY=os.environ.get(
-            "HCAPTCHA_SECRET_KEY", os.environ.get("HCAPTCHA_SECRET", "")
-        ),
-        HCAPTCHA_VERIFY_TIMEOUT=float(
-            os.environ.get("HCAPTCHA_VERIFY_TIMEOUT", "5")
+        TURNSTILE_SITE_KEY=os.environ.get("TURNSTILE_SITE_KEY", ""),
+        TURNSTILE_SECRET_KEY=os.environ.get("TURNSTILE_SECRET_KEY", ""),
+        TURNSTILE_VERIFY_TIMEOUT=float(
+            os.environ.get("TURNSTILE_VERIFY_TIMEOUT", "5")
         ),
         GOOGLE_MAPS_API_KEY=os.environ.get("GOOGLE_MAPS_API_KEY", ""),
         WEB_PUSH_PUBLIC_KEY=os.environ.get("WEB_PUSH_PUBLIC_KEY", ""),
@@ -1111,7 +1109,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     def inject_globals() -> dict[str, Any]:
         lang = current_language()
         member = current_member()
-        hcaptcha_is_enabled = hcaptcha_enabled()
+        turnstile_is_enabled = turnstile_enabled()
         return {
             "lang": lang,
             "t": lambda key: TRANSLATIONS[lang].get(key, key),
@@ -1122,9 +1120,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             "web_push_public_key": app.config["WEB_PUSH_PUBLIC_KEY"],
             "is_admin": bool(member and member["role"] in ADMIN_ROLES),
             "current_user": member,
-            "hcaptcha_enabled": hcaptcha_is_enabled,
-            "hcaptcha_site_key": (
-                app.config["HCAPTCHA_SITE_KEY"] if hcaptcha_is_enabled else ""
+            "turnstile_enabled": turnstile_is_enabled,
+            "turnstile_site_key": (
+                app.config["TURNSTILE_SITE_KEY"] if turnstile_is_enabled else ""
             ),
         }
 
@@ -1303,8 +1301,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             )
         if request.method == "POST":
             verify_csrf()
-            if not verify_hcaptcha_response():
-                flash_t("hcaptcha_required", "error")
+            if not verify_turnstile_response("signup"):
+                flash_t("turnstile_required", "error")
                 return render_template("account/auth.html", signup=True)
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
@@ -1353,8 +1351,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             return redirect(url_for("account_dashboard"))
         if request.method == "POST":
             verify_csrf()
-            if not verify_hcaptcha_response():
-                flash_t("hcaptcha_required", "error")
+            if not verify_turnstile_response("login"):
+                flash_t("turnstile_required", "error")
                 return render_template("account/auth.html", signup=False)
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
@@ -3212,31 +3210,30 @@ def flash_t(key: str, category: str) -> None:
     flash(TRANSLATIONS[current_language()].get(key, key), category)
 
 
-def hcaptcha_enabled() -> bool:
+def turnstile_enabled() -> bool:
     return bool(
         not current_app.debug
-        and current_app.config.get("HCAPTCHA_SITE_KEY")
-        and current_app.config.get("HCAPTCHA_SECRET_KEY")
+        and current_app.config.get("TURNSTILE_SITE_KEY")
+        and current_app.config.get("TURNSTILE_SECRET_KEY")
     )
 
 
-def verify_hcaptcha_response() -> bool:
-    if not hcaptcha_enabled():
+def verify_turnstile_response(expected_action: str) -> bool:
+    if not turnstile_enabled():
         return True
-    token = request.form.get("h-captcha-response", "").strip()
-    if not token:
+    token = request.form.get("cf-turnstile-response", "").strip()
+    if not token or len(token) > 2048:
         return False
 
     payload = {
-        "secret": current_app.config["HCAPTCHA_SECRET_KEY"],
+        "secret": current_app.config["TURNSTILE_SECRET_KEY"],
         "response": token,
-        "sitekey": current_app.config["HCAPTCHA_SITE_KEY"],
     }
     remote_ip = client_ip_address()
     if remote_ip:
         payload["remoteip"] = remote_ip
     verification_request = Request(
-        "https://api.hcaptcha.com/siteverify",
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
         data=urlencode(payload).encode("utf-8"),
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
@@ -3244,15 +3241,19 @@ def verify_hcaptcha_response() -> bool:
     try:
         with urlopen(
             verification_request,
-            timeout=float(current_app.config["HCAPTCHA_VERIFY_TIMEOUT"]),
+            timeout=float(current_app.config["TURNSTILE_VERIFY_TIMEOUT"]),
         ) as response:
             result = json.loads(response.read(65536).decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError) as error:
         current_app.logger.warning(
-            "hCaptcha verification request failed: %s", error.__class__.__name__
+            "Turnstile verification request failed: %s",
+            error.__class__.__name__,
         )
         return False
-    return result.get("success") is True
+    return (
+        result.get("success") is True
+        and result.get("action") == expected_action
+    )
 
 
 def admin_required(view: Callable) -> Callable:

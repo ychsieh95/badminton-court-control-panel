@@ -26,9 +26,16 @@
           <input name="confirm_password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required>
         </label>
       {% endif %}
-      {% if hcaptcha_enabled %}
-        <div class="hcaptcha-wrap">
-          <div class="h-captcha" data-sitekey="{{ hcaptcha_site_key }}"></div>
+      {% if turnstile_enabled %}
+        <div class="turnstile-wrap">
+          <div
+            class="cf-turnstile"
+            data-sitekey="{{ turnstile_site_key }}"
+            data-action="{{ 'signup' if signup else 'login' }}"
+            data-language="{{ 'zh-tw' if lang == 'zh-tw' else 'en-us' }}"
+            data-theme="auto"
+            data-size="flexible"
+          ></div>
         </div>
       {% endif %}
       <button class="button button-primary button-block" type="submit">{{ t('create_account') if signup else t('sign_in') }}</button>
@@ -41,7 +48,7 @@
 </section>
 {% endblock %}
 {% block scripts %}
-  {% if hcaptcha_enabled %}
-    <script src="https://js.hcaptcha.com/1/api.js?hl={{ 'zh-TW' if lang == 'zh-tw' else 'en' }}" async defer></script>
+  {% if turnstile_enabled %}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   {% endif %}
 {% endblock %}

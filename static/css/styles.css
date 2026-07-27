@@ -3064,14 +3064,13 @@ select:focus-visible {
   text-underline-offset: 3px;
 }
 
-.hcaptcha-wrap {
+.turnstile-wrap {
   width: 100%;
   margin-bottom: 18px;
-  overflow-x: auto;
 }
 
-.hcaptcha-wrap .h-captcha {
-  min-height: 78px;
+.turnstile-wrap .cf-turnstile {
+  min-height: 65px;
 }
 
 .remark-copy {

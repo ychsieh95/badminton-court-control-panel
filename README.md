@@ -97,9 +97,9 @@ The development bootstrap credentials are `admin` / `change-me`. Always replace 
 | `SECRET_KEY` | Development value | Flask session and CSRF signing secret. Use a long random production value. |
 | `ADMIN_USERNAME` | `admin` | Username used to bootstrap the first database super-admin. |
 | `ADMIN_PASSWORD` | `change-me` | Initial bootstrap super-admin password. |
-| `HCAPTCHA_SITE_KEY` | Empty | Public hCaptcha site key; set with the secret key to protect signup and login. |
-| `HCAPTCHA_SECRET_KEY` | Empty | Private hCaptcha verification secret; never expose it to browsers. |
-| `HCAPTCHA_VERIFY_TIMEOUT` | `5` | Server-side hCaptcha verification timeout in seconds. |
+| `TURNSTILE_SITE_KEY` | Empty | Public Cloudflare Turnstile site key; set with the secret key to protect signup and login. |
+| `TURNSTILE_SECRET_KEY` | Empty | Private Turnstile Siteverify secret; never expose it to browsers. |
+| `TURNSTILE_VERIFY_TIMEOUT` | `5` | Server-side Turnstile verification timeout in seconds. |
 | `COURT_DATABASE` | `instance/courts.sqlite` | SQLite database location. |
 | `GOOGLE_MAPS_API_KEY` | Empty | Enables Google Places hall autocomplete. |
 | `WEB_PUSH_PUBLIC_KEY` | Empty | Public VAPID application-server key shown to browsers. |
@@ -115,11 +115,11 @@ The development bootstrap credentials are `admin` / `change-me`. Always replace 
 
 Values already present in the process environment take precedence over `.env`.
 
-## hCaptcha
+## Cloudflare Turnstile
 
-Set both `HCAPTCHA_SITE_KEY` and `HCAPTCHA_SECRET_KEY` to require hCaptcha on `/signup` and the shared `/login` page. The browser response is verified server-side with hCaptcha before account creation or credential processing. Missing, rejected, expired, reused, malformed, and unverifiable responses are denied.
+Create a [Turnstile widget](https://developers.cloudflare.com/turnstile/get-started/), allow the deployed hostname, and set both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` to protect `/signup` and the shared `/login` page. The widget uses the `signup` or `login` action, and the server validates both the token and matching action with Cloudflare Siteverify before account creation or credential processing.
 
-If either key is empty or Flask debug mode is active, hCaptcha is disabled. The secret key is used only for server-to-server verification and is never rendered into HTML. The official hCaptcha service may reject `localhost` and `127.0.0.1`; use an hCaptcha-supported development hostname or leave the keys unset for ordinary local development.
+Missing, rejected, expired, reused, oversized, malformed, action-mismatched, and unverifiable tokens are denied. If either key is empty or Flask debug mode is active, Turnstile is disabled. The secret key is used only for server-to-server verification and is never rendered into HTML. Cloudflare provides [dedicated test sitekeys and secret keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) for automated testing and localhost; never deploy those test credentials to production.
 
 ## Google hall search
 
@@ -195,7 +195,7 @@ The image uses `app.py` as the uWSGI module and serves it through Nginx on port 
 
 - Account passwords and participant PINs are stored using secure password hashes.
 - Member and administrator sign-ins are temporarily locked after repeated failures from the same username and IP address.
-- When configured, hCaptcha is verified before signup or sign-in credentials are processed.
+- When configured, Cloudflare Turnstile is verified before signup or sign-in credentials are processed.
 - Successful member sign-ins record the local timestamp and validated client IP.
 - Successful court joins and leaves record the nickname, action, and timestamp. Administrators additionally see the validated IP and a broad device category.
 - Push subscription endpoints and encryption keys are stored only to deliver opted-in court updates and are never displayed publicly.

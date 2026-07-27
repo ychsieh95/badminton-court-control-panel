@@ -97,9 +97,9 @@ flask --app app run --debug
 | `SECRET_KEY` | 開發用值 | Flask 工作階段及 CSRF 簽署密鑰；正式環境請使用足夠長的隨機值。 |
 | `ADMIN_USERNAME` | `admin` | 建立第一個資料庫最高管理員時使用的名稱。 |
 | `ADMIN_PASSWORD` | `change-me` | 最高管理員的初始密碼。 |
-| `HCAPTCHA_SITE_KEY` | 空白 | 公開的 hCaptcha 網站金鑰；與私密金鑰同時設定後保護註冊及登入。 |
-| `HCAPTCHA_SECRET_KEY` | 空白 | hCaptcha 私密驗證金鑰；不可傳送至瀏覽器。 |
-| `HCAPTCHA_VERIFY_TIMEOUT` | `5` | 伺服器端 hCaptcha 驗證逾時秒數。 |
+| `TURNSTILE_SITE_KEY` | 空白 | 公開的 Cloudflare Turnstile 網站金鑰；與私密金鑰同時設定後保護註冊及登入。 |
+| `TURNSTILE_SECRET_KEY` | 空白 | Turnstile Siteverify 私密驗證金鑰；不可傳送至瀏覽器。 |
+| `TURNSTILE_VERIFY_TIMEOUT` | `5` | 伺服器端 Turnstile 驗證逾時秒數。 |
 | `COURT_DATABASE` | `instance/courts.sqlite` | SQLite 資料庫位置。 |
 | `GOOGLE_MAPS_API_KEY` | 空白 | 啟用 Google Places 球館自動完成。 |
 | `WEB_PUSH_PUBLIC_KEY` | 空白 | 提供給瀏覽器的 VAPID 公開應用伺服器金鑰。 |
@@ -115,11 +115,11 @@ flask --app app run --debug
 
 處理程序環境中已存在的變數會優先於 `.env`。
 
-## hCaptcha
+## Cloudflare Turnstile
 
-同時設定 `HCAPTCHA_SITE_KEY` 及 `HCAPTCHA_SECRET_KEY` 後，`/signup` 與共用的 `/login` 頁面都會要求 hCaptcha。建立帳號或處理登入憑證前，伺服器會先向 hCaptcha 驗證瀏覽器回傳內容。缺少、遭拒、過期、重複使用、格式錯誤或無法驗證的回應都會被拒絕。
+在 Cloudflare [建立 Turnstile 小工具](https://developers.cloudflare.com/turnstile/get-started/)、允許正式網站主機名稱，並同時設定 `TURNSTILE_SITE_KEY` 及 `TURNSTILE_SECRET_KEY`，即可保護 `/signup` 與共用的 `/login` 頁面。小工具會使用 `signup` 或 `login` 動作；建立帳號或處理登入憑證前，伺服器會透過 Cloudflare Siteverify 驗證權杖及對應動作。
 
-任一金鑰留空或 Flask 偵錯模式啟用時，hCaptcha 會自動停用。私密金鑰僅用於伺服器間驗證，不會輸出至 HTML。hCaptcha 官方服務可能拒絕 `localhost` 與 `127.0.0.1`；一般本機開發可不設定金鑰，或使用 hCaptcha 支援的開發主機名稱。
+缺少、遭拒、過期、重複使用、過長、格式錯誤、動作不符或無法驗證的權杖都會被拒絕。任一金鑰留空或 Flask 偵錯模式啟用時，Turnstile 會自動停用。私密金鑰僅用於伺服器間驗證，不會輸出至 HTML。Cloudflare 提供適用於自動化測試及 localhost 的[專用測試金鑰](https://developers.cloudflare.com/turnstile/troubleshooting/testing/)；不可將測試憑證部署至正式環境。
 
 ## Google 球館搜尋
 
@@ -195,7 +195,7 @@ docker run --rm \
 
 - 會員密碼及球友 PIN 碼皆以安全密碼雜湊儲存。
 - 同一使用者名稱與 IP 位址連續登入失敗時，會員及管理員登入會暫時鎖定。
-- 設定 hCaptcha 後，註冊或處理登入憑證前會先完成人機驗證。
+- 設定 Cloudflare Turnstile 後，註冊或處理登入憑證前會先完成人機驗證。
 - 會員成功登入時會記錄本機時間及已驗證的用戶端 IP。
 - 成功加入或退出場次時會記錄暱稱、動作及時間；管理員可額外查看已驗證 IP 及概略裝置類型。
 - 推播訂閱端點與加密金鑰只用於傳送使用者已同意的場次更新，且不會公開顯示。

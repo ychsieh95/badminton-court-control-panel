@@ -9,7 +9,7 @@ import pytest
 from werkzeug.security import check_password_hash
 
 import app as app_module
-from app import classify_device, create_app, get_db, verify_hcaptcha_response
+from app import classify_device, create_app, get_db, verify_turnstile_response
 
 
 @pytest.fixture()
@@ -26,8 +26,9 @@ def app(tmp_path):
             "WEB_PUSH_PRIVATE_KEY": "",
             "WEB_PUSH_SUBJECT": "",
             "WEB_PUSH_TIMEOUT": 1,
-            "HCAPTCHA_SITE_KEY": "",
-            "HCAPTCHA_SECRET_KEY": "",
+            "TURNSTILE_SITE_KEY": "",
+            "TURNSTILE_SECRET_KEY": "",
+            "TURNSTILE_VERIFY_TIMEOUT": 1,
             "AVATAR_FOLDER": str(tmp_path / "avatars"),
             "COURT_MEDIA_FOLDER": str(tmp_path / "court-media"),
             "DEFAULT_COUNTRY_CODE": "TW",
@@ -50,36 +51,42 @@ def csrf(client, path="/"):
         return session["csrf_token"]
 
 
-def test_hcaptcha_widgets_render_on_signup_and_login_pages(client, app):
+def test_turnstile_widgets_render_on_signup_and_login_pages(client, app):
     app.config.update(
-        HCAPTCHA_SITE_KEY="test-site-key",
-        HCAPTCHA_SECRET_KEY="test-secret-key",
+        TURNSTILE_SITE_KEY="test-site-key",
+        TURNSTILE_SECRET_KEY="test-secret-key",
     )
-    for path in ("/signup", "/login"):
+    for path, action in (("/signup", b"signup"), ("/login", b"login")):
         response = client.get(path)
-        assert b'class="h-captcha"' in response.data
+        assert b'class="cf-turnstile"' in response.data
         assert b'data-sitekey="test-site-key"' in response.data
-        assert b"https://js.hcaptcha.com/1/api.js" in response.data
+        assert b'data-action="' + action + b'"' in response.data
+        assert b'data-language="zh-tw"' in response.data
+        assert b'data-size="flexible"' in response.data
+        assert (
+            b"https://challenges.cloudflare.com/turnstile/v0/api.js"
+            in response.data
+        )
         assert b"test-secret-key" not in response.data
 
 
-def test_hcaptcha_is_disabled_in_debug_mode(client, app, monkeypatch):
+def test_turnstile_is_disabled_in_debug_mode(client, app, monkeypatch):
     app.config.update(
         DEBUG=True,
-        HCAPTCHA_SITE_KEY="test-site-key",
-        HCAPTCHA_SECRET_KEY="test-secret-key",
+        TURNSTILE_SITE_KEY="test-site-key",
+        TURNSTILE_SECRET_KEY="test-secret-key",
     )
     verification_requested = False
 
     def unexpected_urlopen(*_args, **_kwargs):
         nonlocal verification_requested
         verification_requested = True
-        raise AssertionError("hCaptcha must not be contacted in debug mode")
+        raise AssertionError("Turnstile must not be contacted in debug mode")
 
     monkeypatch.setattr(app_module, "urlopen", unexpected_urlopen)
     page = client.get("/signup")
-    assert b'class="h-captcha"' not in page.data
-    assert b"https://js.hcaptcha.com/1/api.js" not in page.data
+    assert b'class="cf-turnstile"' not in page.data
+    assert b"challenges.cloudflare.com/turnstile" not in page.data
 
     created = client.post(
         "/signup",
@@ -112,21 +119,23 @@ def test_hcaptcha_is_disabled_in_debug_mode(client, app, monkeypatch):
         ),
     ],
 )
-def test_hcaptcha_rejection_blocks_authentication(
+def test_turnstile_rejection_blocks_authentication(
     client, app, monkeypatch, path, data
 ):
     app.config.update(
-        HCAPTCHA_SITE_KEY="test-site-key",
-        HCAPTCHA_SECRET_KEY="test-secret-key",
+        TURNSTILE_SITE_KEY="test-site-key",
+        TURNSTILE_SECRET_KEY="test-secret-key",
     )
-    monkeypatch.setattr(app_module, "verify_hcaptcha_response", lambda: False)
+    monkeypatch.setattr(
+        app_module, "verify_turnstile_response", lambda _action: False
+    )
     response = client.post(
         path,
         data={"csrf_token": csrf(client, path), **data},
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert "請完成人機驗證後再試一次。".encode() in response.data
+    assert "請完成 Cloudflare Turnstile 人機驗證後再試一次。".encode() in response.data
     with client.session_transaction() as browser_session:
         assert "user_id" not in browser_session
         assert "admin" not in browser_session
@@ -137,13 +146,13 @@ def test_hcaptcha_rejection_blocks_authentication(
             ).fetchone() is None
 
 
-def test_hcaptcha_server_verification_posts_expected_payload(
+def test_turnstile_server_verification_posts_expected_payload(
     app, monkeypatch
 ):
     app.config.update(
-        HCAPTCHA_SITE_KEY="expected-site-key",
-        HCAPTCHA_SECRET_KEY="private-secret",
-        HCAPTCHA_VERIFY_TIMEOUT=3,
+        TURNSTILE_SITE_KEY="expected-site-key",
+        TURNSTILE_SECRET_KEY="private-secret",
+        TURNSTILE_VERIFY_TIMEOUT=3,
     )
     captured = {}
 
@@ -155,7 +164,7 @@ def test_hcaptcha_server_verification_posts_expected_payload(
             return False
 
         def read(self, _limit):
-            return b'{"success": true}'
+            return b'{"success": true, "action": "login"}'
 
     def fake_urlopen(verification_request, timeout):
         captured["request"] = verification_request
@@ -166,21 +175,44 @@ def test_hcaptcha_server_verification_posts_expected_payload(
     with app.test_request_context(
         "/login",
         method="POST",
-        data={"h-captcha-response": "browser-token"},
+        data={"cf-turnstile-response": "browser-token"},
         environ_base={"REMOTE_ADDR": "203.0.113.10"},
     ):
-        assert verify_hcaptcha_response() is True
+        assert verify_turnstile_response("login") is True
+        assert verify_turnstile_response("signup") is False
 
     request_data = parse_qs(captured["request"].data.decode())
-    assert captured["request"].full_url == "https://api.hcaptcha.com/siteverify"
+    assert (
+        captured["request"].full_url
+        == "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+    )
     assert captured["request"].get_method() == "POST"
     assert captured["timeout"] == 3
     assert request_data == {
         "secret": ["private-secret"],
         "response": ["browser-token"],
-        "sitekey": ["expected-site-key"],
         "remoteip": ["203.0.113.10"],
     }
+
+
+def test_turnstile_rejects_oversized_token_without_verification_request(
+    app, monkeypatch
+):
+    app.config.update(
+        TURNSTILE_SITE_KEY="test-site-key",
+        TURNSTILE_SECRET_KEY="test-secret-key",
+    )
+
+    def unexpected_urlopen(*_args, **_kwargs):
+        raise AssertionError("Oversized Turnstile tokens must not be submitted")
+
+    monkeypatch.setattr(app_module, "urlopen", unexpected_urlopen)
+    with app.test_request_context(
+        "/login",
+        method="POST",
+        data={"cf-turnstile-response": "x" * 2049},
+    ):
+        assert verify_turnstile_response("login") is False
 
 
 @pytest.mark.parametrize(
