@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}404 · {{ t('brand') }}{% endblock %}
+{% block content %}
+<section class="not-found shell">
+  <span class="error-code">404</span>
+  {% include "_empty_icon.html" %}
+  <h1>{{ t('court_not_found') }}</h1>
+  <p>{{ t('court_not_found_body') }}</p>
+  <a class="button button-primary" href="{{ url_for('index') }}">{{ t('back_home') }}</a>
+</section>
+{% endblock %}

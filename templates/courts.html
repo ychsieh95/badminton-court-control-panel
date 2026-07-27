@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}{{ t('all_courts') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div class="shell page-header-inner">
+    <div>
+      <p class="eyebrow">{{ t('browse_courts') }}</p>
+      <h1>{{ t('all_courts') }}</h1>
+      <p>{{ t('all_courts_body') }}</p>
+    </div>
+    {% if is_admin or current_user %}
+      <a class="button button-primary" href="{{ url_for('court_new') }}">+ {{ t('new_court') }}</a>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section shell section-tight">
+  <details class="panel court-filter-panel">
+    <summary class="filter-summary">
+      <div class="filter-heading">
+        <div>
+          <p class="eyebrow">{{ t('filter_courts') }}</p>
+          <h2>{{ t('filter_courts') }}</h2>
+        </div>
+        <div class="filter-heading-meta">
+          <span class="count-badge">{{ courts|length }} {{ t('filter_results') }}</span>
+          <svg class="filter-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+        </div>
+      </div>
+    </summary>
+    <div class="filter-panel-body">
+      <form class="court-filter-form" method="get" action="{{ url_for('public_courts') }}">
+        <label class="filter-field filter-search">
+          <span>{{ t('filter_search') }}</span>
+          <input name="q" type="search" value="{{ filters.q }}" maxlength="100" placeholder="{{ t('filter_search') }}">
+        </label>
+        <label class="filter-field">
+          <span>{{ t('date_from') }}</span>
+          <input name="date_from" type="text" value="{{ filters.date_from }}" inputmode="numeric" maxlength="10" pattern="\d{4}/\d{2}/\d{2}" placeholder="yyyy/mm/dd" autocomplete="off" data-filter-date data-date-from>
+        </label>
+        <label class="filter-field">
+          <span>{{ t('date_to') }}</span>
+          <input name="date_to" type="text" value="{{ filters.date_to }}" inputmode="numeric" maxlength="10" pattern="\d{4}/\d{2}/\d{2}" placeholder="yyyy/mm/dd" autocomplete="off" data-filter-date data-date-to>
+        </label>
+        <label class="filter-field">
+          <span>{{ t('filter_level') }}</span>
+          <select name="level">
+            <option value="">{{ t('any_level') }}</option>
+            {% for level in range(1, 19) %}
+              <option value="{{ level }}" {% if filters.level == level|string %}selected{% endif %}>{{ level }} · {{ level_label(level) }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="filter-field">
+          <span>{{ t('filter_gender') }}</span>
+          <select name="gender">
+            <option value="both" {% if filters.gender == 'both' %}selected{% endif %}>{{ t('both_genders') }}</option>
+            <option value="male" {% if filters.gender == 'male' %}selected{% endif %}>{{ t('male') }}</option>
+            <option value="female" {% if filters.gender == 'female' %}selected{% endif %}>{{ t('female') }}</option>
+          </select>
+        </label>
+        <label class="filter-field">
+          <span>{{ t('filter_status') }}</span>
+          <select name="status">
+            <option value="">{{ t('any_status') }}</option>
+            <option value="open" {% if filters.status == 'open' %}selected{% endif %}>{{ t('open') }}</option>
+            <option value="full" {% if filters.status == 'full' %}selected{% endif %}>{{ t('full') }}</option>
+            <option value="read_only" {% if filters.status == 'read_only' %}selected{% endif %}>{{ t('read_only') }}</option>
+          </select>
+        </label>
+        <label class="filter-checkbox">
+          <input name="show_expired" type="checkbox" value="1" {% if filters.show_expired %}checked{% endif %}>
+          <span>{{ t('show_expired') }}</span>
+        </label>
+        <div class="filter-actions">
+          <button class="button button-primary" type="submit">{{ t('apply_filters') }}</button>
+          <a class="button button-ghost" href="{{ url_for('public_courts') }}">{{ t('clear_filters') }}</a>
+        </div>
+      </form>
+    </div>
+  </details>
+  {% if courts %}
+    <div class="court-grid">
+      {% for court in courts %}
+        <article class="court-card">
+          {% if court.cover_image %}
+            <a class="court-card-cover" href="{{ url_for('court_detail', guid=court.guid) }}">
+              <img src="{{ url_for('court_media_file', filename=court.cover_image) }}" alt="{{ t('court_media_alt')|replace('{hall}', court.hall_name) }}" loading="lazy">
+            </a>
+          {% endif %}
+          <div class="card-topline">
+            <span class="date-chip">
+              <span class="date-month">{{ court.court_date[5:7] }}</span>
+              <strong>{{ court.court_date[8:10] }}</strong>
+            </span>
+            {% if court.is_expired %}
+              <span class="status status-expired">{{ t('expired') }}</span>
+            {% elif court.roll_clearing_locked %}
+              <span class="status status-read-only">{{ t('read_only') }}</span>
+            {% elif court.total_count >= court.member_max %}
+              <span class="status status-full">{{ t('full') }}</span>
+            {% else %}
+              <span class="status status-open"><i></i>{{ t('open') }}</span>
+            {% endif %}
+          </div>
+          <div class="court-card-body">
+            <p class="card-time">{{ court.court_date|court_date }} · {{ court.court_date|court_weekday }} · {{ court.start_time }}–{{ court.end_time }}</p>
+            <h3>{{ court.event_name or court.hall_name }}</h3>
+            {% if court.event_name or court.badminton_name %}
+              <p class="card-event-context">
+                {% if court.event_name %}<span>{{ court.hall_name }}</span>{% endif %}
+                {% if court.badminton_name %}<span>{{ court.badminton_name }}</span>{% endif %}
+              </p>
+            {% endif %}
+            <p class="card-location">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+              {{ court.location }}
+            </p>
+            <p class="card-creator">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+              {{ t('creator') }} · <strong>{{ court.creator_username or t('admin_account') }}</strong>
+            </p>
+            <div class="card-meta">
+              <span>{{ t('court_id') }} <strong>{{ court.court_id }}</strong></span>
+              <span>{{ t('members') }} <strong>{{ court.total_count }}/{{ court.member_max }}</strong></span>
+              {% if court.waiting_count %}<span>{{ t('waiting_list') }} <strong>{{ court.waiting_count }}</strong></span>{% endif %}
+            </div>
+            <div class="levels-inline">
+              <span><b>♂</b> {{ court.male_level_min }}–{{ court.male_level_max }}</span>
+              <span><b>♀</b> {{ court.female_level_min }}–{{ court.female_level_max }}</span>
+            </div>
+          </div>
+          <a class="card-link" href="{{ url_for('court_detail', guid=court.guid) }}">
+            {{ t('view_court') }}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+          </a>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state panel">
+      {% include "_empty_icon.html" %}
+      <h3>{{ t('no_courts') }}</h3>
+      <p>{{ t('no_courts_body') }}</p>
+      {% if is_admin or current_user %}
+        <a class="button button-primary" href="{{ url_for('court_new') }}">{{ t('new_court') }}</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

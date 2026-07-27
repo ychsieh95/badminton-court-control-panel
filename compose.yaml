@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: badminton-court-control-panel:local
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - instance-data:/instance
+    restart: unless-stopped
+
+volumes:
+  instance-data:
+    name: badminton-court-control-data

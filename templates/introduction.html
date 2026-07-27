@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ t('introduction') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+{% set create_url = url_for('court_new') if is_admin or current_user else url_for('account_signup') %}
+
+<section class="intro-hero">
+  <div class="intro-orbit intro-orbit-one" aria-hidden="true"></div>
+  <div class="intro-orbit intro-orbit-two" aria-hidden="true"></div>
+  <div class="shell intro-hero-inner">
+    <div class="intro-hero-copy">
+      <p class="eyebrow">{{ t('intro_eyebrow') }}</p>
+      <h1>{{ t('intro_title') }}</h1>
+      <p>{{ t('intro_body') }}</p>
+      <div class="intro-actions">
+        <a class="button button-primary" href="{{ url_for('public_courts') }}">
+          {{ t('intro_browse') }}
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+        <a class="button button-secondary" href="{{ create_url }}">{{ t('intro_start') }}</a>
+      </div>
+    </div>
+    <div class="intro-overview panel" aria-hidden="true">
+      <div class="intro-overview-mark">
+        {% include "_brand_mark.html" %}
+      </div>
+      <div class="intro-overview-row">
+        <span>{{ t('level') }}</span>
+        <strong>1–18</strong>
+      </div>
+      <div class="intro-overview-row">
+        <span>{{ t('join') }}</span>
+        <strong>PIN · 6</strong>
+      </div>
+      <div class="intro-overview-row">
+        <span>{{ t('public_link') }}</span>
+        <strong>GUID</strong>
+      </div>
+      <div class="intro-overview-court">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section shell">
+  <div class="section-heading intro-section-heading">
+    <div>
+      <p class="eyebrow">{{ t('intro_features_eyebrow') }}</p>
+      <h2>{{ t('intro_features_title') }}</h2>
+      <p>{{ t('intro_features_body') }}</p>
+    </div>
+  </div>
+  <div class="intro-feature-grid">
+    {% set features = [
+      ('search', 'intro_discover_title', 'intro_discover_body'),
+      ('join', 'intro_join_title', 'intro_join_feature_body'),
+      ('share', 'intro_create_title', 'intro_create_feature_body'),
+      ('members', 'intro_manage_title', 'intro_manage_body'),
+      ('check', 'intro_finish_title', 'intro_finish_body'),
+      ('preferences', 'intro_preferences_title', 'intro_preferences_body')
+    ] %}
+    {% for icon, title, body in features %}
+      <article class="panel intro-feature-card">
+        <div class="intro-feature-icon">
+          {% if icon == 'search' %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          {% elif icon == 'join' %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8M19 8v6M22 11h-6"/></svg>
+          {% elif icon == 'share' %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg>
+          {% elif icon == 'members' %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          {% elif icon == 'check' %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          {% else %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.1.37.31.7.6 1 .3.28.68.42 1.1.4h.1v4h-.1c-.42-.02-.8.12-1.1.4-.29.3-.5.63-.6 1Z"/></svg>
+          {% endif %}
+        </div>
+        <h3>{{ t(title) }}</h3>
+        <p>{{ t(body) }}</p>
+      </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section intro-how-section">
+  <div class="shell">
+    <div class="section-heading intro-section-heading">
+      <div>
+        <p class="eyebrow">{{ t('intro_browse') }}</p>
+        <h2>{{ t('intro_how_title') }}</h2>
+      </div>
+    </div>
+    <div class="intro-steps">
+      {% for title, body in [
+        ('intro_step_one_title', 'intro_step_one_body'),
+        ('intro_step_two_title', 'intro_step_two_body'),
+        ('intro_step_three_title', 'intro_step_three_body')
+      ] %}
+        <article class="intro-step">
+          <span>0{{ loop.index }}</span>
+          <h3>{{ t(title) }}</h3>
+          <p>{{ t(body) }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section shell intro-trust-section">
+  <article class="panel intro-trust-card">
+    <div class="intro-trust-icon">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22s8-3 8-10V5l-8-3-8 3v7c0 7 8 10 8 10Z"/><path d="m9 12 2 2 4-5"/></svg>
+    </div>
+    <div>
+      <p class="eyebrow">{{ t('intro_trust_eyebrow') }}</p>
+      <h2>{{ t('intro_trust_title') }}</h2>
+      <p>{{ t('intro_trust_body') }}</p>
+    </div>
+  </article>
+</section>
+
+<section class="intro-cta">
+  <div class="shell intro-cta-inner">
+    <div>
+      <h2>{{ t('intro_ready_title') }}</h2>
+      <p>{{ t('intro_ready_body') }}</p>
+    </div>
+    <div class="intro-actions">
+      <a class="button button-primary" href="{{ url_for('public_courts') }}">{{ t('intro_browse') }}</a>
+      <a class="button button-secondary" href="{{ create_url }}">{{ t('intro_start') }}</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

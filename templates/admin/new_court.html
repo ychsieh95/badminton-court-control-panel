@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% set back_route = dashboard_endpoint|default('admin_dashboard') %}
+{% set form_console_key = console_key|default('admin_console') %}
+{% block title %}{{ t('edit_title') if editing else t('new_court') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<section class="page-header page-header-small">
+  <div class="shell">
+    <a class="back-link" href="{{ url_for(back_route) }}">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+      {{ t('dashboard') }}
+    </a>
+    <p class="eyebrow">{{ t(form_console_key) }}</p>
+    <h1>{{ t('edit_title') if editing else t('create_title') }}</h1>
+    <p>{{ t('edit_body') if editing else t('create_body') }}</p>
+  </div>
+</section>
+
+<section class="section shell form-shell">
+  <form method="post" class="court-form" enctype="multipart/form-data" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <article class="panel form-section">
+      <div class="form-section-number">01</div>
+      <div class="form-section-content">
+        <div class="form-section-heading">
+          <h2>{{ t('event_information') }}</h2>
+        </div>
+        <div class="form-grid form-grid-2 event-name-fields">
+          <label class="field">
+            <span>{{ t('event_name') }} <small class="field-hint-inline">{{ t('optional') }}</small></span>
+            <input name="event_name" value="{{ values.event_name }}" maxlength="160" placeholder="{{ t('event_name_placeholder') }}" class="{% if errors.event_name %}invalid{% endif %}">
+            {% if errors.event_name %}<small class="field-error">{{ errors.event_name }}</small>{% endif %}
+          </label>
+          <label class="field">
+            <span>{{ t('badminton_name') }} <small class="field-hint-inline">{{ t('optional') }}</small></span>
+            <input name="badminton_name" value="{{ values.badminton_name }}" maxlength="160" placeholder="{{ t('badminton_name_placeholder') }}" class="{% if errors.badminton_name %}invalid{% endif %}">
+            {% if errors.badminton_name %}<small class="field-error">{{ errors.badminton_name }}</small>{% endif %}
+          </label>
+        </div>
+        <h3 class="form-subsection-title">{{ t('date') }} &amp; {{ t('time') }}</h3>
+        <div class="form-grid form-grid-3">
+          <label class="field">
+            <span>{{ t('date') }}</span>
+            <input type="date" name="court_date" value="{{ values.court_date }}" required data-court-date class="{% if errors.court_date %}invalid{% endif %}">
+            <small
+              class="field-help"
+              data-court-weekday
+              data-weekday-sunday="{{ t('weekday_sunday') }}"
+              data-weekday-monday="{{ t('weekday_monday') }}"
+              data-weekday-tuesday="{{ t('weekday_tuesday') }}"
+              data-weekday-wednesday="{{ t('weekday_wednesday') }}"
+              data-weekday-thursday="{{ t('weekday_thursday') }}"
+              data-weekday-friday="{{ t('weekday_friday') }}"
+              data-weekday-saturday="{{ t('weekday_saturday') }}"
+            >{{ values.court_date|court_weekday }}</small>
+            {% if errors.court_date %}<small class="field-error">{{ errors.court_date }}</small>{% endif %}
+          </label>
+          <label class="field">
+            <span>{{ t('start_time') }} <small class="field-hint-inline">{{ t('time_hint') }}</small></span>
+            <input type="text" name="start_time" value="{{ values.start_time }}" inputmode="numeric" pattern="(?:[01]\d|2[0-3]):[0-5]\d" minlength="5" maxlength="5" placeholder="19:00" required data-time24 class="{% if errors.start_time %}invalid{% endif %}">
+            {% if errors.start_time %}<small class="field-error">{{ errors.start_time }}</small>{% endif %}
+          </label>
+          <label class="field">
+            <span>{{ t('end_time') }} <small class="field-hint-inline">{{ t('time_hint') }}</small></span>
+            <input type="text" name="end_time" value="{{ values.end_time }}" inputmode="numeric" pattern="(?:[01]\d|2[0-3]):[0-5]\d" minlength="5" maxlength="5" placeholder="21:00" required data-time24 class="{% if errors.end_time %}invalid{% endif %}">
+            {% if errors.end_time %}<small class="field-error">{{ errors.end_time }}</small>{% endif %}
+          </label>
+        </div>
+      </div>
+    </article>
+
+    <article class="panel form-section">
+      <div class="form-section-number">02</div>
+      <div class="form-section-content">
+        <div class="form-section-heading">
+          <h2>{{ t('hall') }}</h2>
+        </div>
+        <div class="form-grid form-grid-2">
+          {% if allow_save_location|default(false) %}
+          <label class="field field-wide">
+            <span>{{ t('use_saved_location') }}</span>
+            <select data-saved-location-select {% if not saved_locations %}disabled{% endif %}>
+              <option value="">{{ t('choose_saved_location') if saved_locations else t('no_saved_locations') }}</option>
+              {% for saved_location in saved_locations|default([]) %}
+                <option
+                  value="{{ saved_location.id }}"
+                  data-hall-name="{{ saved_location.hall_name }}"
+                  data-location="{{ saved_location.location }}"
+                  data-google-place-id="{{ saved_location.google_place_id }}"
+                  data-latitude="{{ saved_location.latitude if saved_location.latitude is not none else '' }}"
+                  data-longitude="{{ saved_location.longitude if saved_location.longitude is not none else '' }}"
+                >{{ saved_location.hall_name }} · {{ saved_location.location }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% endif %}
+          {% if google_maps_api_key %}
+          <div class="field field-wide">
+            <span>{{ t('hall_search') }}</span>
+            <div id="hall-autocomplete-host" class="places-host" data-placeholder="{{ t('hall_placeholder') }}" data-description="{{ t('hall_search') }}" data-error="{{ t('hall_search_error') }}" data-api-error="{{ t('hall_api_error') }}"></div>
+            <small class="field-help">{{ t('hall_search_help') }}</small>
+            <small id="place-search-status" class="field-error" role="status" aria-live="polite"></small>
+          </div>
+          {% endif %}
+          <label class="field field-wide">
+            <span>{{ t('selected_hall') if google_maps_api_key else t('hall_name') }}</span>
+            <input id="hall-name" name="hall_name" value="{{ values.hall_name }}" placeholder="{{ t('hall_placeholder') }}" maxlength="160" required class="{% if errors.hall_name %}invalid{% endif %}" autocomplete="off" {% if google_maps_api_key %}readonly{% endif %}>
+            {% if errors.hall_name %}<small class="field-error">{{ errors.hall_name }}</small>{% endif %}
+            {% if not google_maps_api_key %}<small class="field-help">{{ t('hall_search_setup') }}</small>{% endif %}
+          </label>
+          <label class="field field-wide">
+            <span>{{ t('location') }}</span>
+            <input id="hall-location" name="location" value="{{ values.location }}" placeholder="{{ t('location_placeholder') }}" maxlength="160" required class="{% if errors.location %}invalid{% endif %}" {% if google_maps_api_key %}readonly{% endif %}>
+            {% if errors.location %}<small class="field-error">{{ errors.location }}</small>{% endif %}
+            <a id="maps-search-link" class="field-link" href="https://www.google.com/maps/search/" target="_blank" rel="noopener">{{ t('search_maps') }} ↗</a>
+          </label>
+          <input id="google-place-id" type="hidden" name="google_place_id" value="{{ values.google_place_id }}">
+          <input id="hall-latitude" type="hidden" name="latitude" value="{{ values.latitude }}">
+          <input id="hall-longitude" type="hidden" name="longitude" value="{{ values.longitude }}">
+          {% if allow_save_location|default(false) %}
+          <label class="checkbox-field field-wide saved-location-checkbox">
+            <input type="checkbox" name="save_location" value="1" {% if save_location|default(false) %}checked{% endif %}>
+            <span>
+              <strong>{{ t('save_this_location') }}</strong>
+              <small>{{ t('save_location_help') }}</small>
+            </span>
+          </label>
+          {% endif %}
+          <label class="field">
+            <span>{{ t('court_id') }}</span>
+            <input name="court_id" value="{{ values.court_id }}" maxlength="160" required class="{% if errors.court_id %}invalid{% endif %}" placeholder="A1">
+            {% if errors.court_id %}<small class="field-error">{{ errors.court_id }}</small>{% endif %}
+          </label>
+        </div>
+      </div>
+    </article>
+
+    <article class="panel form-section">
+      <div class="form-section-number">03</div>
+      <div class="form-section-content">
+        <div class="form-section-heading">
+          <h2>{{ t('members') }}</h2>
+          <p>{{ t('ordered_help') }}</p>
+        </div>
+        <div class="form-grid form-grid-3">
+          <label class="field">
+            <span>{{ t('member_min') }}</span>
+            <input type="number" name="member_min" value="{{ values.member_min }}" min="1" max="99" required class="{% if errors.member_min %}invalid{% endif %}">
+            {% if errors.member_min %}<small class="field-error">{{ errors.member_min }}</small>{% endif %}
+          </label>
+          <label class="field">
+            <span>{{ t('member_max') }}</span>
+            <input type="number" name="member_max" value="{{ values.member_max }}" min="1" max="99" required class="{% if errors.member_max %}invalid{% endif %}">
+            {% if errors.member_max %}<small class="field-error">{{ errors.member_max }}</small>{% endif %}
+          </label>
+          <label class="field">
+            <span>{{ t('ordered_count') }}</span>
+            <input id="ordered-count" type="number" name="ordered_count" value="{{ values.ordered_count }}" min="0" max="99" required class="{% if errors.ordered_count %}invalid{% endif %}">
+            {% if errors.ordered_count %}<small class="field-error">{{ errors.ordered_count }}</small>{% endif %}
+          </label>
+        </div>
+        <div class="reserved-members-editor">
+          <div class="reserved-members-heading">
+            <strong>{{ t('reserved_nicknames') }}</strong>
+            <small>{{ t('reserved_nicknames_help') }}</small>
+          </div>
+          <label class="field reserved-visibility-field">
+            <span>{{ t('reserved_name_visibility') }}</span>
+            <select name="reserved_names_visible" class="{% if errors.reserved_names_visible %}invalid{% endif %}">
+              <option value="1" {% if values.reserved_names_visible|string == '1' %}selected{% endif %}>{{ t('show_reserved_names') }}</option>
+              <option value="0" {% if values.reserved_names_visible|string == '0' %}selected{% endif %}>{{ t('hide_reserved_names') }}</option>
+            </select>
+            {% if errors.reserved_names_visible %}<small class="field-error">{{ errors.reserved_names_visible }}</small>{% endif %}
+          </label>
+          <div
+            id="reserved-nickname-list"
+            class="reserved-nickname-list"
+            data-label="{{ t('reserved_nickname') }}"
+            data-placeholder="{{ t('reserved_nickname_placeholder') }}"
+          >
+            {% for nickname in reserved_nicknames %}
+              <label class="field reserved-nickname-field">
+                <span>{{ t('reserved_nickname') }} {{ loop.index }}</span>
+                <input name="reserved_nickname" value="{{ nickname }}" maxlength="40" placeholder="{{ t('reserved_nickname_placeholder') }}">
+              </label>
+            {% endfor %}
+          </div>
+          {% if errors.reserved_nicknames %}<small class="field-error">{{ t(errors.reserved_nicknames) }}</small>{% endif %}
+        </div>
+      </div>
+    </article>
+
+    <article class="panel form-section">
+      <div class="form-section-number">04</div>
+      <div class="form-section-content">
+        <div class="form-section-heading">
+          <h2>{{ t('price_and_shuttlecock') }}</h2>
+        </div>
+        <div class="form-grid form-grid-2">
+          <label class="field">
+            <span>{{ t('male_price') }} <small class="field-hint-inline">{{ t('price_hint') }}</small></span>
+            <input type="number" name="male_price" value="{{ values.male_price }}" min="0" step="1" required class="{% if errors.male_price %}invalid{% endif %}">
+            {% if errors.male_price %}<small class="field-error">{{ errors.male_price }}</small>{% endif %}
+          </label>
+          <label class="field">
+            <span>{{ t('female_price') }} <small class="field-hint-inline">{{ t('price_hint') }}</small></span>
+            <input type="number" name="female_price" value="{{ values.female_price }}" min="0" step="1" required class="{% if errors.female_price %}invalid{% endif %}">
+            {% if errors.female_price %}<small class="field-error">{{ errors.female_price }}</small>{% endif %}
+          </label>
+          <label class="field field-wide">
+            <span>{{ t('shuttlecock') }}</span>
+            <textarea name="shuttlecock_info" maxlength="500" rows="3" placeholder="{{ t('shuttlecock_placeholder') }}" class="{% if errors.shuttlecock_info %}invalid{% endif %}">{{ values.shuttlecock_info }}</textarea>
+            {% if errors.shuttlecock_info %}<small class="field-error">{{ errors.shuttlecock_info }}</small>{% endif %}
+          </label>
+        </div>
+      </div>
+    </article>
+
+    <article class="panel form-section">
+      <div class="form-section-number">05</div>
+      <div class="form-section-content">
+        <div class="form-section-heading">
+          <h2>{{ t('level') }}</h2>
+          <p>{{ t('level_guide_text') }}</p>
+        </div>
+        <div class="level-form-group">
+          <div class="level-form-label"><span class="gender-symbol male-symbol">♂</span><strong>{{ t('male') }}</strong></div>
+          <div class="form-grid form-grid-2">
+            <label class="field">
+              <span>{{ t('male_min') }}</span>
+              <select name="male_level_min" class="{% if errors.male_level_min %}invalid{% endif %}">
+                {% for n in range(1, 19) %}<option value="{{ n }}" {% if values.male_level_min|string == n|string %}selected{% endif %}>{{ n }} · {{ level_label(n) }}</option>{% endfor %}
+              </select>
+              {% if errors.male_level_min %}<small class="field-error">{{ errors.male_level_min }}</small>{% endif %}
+            </label>
+            <label class="field">
+              <span>{{ t('male_max') }}</span>
+              <select name="male_level_max" class="{% if errors.male_level_max %}invalid{% endif %}">
+                {% for n in range(1, 19) %}<option value="{{ n }}" {% if values.male_level_max|string == n|string %}selected{% endif %}>{{ n }} · {{ level_label(n) }}</option>{% endfor %}
+              </select>
+              {% if errors.male_level_max %}<small class="field-error">{{ errors.male_level_max }}</small>{% endif %}
+            </label>
+          </div>
+        </div>
+        <div class="level-form-group">
+          <div class="level-form-label"><span class="gender-symbol female-symbol">♀</span><strong>{{ t('female') }}</strong></div>
+          <div class="form-grid form-grid-2">
+            <label class="field">
+              <span>{{ t('female_min') }}</span>
+              <select name="female_level_min" class="{% if errors.female_level_min %}invalid{% endif %}">
+                {% for n in range(1, 19) %}<option value="{{ n }}" {% if values.female_level_min|string == n|string %}selected{% endif %}>{{ n }} · {{ level_label(n) }}</option>{% endfor %}
+              </select>
+              {% if errors.female_level_min %}<small class="field-error">{{ errors.female_level_min }}</small>{% endif %}
+            </label>
+            <label class="field">
+              <span>{{ t('female_max') }}</span>
+              <select name="female_level_max" class="{% if errors.female_level_max %}invalid{% endif %}">
+                {% for n in range(1, 19) %}<option value="{{ n }}" {% if values.female_level_max|string == n|string %}selected{% endif %}>{{ n }} · {{ level_label(n) }}</option>{% endfor %}
+              </select>
+              {% if errors.female_level_max %}<small class="field-error">{{ errors.female_level_max }}</small>{% endif %}
+            </label>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="panel form-section">
+      <div class="form-section-number">06</div>
+      <div class="form-section-content">
+        <div class="form-section-heading">
+          <h2>{{ t('remark') }}</h2>
+        </div>
+        <label class="field">
+          <span>{{ t('remark') }}</span>
+          <textarea name="remark" maxlength="2000" rows="5" placeholder="{{ t('remark_placeholder') }}" class="{% if errors.remark %}invalid{% endif %}">{{ values.remark }}</textarea>
+          {% if errors.remark %}<small class="field-error">{{ errors.remark }}</small>{% endif %}
+        </label>
+      </div>
+    </article>
+
+    <article class="panel form-section">
+      <div class="form-section-number">07</div>
+      <div class="form-section-content">
+        <div class="form-section-heading">
+          <h2>{{ t('event_media') }}</h2>
+          <p>{{ t('event_media_body') }}</p>
+        </div>
+        {% if court_media %}
+          <p class="media-section-label">{{ t('current_media') }}</p>
+          <div class="media-editor-grid">
+            {% for media in court_media %}
+              <label class="media-editor-item">
+                {% if media.media_type == 'image' %}
+                  <img src="{{ url_for('court_media_file', filename=media.filename) }}" alt="{{ media.original_name }}" loading="lazy">
+                {% else %}
+                  <video src="{{ url_for('court_media_file', filename=media.filename) }}" preload="metadata" muted></video>
+                {% endif %}
+                <span class="media-editor-name">{{ media.original_name }}</span>
+                <span class="media-remove-control">
+                  <input type="checkbox" name="remove_media" value="{{ media.id }}" {% if media.id in selected_remove_media %}checked{% endif %}>
+                  {{ t('remove_media') }}
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <label class="field media-upload-field">
+          <span>{{ t('media_upload') }}</span>
+          <input
+            type="file"
+            name="media"
+            multiple
+            accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+            class="{% if errors.media %}invalid{% endif %}"
+            data-court-media-input
+          >
+          <small class="field-help">{{ t('media_upload_help') }}</small>
+          {% if errors.media %}<small class="field-error">{{ t(errors.media) }}</small>{% endif %}
+        </label>
+        <div class="media-upload-preview" data-court-media-preview aria-live="polite"></div>
+      </div>
+    </article>
+
+    <div class="form-actions">
+      <a class="button button-ghost" href="{{ url_for(back_route) }}">{{ t('cancel') }}</a>
+      <button class="button button-primary" type="submit">{{ t('save_changes') if editing else t('create_court') }}</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}
+  {% if google_maps_api_key %}
+    <script async src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key|urlencode }}&loading=async&libraries=places&v=weekly&language={{ 'zh-TW' if lang == 'zh-tw' else 'en-US' }}&region=TW&callback=initPlacesAutocomplete"></script>
+  {% endif %}
+{% endblock %}

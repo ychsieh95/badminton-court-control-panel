@@ -1,0 +1,17 @@
+# Environment and secrets
+.env
+.venv/
+
+# Python
+*.py[cod]
+__pycache__/
+
+# Tests and coverage
+.coverage
+.pytest_cache/
+
+# Runtime data
+instance/
+
+# Private project files
+private/

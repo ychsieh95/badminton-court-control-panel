@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% set title_key = dashboard_title_key|default('dashboard_title') %}
+{% set body_key = dashboard_body_key|default('dashboard_body') %}
+{% set label_key = dashboard_label_key|default('admin_console') %}
+{% set logout_route = logout_endpoint|default('admin_logout') %}
+{% set new_route = new_endpoint|default('court_new') %}
+{% set edit_route = edit_endpoint|default('admin_edit_court') %}
+{% set duplicate_route = duplicate_endpoint|default('admin_duplicate_court') %}
+{% set archive_route = archive_endpoint|default('admin_archive_court') %}
+{% set restore_route = restore_endpoint|default('admin_restore_court') %}
+{% set delete_route = delete_endpoint|default('admin_delete_court') %}
+{% set mode = dashboard_mode|default('admin') %}
+{% block title %}{{ t(title_key) }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div class="shell page-header-inner">
+    <div>
+      <p class="eyebrow">{{ t(label_key) }}</p>
+      <h1>{{ t(title_key) }}</h1>
+      <p>{{ t(body_key) }}</p>
+    </div>
+    <div class="page-actions">
+      {% if mode == 'member' %}
+        <a class="button button-secondary" href="{{ url_for('account_change_password') }}">{{ t('change_password') }}</a>
+      {% elif current_user.role in ('admin', 'super_admin') %}
+        <a class="button button-secondary" href="{{ url_for('admin_users') }}">{{ t('users') }}</a>
+      {% endif %}
+      {% if mode == 'member' %}
+        <form method="post" action="{{ url_for(logout_route) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="button button-ghost" type="submit">{{ t('sign_out') }}</button>
+        </form>
+      {% endif %}
+      <a class="button button-primary" href="{{ url_for(new_route) }}">+ {{ t('new_court') }}</a>
+    </div>
+  </div>
+</section>
+
+<section class="section shell section-tight">
+  {% if mode == 'admin' %}
+    {% if current_user.role in ('admin', 'super_admin') %}
+    <div class="panel dashboard-settings">
+      <div>
+        <p class="eyebrow">{{ t('homepage_settings') }}</p>
+        <h2>{{ t('homepage_settings') }}</h2>
+        <p>{{ t('homepage_settings_body') }}</p>
+      </div>
+      <form method="post" action="{{ url_for('admin_update_homepage_settings') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field">
+          <span>{{ t('homepage_court_limit') }}</span>
+          <input name="homepage_court_limit" type="number" min="1" max="100" value="{{ home_court_limit }}" required>
+          <small class="field-help">{{ t('homepage_court_limit_help') }}</small>
+        </label>
+        <button class="button button-secondary" type="submit">{{ t('save_settings') }}</button>
+      </form>
+    </div>
+    {% endif %}
+    <details class="panel court-filter-panel admin-court-filter-panel">
+      <summary class="filter-summary">
+        <div class="filter-heading">
+          <div>
+            <p class="eyebrow">{{ t('all_courts') }}</p>
+            <h2>{{ t('filter_courts') }}</h2>
+          </div>
+          <div class="filter-heading-meta">
+            <span class="count-badge">{{ courts|length }} {{ t('filter_results') }}</span>
+            <svg class="filter-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+          </div>
+        </div>
+      </summary>
+      <div class="filter-panel-body">
+        <form class="court-filter-form" method="get" action="{{ url_for('admin_dashboard') }}">
+          <label class="filter-field filter-search">
+            <span>{{ t('filter_search') }}</span>
+            <input name="q" type="search" value="{{ admin_filters.q }}" maxlength="100" placeholder="{{ t('filter_search') }}">
+          </label>
+          <label class="filter-field">
+            <span>{{ t('date_from') }}</span>
+            <input name="date_from" type="text" value="{{ admin_filters.date_from }}" inputmode="numeric" maxlength="10" pattern="\d{4}/\d{2}/\d{2}" placeholder="yyyy/mm/dd" autocomplete="off" data-filter-date data-date-from>
+          </label>
+          <label class="filter-field">
+            <span>{{ t('date_to') }}</span>
+            <input name="date_to" type="text" value="{{ admin_filters.date_to }}" inputmode="numeric" maxlength="10" pattern="\d{4}/\d{2}/\d{2}" placeholder="yyyy/mm/dd" autocomplete="off" data-filter-date data-date-to>
+          </label>
+          <label class="filter-field">
+            <span>{{ t('filter_level') }}</span>
+            <select name="level">
+              <option value="">{{ t('any_level') }}</option>
+              {% for level in range(1, 19) %}
+                <option value="{{ level }}" {% if admin_filters.level == level|string %}selected{% endif %}>{{ level }} · {{ level_label(level) }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>{{ t('filter_gender') }}</span>
+            <select name="gender">
+              <option value="both" {% if admin_filters.gender == 'both' %}selected{% endif %}>{{ t('both_genders') }}</option>
+              <option value="male" {% if admin_filters.gender == 'male' %}selected{% endif %}>{{ t('male') }}</option>
+              <option value="female" {% if admin_filters.gender == 'female' %}selected{% endif %}>{{ t('female') }}</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>{{ t('filter_status') }}</span>
+            <select name="status">
+              <option value="">{{ t('any_status') }}</option>
+              <option value="open" {% if admin_filters.status == 'open' %}selected{% endif %}>{{ t('open') }}</option>
+              <option value="full" {% if admin_filters.status == 'full' %}selected{% endif %}>{{ t('full') }}</option>
+              <option value="read_only" {% if admin_filters.status == 'read_only' %}selected{% endif %}>{{ t('read_only') }}</option>
+              <option value="archived" {% if admin_filters.status == 'archived' %}selected{% endif %}>{{ t('archived') }}</option>
+            </select>
+          </label>
+          <label class="filter-checkbox">
+            <input name="show_expired" type="checkbox" value="1" {% if admin_filters.show_expired %}checked{% endif %}>
+            <span>{{ t('show_expired') }}</span>
+          </label>
+          <div class="filter-actions">
+            <button class="button button-primary" type="submit">{{ t('apply_filters') }}</button>
+            <a class="button button-ghost" href="{{ url_for('admin_dashboard') }}">{{ t('clear_filters') }}</a>
+          </div>
+        </form>
+      </div>
+    </details>
+  {% endif %}
+  <div class="panel table-panel">
+    <div class="panel-heading table-heading">
+      <h2>{{ t('all_courts') }}</h2>
+      <span class="count-badge">{{ courts|length }}</span>
+    </div>
+    {% if courts %}
+      <div class="responsive-table">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('date') }}</th>
+              <th>{{ t('hall') }}</th>
+              <th>{{ t('court_id') }}</th>
+              <th>{{ t('members') }}</th>
+              {% if mode == 'admin' %}<th>{{ t('created') }}</th>{% endif %}
+              <th>{{ t('status') }}</th>
+              <th class="align-right">{{ t('actions') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for court in courts %}
+              <tr>
+                <td data-label="{{ t('date') }}">
+                  <strong>{{ court.court_date|court_date }}</strong>
+                  <small>{{ court.court_date|court_weekday }} · {{ court.start_time }}–{{ court.end_time }}</small>
+                </td>
+                <td data-label="{{ t('hall') }}">
+                  <a class="table-link" href="{{ url_for('court_detail', guid=court.guid) }}">{{ court.event_name or court.hall_name }}</a>
+                  <small>{% if court.event_name %}{{ court.hall_name }} · {% endif %}{{ court.location }}</small>
+                  {% if court.badminton_name %}<small>{{ court.badminton_name }}</small>{% endif %}
+                </td>
+                <td data-label="{{ t('court_id') }}"><span class="court-id-chip">{{ court.court_id }}</span></td>
+                <td data-label="{{ t('members') }}">{{ court.total_count }} / {{ court.member_max }}</td>
+                {% if mode == 'admin' %}
+                  <td data-label="{{ t('created') }}">
+                    <small class="table-date">{{ court.created_at|audit_datetime }}</small>
+                  </td>
+                {% endif %}
+                <td data-label="{{ t('status') }}">
+                  {% if court.archived %}
+                    <span class="status status-archived">{{ t('archived') }}</span>
+                  {% elif court.is_expired %}
+                    <span class="status status-expired">{{ t('expired') }}</span>
+                  {% elif court.roll_clearing_locked %}
+                    <span class="status status-read-only">{{ t('read_only') }}</span>
+                  {% else %}
+                    <span class="status status-open"><i></i>{{ t('open') }}</span>
+                  {% endif %}
+                </td>
+                <td data-label="{{ t('actions') }}" class="align-right">
+                  <div class="row-actions">
+                    <a class="icon-button" href="{{ url_for('court_detail', guid=court.guid) }}" title="{{ t('public_link') }}" aria-label="{{ t('public_link') }}">
+                      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                    </a>
+                    {% if not court.roll_clearing_locked %}
+                      <a class="icon-button" href="{{ url_for(edit_route, guid=court.guid) }}" title="{{ t('edit') }}" aria-label="{{ t('edit') }}">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                      </a>
+                    {% endif %}
+                    <form method="post" action="{{ url_for(duplicate_route, guid=court.guid) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="icon-button" type="submit" title="{{ t('duplicate') }}" aria-label="{{ t('duplicate') }}">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+                      </button>
+                    </form>
+                    {% if court.archived %}
+                      <form method="post" action="{{ url_for(restore_route, guid=court.guid) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="icon-button" type="submit" title="{{ t('restore') }}" aria-label="{{ t('restore') }}">
+                          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+                        </button>
+                      </form>
+                    {% else %}
+                      <form method="post" action="{{ url_for(archive_route, guid=court.guid) }}" data-confirm="{{ t('archive_confirm') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="icon-button" type="submit" title="{{ t('archive') }}" aria-label="{{ t('archive') }}">
+                          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>
+                        </button>
+                      </form>
+                    {% endif %}
+                    <form method="post" action="{{ url_for(delete_route, guid=court.guid) }}" data-confirm="{{ t('delete_confirm') }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="icon-button danger" type="submit" title="{{ t('delete') }}" aria-label="{{ t('delete') }}">
+                        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v5M14 11v5"/></svg>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state empty-compact">
+        <h3>{{ t('no_courts') }}</h3>
+        <a class="button button-primary" href="{{ url_for(new_route) }}">{{ t('new_court') }}</a>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

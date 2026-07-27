@@ -1,0 +1,19 @@
+# Environment and local configuration
+.env
+.venv
+
+# Version control
+.git
+.gitignore
+
+# Python cache and compiled files
+.pytest_cache
+__pycache__
+*.py[cod]
+
+# Application data
+*.sqlite
+instance
+
+# Tests
+tests

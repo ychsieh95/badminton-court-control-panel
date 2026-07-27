@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ t('signup_title') if signup else t('member_login_title') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<section class="auth-section">
+  <div class="auth-decoration" aria-hidden="true"></div>
+  <div class="auth-card panel">
+    <div class="auth-mark">{% include "_brand_mark.html" %}</div>
+    <p class="eyebrow">{{ t('account') }}</p>
+    <h1>{{ t('signup_title') if signup else t('member_login_title') }}</h1>
+    <p>{{ t('signup_body') if signup else t('member_login_body') }}</p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="field">
+        <span>{{ t('username') }}</span>
+        <input name="username" minlength="3" maxlength="40" pattern="[^\s&lt;&gt;]{3,40}" autocomplete="username" required autofocus>
+        {% if signup %}<small class="field-help">{{ t('account_username_help') }}</small>{% endif %}
+      </label>
+      <label class="field">
+        <span>{{ t('password') }}</span>
+        <input name="password" type="password" minlength="{{ 8 if signup else 1 }}" maxlength="128" autocomplete="{{ 'new-password' if signup else 'current-password' }}" required>
+        {% if signup %}<small class="field-help">{{ t('password_help') }}</small>{% endif %}
+      </label>
+      {% if signup %}
+        <label class="field">
+          <span>{{ t('confirm_password') }}</span>
+          <input name="confirm_password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required>
+        </label>
+      {% endif %}
+      {% if hcaptcha_enabled %}
+        <div class="hcaptcha-wrap">
+          <div class="h-captcha" data-sitekey="{{ hcaptcha_site_key }}"></div>
+        </div>
+      {% endif %}
+      <button class="button button-primary button-block" type="submit">{{ t('create_account') if signup else t('sign_in') }}</button>
+    </form>
+    <p class="auth-switch">
+      {{ t('have_account') if signup else t('need_account') }}
+      <a href="{{ url_for('account_login') if signup else url_for('account_signup') }}">{{ t('sign_in') if signup else t('sign_up') }}</a>
+    </p>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+  {% if hcaptcha_enabled %}
+    <script src="https://js.hcaptcha.com/1/api.js?hl={{ 'zh-TW' if lang == 'zh-tw' else 'en' }}" async defer></script>
+  {% endif %}
+{% endblock %}

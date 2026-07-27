@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ t('license_title') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div class="shell page-header-inner">
+    <div>
+      <p class="eyebrow">{{ t('licenses') }}</p>
+      <h1>{{ t('license_title') }}</h1>
+      <p>{{ t('license_body') }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="section shell section-tight license-shell">
+  <div class="license-list">
+    <article class="panel license-card">
+      <div class="license-preview">
+        <img src="{{ url_for('static', filename='shuttlecock.png') }}" width="512" height="512" alt="">
+      </div>
+      <div class="license-copy">
+        <p class="eyebrow">Flaticon</p>
+        <h2>{{ t('shuttlecock_icon') }}</h2>
+        <p>{{ t('icon_attribution') }}</p>
+        <p>{{ t('icon_usage') }}</p>
+        <div class="license-links">
+          <a href="https://www.flaticon.com/free-icon/shuttlecock_9719863?term=badminton&amp;page=1&amp;position=51&amp;origin=search&amp;related_id=9719863" target="_blank" rel="noopener">{{ t('source_page') }}</a>
+          <a href="https://media.flaticon.com/license/license.pdf" target="_blank" rel="noopener">{{ t('flaticon_license') }}</a>
+          <a href="https://www.flaticon.com/terms-of-use" target="_blank" rel="noopener">{{ t('flaticon_terms') }}</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="panel license-card codex-credit-card">
+      <div class="license-preview license-preview-codex" aria-hidden="true">
+        <svg class="codex-credit-mark" viewBox="0 0 96 96">
+          <rect x="12" y="12" width="72" height="72" rx="20"/>
+          <path d="m40 34-14 14 14 14M56 34l14 14-14 14M52 27 44 69"/>
+        </svg>
+      </div>
+      <div class="license-copy">
+        <p class="eyebrow">{{ t('development_acknowledgment') }}</p>
+        <h2>{{ t('codex_support_title') }}</h2>
+        <p>{{ t('codex_support_body') }}</p>
+        <p>{{ t('codex_responsibility') }}</p>
+        <div class="license-links">
+          <a href="https://openai.com/codex/" target="_blank" rel="noopener">{{ t('codex_official_page') }}</a>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,652 @@
+{% extends "base.html" %}
+{% block title %}{{ court.event_name or court.hall_name }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+{% set owns_court = current_user and court.owner_id == current_user.id %}
+{% set can_manage_court = is_admin or owns_court %}
+<section class="detail-hero">
+  <div class="shell">
+    <a class="back-link" href="{{ url_for('index') }}">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+      {{ t('back_home') }}
+    </a>
+    <div class="detail-title-row">
+      <div>
+        <div class="title-status">
+          {% if court.archived %}
+            <span class="status status-archived">{{ t('archived') }}</span>
+          {% elif court.is_expired %}
+            <span class="status status-expired">{{ t('expired') }}</span>
+          {% elif court.roll_clearing_locked %}
+            <span class="status status-read-only">{{ t('read_only') }}</span>
+          {% elif court.total_count >= court.member_max %}
+            <span class="status status-full">{{ t('full') }}</span>
+          {% else %}
+            <span class="status status-open"><i></i>{{ t('open') }}</span>
+          {% endif %}
+        </div>
+        <h1>{{ court.event_name or court.hall_name }}</h1>
+        {% if court.event_name %}
+          <p class="detail-hall">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V7l8-4 8 4v13M8 20v-5h8v5M8 9h.01M12 9h.01M16 9h.01"/></svg>
+            {{ court.hall_name }}
+          </p>
+        {% endif %}
+        {% if court.badminton_name %}
+          <p class="detail-badminton-name">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            {{ court.badminton_name }}
+          </p>
+        {% endif %}
+        <p class="detail-location">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          {{ court.location }}
+        </p>
+        <p class="detail-creator">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          {{ t('creator') }} · <strong>{{ court.creator_username or t('admin_account') }}</strong>
+        </p>
+      </div>
+      <div class="detail-actions">
+        {% set edit_route = 'admin_edit_court' if is_admin else 'account_edit_court' %}
+        {% set duplicate_route = 'admin_duplicate_court' if is_admin else 'account_duplicate_court' %}
+        {% set archive_route = 'admin_archive_court' if is_admin else 'account_archive_court' %}
+        {% set restore_route = 'admin_restore_court' if is_admin else 'account_restore_court' %}
+        {% set delete_route = 'admin_delete_court' if is_admin else 'account_delete_court' %}
+        <button class="button button-secondary copy-button" type="button" data-copy="{{ request.url }}">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+          <span data-copy-label="{{ t('copy_link') }}" data-copied-label="{{ t('copied') }}">{{ t('copy_link') }}</span>
+        </button>
+        {% if is_admin or owns_court %}
+          <details class="court-action-menu">
+            <summary class="button button-secondary court-action-trigger">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+              {{ t('actions') }}
+              <svg class="menu-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+            </summary>
+            <div class="account-menu-list court-action-list">
+              {% if court.roll_clearing_locked %}
+                <form method="post" action="{{ url_for('restore_court_editing', guid=court.guid) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                    {{ t('edit') }}
+                  </button>
+                </form>
+              {% else %}
+                <a href="{{ url_for(edit_route, guid=court.guid) }}">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                  {{ t('edit') }}
+                </a>
+              {% endif %}
+              <form method="post" action="{{ url_for(duplicate_route, guid=court.guid) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+                  {{ t('duplicate') }}
+                </button>
+              </form>
+              {% if not court.roll_clearing_locked %}
+                <form method="post" action="{{ url_for('start_roll_clearing', guid=court.guid) }}" data-confirm="{{ t('roll_and_clearing_confirm') }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    {{ t('start_roll_and_clearing') }}
+                  </button>
+                </form>
+              {% endif %}
+              {% if court.archived %}
+                <form method="post" action="{{ url_for(restore_route, guid=court.guid) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+                    {{ t('restore') }}
+                  </button>
+                </form>
+              {% else %}
+                <form method="post" action="{{ url_for(archive_route, guid=court.guid) }}" data-confirm="{{ t('archive_confirm') }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>
+                    {{ t('archive') }}
+                  </button>
+                </form>
+              {% endif %}
+              <form method="post" action="{{ url_for(delete_route, guid=court.guid) }}" data-confirm="{{ t('delete_confirm') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="menu-danger" type="submit">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v5M14 11v5"/></svg>
+                  {{ t('delete') }}
+                </button>
+              </form>
+            </div>
+          </details>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section shell detail-layout">
+  <div class="detail-main">
+    <div class="info-grid">
+      <article class="info-card">
+        <div class="info-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></div>
+        <span>{{ t('date') }}</span>
+        <strong>{{ court.court_date|court_date }}</strong>
+        <small class="info-weekday">{{ court.court_date|court_weekday }}</small>
+      </article>
+      <article class="info-card">
+        <div class="info-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <span>{{ t('time') }}</span>
+        <strong>{{ court.start_time }}–{{ court.end_time }}</strong>
+      </article>
+      <article class="info-card">
+        <div class="info-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V7l8-4 8 4v13M8 20v-5h8v5M8 9h.01M12 9h.01M16 9h.01"/></svg></div>
+        <span>{{ t('court_id') }}</span>
+        <strong>{{ court.court_id }}</strong>
+      </article>
+      <article class="info-card">
+        <div class="info-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <span>{{ t('member_range') }}</span>
+        <strong>{{ court.member_min }}–{{ court.member_max }}</strong>
+      </article>
+    </div>
+
+    <article
+      class="panel push-notification-panel"
+      data-push-notification-panel
+      data-push-enabled="{{ 'true' if web_push_enabled else 'false' }}"
+      data-push-public-key="{{ web_push_public_key }}"
+      data-push-subscribe-url="{{ url_for('subscribe_to_court_push', guid=court.guid) }}"
+      data-push-status-url="{{ url_for('court_push_subscription_status', guid=court.guid) }}"
+      data-push-csrf-token="{{ csrf_token() }}"
+      data-status-checking="{{ t('push_notifications_checking') }}"
+      data-status-enabled="{{ t('push_notifications_enabled') }}"
+      data-status-disabled="{{ t('push_notifications_disabled') }}"
+      data-status-enabling="{{ t('push_notifications_enabling') }}"
+      data-status-disabling="{{ t('push_notifications_disabling') }}"
+      data-status-denied="{{ t('push_notifications_denied') }}"
+      data-status-unsupported="{{ t('push_notifications_unsupported') }}"
+      data-status-unavailable="{{ t('push_notifications_unavailable') }}"
+      data-status-error="{{ t('push_notifications_error') }}"
+    >
+      <div class="push-notification-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
+          <path d="M10 21h4"/>
+        </svg>
+      </div>
+      <div class="push-notification-content">
+        <h2>{{ t('push_notifications') }}</h2>
+        <p>{{ t('push_notifications_body') }}</p>
+        <label class="push-notification-toggle">
+          <input
+            type="checkbox"
+            role="switch"
+            data-push-notification-toggle
+            aria-describedby="push-notification-status"
+            disabled
+          >
+          <span class="push-toggle-track" aria-hidden="true"><i></i></span>
+          <strong>{{ t('push_notifications_toggle') }}</strong>
+        </label>
+        <p
+          class="push-notification-status"
+          id="push-notification-status"
+          data-push-notification-status
+          role="status"
+          aria-live="polite"
+        >
+          {{ t('push_notifications_checking') if web_push_enabled else t('push_notifications_unavailable') }}
+        </p>
+      </div>
+    </article>
+
+    {% if court_media %}
+      <details class="panel event-gallery-panel">
+        <summary class="event-gallery-summary">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">{{ t('event_media') }}</p>
+              <h2>{{ t('event_gallery') }}</h2>
+            </div>
+            <svg class="event-gallery-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+          </div>
+        </summary>
+        <div class="event-gallery-panel-body">
+          <div class="event-gallery" data-event-gallery>
+            <div class="event-gallery-stage">
+              {% for media in court_media %}
+                <figure
+                  class="event-gallery-slide{% if loop.first %} is-active{% endif %}"
+                  data-gallery-slide="{{ loop.index0 }}"
+                  {% if not loop.first %}hidden{% endif %}
+                >
+                  {% if media.media_type == 'image' %}
+                    <a href="{{ url_for('court_media_file', filename=media.filename) }}" target="_blank" rel="noopener">
+                      <img src="{{ url_for('court_media_file', filename=media.filename) }}" alt="{{ t('court_media_alt')|replace('{hall}', court.hall_name) }}" {% if not loop.first %}loading="lazy"{% endif %}>
+                    </a>
+                  {% else %}
+                    <video controls preload="metadata">
+                      <source src="{{ url_for('court_media_file', filename=media.filename) }}" type="{{ media.mime_type }}">
+                    </video>
+                  {% endif %}
+                  {% if media.original_name %}<figcaption>{{ media.original_name }}</figcaption>{% endif %}
+                </figure>
+              {% endfor %}
+            </div>
+            {% if court_media|length > 1 %}
+              <div class="event-gallery-thumbnails" aria-label="{{ t('event_gallery') }}">
+                {% for media in court_media %}
+                  <button
+                    class="event-gallery-thumbnail{% if loop.first %} is-active{% endif %}"
+                    type="button"
+                    data-gallery-thumbnail="{{ loop.index0 }}"
+                    aria-label="{{ media.original_name or (t('event_gallery') ~ ' ' ~ loop.index) }}"
+                    aria-pressed="{{ 'true' if loop.first else 'false' }}"
+                  >
+                    {% if media.media_type == 'image' %}
+                      <img src="{{ url_for('court_media_file', filename=media.filename) }}" alt="" loading="lazy">
+                    {% else %}
+                      <video src="{{ url_for('court_media_file', filename=media.filename) }}" preload="metadata" muted playsinline></video>
+                      <span class="event-gallery-play" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5Z"/></svg>
+                      </span>
+                    {% endif %}
+                  </button>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </details>
+    {% endif %}
+
+    <article class="panel capacity-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">{{ t('members') }}</p>
+          <h2>{{ court.total_count }} / {{ court.member_max }}</h2>
+        </div>
+        {% if court.total_count < court.member_max %}
+          <span class="spots-number">{{ court.member_max - court.total_count }} {{ t('spots_left') }}</span>
+        {% else %}
+          <span class="status status-full">{{ t('full') }}</span>
+        {% endif %}
+      </div>
+      <div class="capacity-track">
+        <span style="width: {{ [100, (court.total_count / court.member_max * 100)]|min }}%"></span>
+      </div>
+      <div class="capacity-legend">
+        <span><i class="dot dot-reserved"></i>{{ court.ordered_count }} {{ t('reserved') }}</span>
+        <span><i class="dot dot-online"></i>{{ court.online_count }} {{ t('joined_on_site') }}</span>
+        {% if court.waiting_count %}
+          <span><i class="dot dot-waiting"></i>{{ court.waiting_count }} {{ t('waiting') }}</span>
+        {% endif %}
+      </div>
+    </article>
+
+    {% if court.roll_clearing_locked and can_manage_court %}
+      <article class="panel roll-clearing-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">{{ t('read_only') }}</p>
+            <h2>{{ t('roll_and_clearing') }}</h2>
+          </div>
+          <span class="status status-read-only">{{ t('read_only') }}</span>
+        </div>
+        <p class="roll-clearing-copy">{{ t('roll_and_clearing_body') }}</p>
+        <form method="post" action="{{ url_for('update_roll_clearing_status', guid=court.guid) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="member-status-list">
+            <div class="member-status-row member-status-header" aria-hidden="true">
+              <span>{{ t('members') }}</span>
+              <span>{{ t('member_source') }}</span>
+              <span>{{ t('roll_call') }}</span>
+              <span>{{ t('cleared') }}</span>
+            </div>
+            {% for member in all_reserved_members %}
+              <div class="member-status-row">
+                <strong>{{ member.nickname or (t('unnamed_reserved_member') ~ ' ' ~ (member.position + 1)) }}</strong>
+                <span class="member-source">{{ t('reserved') }}</span>
+                <label class="status-check">
+                  <span class="sr-only">{{ t('roll_call') }} · {{ member.nickname or (t('unnamed_reserved_member') ~ ' ' ~ (member.position + 1)) }}</span>
+                  <input type="checkbox" name="reserved_roll" value="{{ member.id }}" {% if member.roll_called %}checked{% endif %}>
+                </label>
+                <label class="status-check">
+                  <span class="sr-only">{{ t('cleared') }} · {{ member.nickname or (t('unnamed_reserved_member') ~ ' ' ~ (member.position + 1)) }}</span>
+                  <input type="checkbox" name="reserved_cleared" value="{{ member.id }}" {% if member.cleared %}checked{% endif %}>
+                </label>
+              </div>
+            {% endfor %}
+            {% for member in participants %}
+              <div class="member-status-row">
+                <strong>{{ member.username }}</strong>
+                <span class="member-source">{{ t('joined_on_site') }}</span>
+                <label class="status-check">
+                  <span class="sr-only">{{ t('roll_call') }} · {{ member.username }}</span>
+                  <input type="checkbox" name="participant_roll" value="{{ member.id }}" {% if member.roll_called %}checked{% endif %}>
+                </label>
+                <label class="status-check">
+                  <span class="sr-only">{{ t('cleared') }} · {{ member.username }}</span>
+                  <input type="checkbox" name="participant_cleared" value="{{ member.id }}" {% if member.cleared %}checked{% endif %}>
+                </label>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="roll-clearing-actions">
+            <button class="button button-primary" type="submit">{{ t('save_member_statuses') }}</button>
+          </div>
+        </form>
+      </article>
+    {% endif %}
+
+    <article class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">{{ t('price_and_shuttlecock') }}</p>
+          <h2>{{ t('price_and_shuttlecock') }}</h2>
+        </div>
+      </div>
+      <div class="event-details-grid">
+        <div class="event-detail">
+          <span class="gender-symbol male-symbol">♂</span>
+          <div>
+            <span>{{ t('male_price') }}</span>
+            <strong>{% if court.male_price %}NT$ {{ court.male_price }}{% else %}{{ t('free') }}{% endif %}</strong>
+          </div>
+        </div>
+        <div class="event-detail">
+          <span class="gender-symbol female-symbol">♀</span>
+          <div>
+            <span>{{ t('female_price') }}</span>
+            <strong>{% if court.female_price %}NT$ {{ court.female_price }}{% else %}{{ t('free') }}{% endif %}</strong>
+          </div>
+        </div>
+        <div class="event-detail event-detail-wide">
+          <div class="event-detail-icon">
+            <svg class="shuttle-icon" viewBox="0 0 120 162" aria-hidden="true">
+              <path class="shuttle-skirt" d="M12 13Q60-2 108 13L77 105Q60 114 43 105Z"/>
+              <g class="shuttle-ribs">
+                <path d="M14 13 44 103M36 7l16 99M60 4v104M84 7l-16 99M106 13l-30 90"/>
+                <path d="M25 48q35 13 70 0M34 78q26 13 52 0"/>
+              </g>
+              <path class="shuttle-band" d="M41 103q19 7 38 0l-2 14q-17 6-34 0Z"/>
+              <path class="shuttle-cork" d="M44 116q16 5 32 0l-3 27q-3 12-13 15-10-3-13-15Z"/>
+            </svg>
+          </div>
+          <div>
+            <span>{{ t('shuttlecock') }}</span>
+            <strong>{{ court.shuttlecock_info or '—' }}</strong>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">{{ t('level') }}</p>
+          <h2>{{ t('level_guide') }}</h2>
+        </div>
+      </div>
+      <div class="gender-levels">
+        <div class="gender-level">
+          <span class="gender-symbol male-symbol">♂</span>
+          <div>
+            <span>{{ t('male') }}</span>
+            <strong>{{ court.male_level_min }}–{{ court.male_level_max }}</strong>
+            <small>{{ level_label(court.male_level_min) }} – {{ level_label(court.male_level_max) }}</small>
+          </div>
+        </div>
+        <div class="gender-level">
+          <span class="gender-symbol female-symbol">♀</span>
+          <div>
+            <span>{{ t('female') }}</span>
+            <strong>{{ court.female_level_min }}–{{ court.female_level_max }}</strong>
+            <small>{{ level_label(court.female_level_min) }} – {{ level_label(court.female_level_max) }}</small>
+          </div>
+        </div>
+      </div>
+      <p class="level-guide-copy">{{ t('level_guide_text') }}</p>
+      <details class="grading-chart">
+        <summary>
+          <span>
+            <strong>{{ t('show_grading_chart') }}</strong>
+            <small>{{ t('grading_chart_caption') }}</small>
+          </span>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+        </summary>
+        <div class="grading-chart-body">
+          <a href="{{ url_for('static', filename='grading.webp') }}" target="_blank" rel="noopener" aria-label="{{ t('view_full_chart') }}">
+            <img src="{{ url_for('static', filename='grading.webp') }}" width="1434" height="2048" loading="lazy" alt="{{ t('grading_chart_alt') }}">
+          </a>
+          <a class="grading-full-link" href="{{ url_for('static', filename='grading.webp') }}" target="_blank" rel="noopener">{{ t('view_full_chart') }}</a>
+        </div>
+      </details>
+    </article>
+
+    {% if court.remark %}
+      <article class="panel remark-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">{{ t('remark') }}</p>
+            <h2>{{ t('remark') }}</h2>
+          </div>
+        </div>
+        <p class="remark-copy">{{ court.remark }}</p>
+      </article>
+    {% endif %}
+
+    {% if reserved_members and (court.reserved_names_visible or can_manage_court) %}
+      <article class="panel reserved-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">{{ t('reserved') }}</p>
+            <h2>{{ t('reserved_players') }}</h2>
+          </div>
+          <div class="panel-heading-meta">
+            {% if not court.reserved_names_visible %}
+              <span class="status status-archived">{{ t('hidden_from_viewers') }}</span>
+            {% endif %}
+            <span class="count-badge">{{ reserved_members|length }} / {{ court.ordered_count }}</span>
+          </div>
+        </div>
+        <div class="participant-list">
+          {% for member in reserved_members %}
+            <div class="participant">
+              <span class="avatar reserved-avatar">{{ member.nickname[:1]|upper }}</span>
+              <strong>{{ member.nickname }}</strong>
+              <span class="participant-status">{{ t('reserved') }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </article>
+    {% endif %}
+
+    <article class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">{{ t('joined_on_site') }}</p>
+          <h2>{{ t('participants') }}</h2>
+        </div>
+        <span class="count-badge">{{ participants|length }}</span>
+      </div>
+      {% if participants %}
+        <div class="participant-list">
+          {% for participant in participants %}
+            <div class="participant">
+              <span class="avatar">{{ participant.username[:1]|upper }}</span>
+              <strong>{{ participant.username }}</strong>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">{{ t('no_participants') }}</p>
+      {% endif %}
+    </article>
+
+    {% if waiting_participants %}
+      <article class="panel waiting-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">{{ t('waitlisted') }}</p>
+            <h2>{{ t('waiting_list') }}</h2>
+          </div>
+          <span class="count-badge">{{ waiting_participants|length }}</span>
+        </div>
+        <div class="participant-list">
+          {% for participant in waiting_participants %}
+            <div class="participant">
+              <span class="avatar waiting-avatar">{{ loop.index }}</span>
+              <strong>{{ participant.username }}</strong>
+              <span class="participant-status">{{ t('waitlisted') }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </article>
+    {% endif %}
+
+    <details class="panel participation-history-panel">
+      <summary class="participation-history-summary">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">{{ t('participation_history_eyebrow') }}</p>
+            <h2>{{ t('participation_history') }}</h2>
+          </div>
+          <div class="participation-history-summary-meta">
+            <span class="count-badge">{{ participation_history|length }}</span>
+            <svg class="details-chevron" aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </div>
+        </div>
+      </summary>
+      {% if participation_history %}
+        <div class="responsive-table participation-history-table">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ t('username') }}</th>
+                <th>{{ t('history_action') }}</th>
+                <th>{{ t('date_and_time') }}</th>
+                {% if is_admin %}
+                  <th>{{ t('ip_address') }}</th>
+                  <th>{{ t('device_information') }}</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for event in participation_history %}
+                <tr>
+                  <td data-label="{{ t('username') }}"><strong>{{ event.username }}</strong></td>
+                  <td data-label="{{ t('history_action') }}">
+                    <span class="history-action history-action-{{ event.event_type }}">
+                      {{ t('history_joined') if event.event_type == 'join' else t('history_left') }}
+                    </span>
+                  </td>
+                  <td data-label="{{ t('date_and_time') }}">
+                    <time datetime="{{ event.occurred_at }}">{{ event.occurred_at|audit_datetime }}</time>
+                  </td>
+                  {% if is_admin %}
+                    <td data-label="{{ t('ip_address') }}">
+                      {% if event.ip_address %}
+                        <code class="ip-address">{{ event.ip_address }}</code>
+                      {% else %}
+                        <span class="muted-inline">—</span>
+                      {% endif %}
+                    </td>
+                    <td class="history-device" data-label="{{ t('device_information') }}">
+                      {{ t('device_' ~ event.device_information) }}
+                    </td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="participation-history-empty muted">{{ t('no_participation_history') }}</p>
+      {% endif %}
+    </details>
+  </div>
+
+  <aside class="join-panel panel" data-join-panel>
+    {% if court.is_expired %}
+      <div class="read-only-notice">
+        <span class="status status-expired">{{ t('expired') }}</span>
+        <h2>{{ t('court_expired') }}</h2>
+        <p>{{ t('court_expired_body') }}</p>
+      </div>
+    {% elif court.roll_clearing_locked %}
+      <div class="read-only-notice">
+        <span class="status status-read-only">{{ t('read_only') }}</span>
+        <h2>{{ t('court_read_only') }}</h2>
+        <p>{{ t('court_read_only_body') }}</p>
+      </div>
+    {% else %}
+    <div class="join-tabs" role="tablist">
+      <button class="join-tab active" type="button" role="tab" aria-selected="true" data-tab="join">{{ t('join') }}</button>
+      <button class="join-tab" type="button" role="tab" aria-selected="false" data-tab="leave">{{ t('leave') }}</button>
+    </div>
+    <div class="tab-content active" data-panel="join">
+      <h2>{{ t('join_waitlist') if court.total_count >= court.member_max else t('join_title') }}</h2>
+      <p>{{ t('join_waitlist_body') if court.total_count >= court.member_max else t('join_body') }}</p>
+      <form method="post" action="{{ url_for('join_court', guid=court.guid) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field">
+          <span>{{ t('username') }}</span>
+          <input name="username" minlength="2" maxlength="40" autocomplete="nickname" required {% if court.archived %}disabled{% endif %}>
+        </label>
+        <label class="field">
+          <span>{{ t('pin') }}</span>
+          <input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required {% if court.archived %}disabled{% endif %}>
+        </label>
+        <button class="button button-primary button-block" type="submit" {% if court.archived %}disabled{% endif %}>
+          {% if court.archived %}{{ t('archived') }}{% elif court.total_count >= court.member_max %}{{ t('join_waitlist') }}{% else %}{{ t('join') }}{% endif %}
+        </button>
+      </form>
+    </div>
+    <div class="tab-content" data-panel="leave" hidden>
+      <h2>{{ t('leave_title') }}</h2>
+      <p>{{ t('leave_body') }}</p>
+      <form method="post" action="{{ url_for('leave_court', guid=court.guid) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field">
+          <span>{{ t('username') }}</span>
+          <input name="username" minlength="2" maxlength="40" autocomplete="nickname" required>
+        </label>
+        <label class="field">
+          <span>{{ t('pin') }}</span>
+          <input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
+        </label>
+        <button class="button button-danger-outline button-block" type="submit">{{ t('leave') }}</button>
+      </form>
+    </div>
+    {% endif %}
+  </aside>
+</section>
+
+<button
+  class="mobile-join-trigger"
+  type="button"
+  data-mobile-join-trigger
+  aria-label="{{ t('join') }}"
+  title="{{ t('join') }}"
+>
+  <svg aria-hidden="true" viewBox="0 0 24 24">
+    <path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8M19 8v6M22 11h-6"/>
+  </svg>
+  <span class="sr-only">{{ t('join') }}</span>
+</button>
+
+<dialog class="mobile-join-dialog" data-mobile-join-dialog aria-label="{{ t('join') }}">
+  <div class="mobile-join-dialog-toolbar">
+    <strong>{{ t('join_waitlist') if court.total_count >= court.member_max else t('join_title') }}</strong>
+    <button type="button" data-mobile-join-close aria-label="{{ t('close') }}" title="{{ t('close') }}">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div class="mobile-join-dialog-content" data-mobile-join-dialog-content></div>
+</dialog>
+{% endblock %}

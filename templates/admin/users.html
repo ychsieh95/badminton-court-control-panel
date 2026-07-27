@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}{{ t('user_management') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div class="shell page-header-inner">
+    <div>
+      <p class="eyebrow">{{ t('admin_console') }}</p>
+      <h1>{{ t('user_management') }}</h1>
+      <p>{{ t('user_management_body') }}</p>
+    </div>
+    <a class="button button-secondary" href="{{ url_for('admin_dashboard') }}">{{ t('dashboard') }}</a>
+  </div>
+</section>
+
+<section class="section shell section-tight">
+  <div class="panel table-panel">
+    <div class="panel-heading table-heading">
+      <h2>{{ t('users') }}</h2>
+      <span class="count-badge">{{ users|length }}</span>
+    </div>
+    {% if users %}
+      <div class="responsive-table">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ t('username') }}</th>
+              <th>{{ t('account_role') }}</th>
+              <th>{{ t('home') }}</th>
+              <th>{{ t('created') }}</th>
+              <th>{{ t('last_login') }}</th>
+              <th>{{ t('ip_address') }}</th>
+              <th>{{ t('status') }}</th>
+              <th class="align-right">{{ t('actions') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+              <tr>
+                <td data-label="{{ t('username') }}"><strong>{{ user.username }}</strong></td>
+                <td data-label="{{ t('account_role') }}">
+                  {% if current_user.role == 'super_admin' and user.id != current_user.id %}
+                    <a
+                      class="status role-dialog-trigger"
+                      href="#role-dialog"
+                      data-role-dialog-trigger
+                      data-role-url="{{ url_for('admin_update_user_role', user_id=user.id) }}"
+                      data-role-user="{{ user.username }}"
+                      data-current-role="{{ user.role }}"
+                    >{{ t('role_' ~ user.role) }}</a>
+                  {% else %}
+                    <span class="status">{{ t('role_' ~ user.role) }}</span>
+                  {% endif %}
+                </td>
+                <td data-label="{{ t('home') }}">{{ user.court_count }}</td>
+                <td data-label="{{ t('created') }}"><small class="table-date">{{ user.created_at[:10] }}</small></td>
+                <td data-label="{{ t('last_login') }}">
+                  {% if user.last_login_at %}
+                    <span class="login-audit">{{ user.last_login_at[:16]|replace('T', ' ') }}</span>
+                  {% else %}
+                    <span class="muted-inline">{{ t('never') }}</span>
+                  {% endif %}
+                </td>
+                <td data-label="{{ t('ip_address') }}">
+                  {% if user.last_login_ip %}
+                    <code class="ip-address">{{ user.last_login_ip }}</code>
+                  {% else %}
+                    <span class="muted-inline">—</span>
+                  {% endif %}
+                </td>
+                <td data-label="{{ t('status') }}">
+                  {% if user.banned %}
+                    <span class="status status-banned">{{ t('banned') }}</span>
+                    {% if user.archived %}<small class="account-secondary-status">{{ t('archived') }}</small>{% endif %}
+                  {% elif user.archived %}
+                    <span class="status status-archived">{{ t('archived') }}</span>
+                  {% else %}
+                    <span class="status status-open"><i></i>{{ t('active_account') }}</span>
+                  {% endif %}
+                  {% if user.must_change_password %}
+                    <small class="password-required">{{ t('must_change_password') }}</small>
+                  {% endif %}
+                </td>
+                <td data-label="{{ t('actions') }}" class="align-right">
+                  {% if user.role == 'member' %}
+                  <div class="user-actions">
+                    <button class="button button-secondary temp-password-trigger" type="button" data-temp-password-url="{{ url_for('admin_set_temporary_password', user_id=user.id) }}" data-temp-password-user="{{ user.username }}">{{ t('set_temporary_password') }}</button>
+                    {% if user.failed_login_attempts %}
+                      <form method="post" action="{{ url_for('admin_reset_user_login_retries', user_id=user.id) }}" data-confirm="{{ t('reset_login_retries_confirm') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button button-secondary" type="submit">
+                          {{ t('reset_login_retries') }}
+                          <span class="action-count">{{ user.failed_login_attempts }}</span>
+                        </button>
+                      </form>
+                    {% endif %}
+                    {% if user.banned %}
+                      <form method="post" action="{{ url_for('admin_unban_user', user_id=user.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button button-secondary" type="submit">{{ t('unban_account') }}</button>
+                      </form>
+                    {% else %}
+                      <form method="post" action="{{ url_for('admin_ban_user', user_id=user.id) }}" data-confirm="{{ t('ban_account_confirm') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button button-danger-outline" type="submit">{{ t('ban_account') }}</button>
+                      </form>
+                    {% endif %}
+                    {% if user.archived %}
+                      <form method="post" action="{{ url_for('admin_restore_user', user_id=user.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button button-secondary" type="submit">{{ t('restore_account') }}</button>
+                      </form>
+                      <form method="post" action="{{ url_for('admin_delete_user', user_id=user.id) }}" data-confirm="{{ t('delete_user_account_confirm') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button button-danger-outline" type="submit">{{ t('delete_user_account') }}</button>
+                      </form>
+                    {% else %}
+                      <form method="post" action="{{ url_for('admin_archive_user', user_id=user.id) }}" data-confirm="{{ t('archive_account_confirm') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="button button-danger-outline" type="submit">{{ t('archive_account') }}</button>
+                      </form>
+                    {% endif %}
+                  </div>
+                  {% else %}
+                    <span class="muted-inline">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state empty-compact">
+        <h3>{{ t('no_users') }}</h3>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<dialog id="role-dialog" class="modal-dialog">
+  <div class="modal-card">
+    <div class="modal-heading">
+      <div>
+        <p class="eyebrow">{{ t('users') }}</p>
+        <h2>{{ t('change_role') }}</h2>
+        <p data-role-dialog-username></p>
+      </div>
+      <button class="modal-close" type="button" data-role-dialog-close aria-label="{{ t('cancel') }}">&times;</button>
+    </div>
+    <form method="post" data-role-dialog-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="role-option-list" role="group" aria-label="{{ t('account_role') }}">
+        {% for role in ('member', 'sub_admin', 'admin', 'super_admin') %}
+          <button class="role-option" type="submit" name="role" value="{{ role }}" data-role-option="{{ role }}">
+            {{ t('role_' ~ role) }}
+          </button>
+        {% endfor %}
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<dialog id="temp-password-dialog" class="modal-dialog">
+  <form method="post" class="modal-card" data-temp-password-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-heading">
+      <div>
+        <p class="eyebrow">{{ t('users') }}</p>
+        <h2>{{ t('set_temporary_password') }}</h2>
+        <p data-temp-password-username></p>
+      </div>
+      <button class="modal-close" type="button" data-dialog-close aria-label="{{ t('cancel') }}">&times;</button>
+    </div>
+    <label class="field">
+      <span>{{ t('temporary_password') }}</span>
+      <input name="temporary_password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required data-temp-password-input>
+      <small class="field-help">{{ t('password_help') }}</small>
+    </label>
+    <div class="modal-actions">
+      <button class="button button-ghost" type="button" data-dialog-close>{{ t('cancel') }}</button>
+      <button class="button button-primary" type="submit">{{ t('set_temporary_password') }}</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
