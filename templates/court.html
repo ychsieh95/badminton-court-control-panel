@@ -24,6 +24,46 @@
 {% block content %}
 {% set owns_court = current_user and court.owner_id == current_user.id %}
 {% set can_manage_court = is_admin or owns_court %}
+{% macro participant_admin_menu(participant) %}
+  {% if is_admin and not court.roll_clearing_locked %}
+    <details class="participant-admin-menu" data-participant-admin-menu>
+      <summary
+        class="participant-admin-trigger"
+        aria-label="{{ t('manage_participant') }}: {{ participant.username }}"
+        title="{{ t('manage_participant') }}"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle cx="5" cy="12" r="1"/>
+          <circle cx="12" cy="12" r="1"/>
+          <circle cx="19" cy="12" r="1"/>
+        </svg>
+      </summary>
+      <div class="participant-admin-controls">
+        <strong>{{ t('manage_participant') }}</strong>
+        <form method="post" action="{{ url_for('admin_rename_participant', guid=court.guid, participant_id=participant.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label>
+            <span>{{ t('participant_new_name') }}</span>
+            <input name="username" minlength="2" maxlength="40" value="{{ participant.username }}" autocomplete="off" required>
+          </label>
+          <button class="button button-secondary" type="submit">{{ t('rename_participant') }}</button>
+        </form>
+        <form method="post" action="{{ url_for('admin_reset_participant_pin', guid=court.guid, participant_id=participant.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label>
+            <span>{{ t('pin') }}</span>
+            <input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
+          </label>
+          <button class="button button-secondary" type="submit">{{ t('reset_participant_pin') }}</button>
+        </form>
+        <form method="post" action="{{ url_for('admin_delete_participant', guid=court.guid, participant_id=participant.id) }}" data-confirm="{{ t('remove_participant_confirm') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="button button-danger-outline" type="submit">{{ t('remove_participant') }}</button>
+        </form>
+      </div>
+    </details>
+  {% endif %}
+{% endmacro %}
 <section class="detail-hero">
   <div class="shell">
     <a class="back-link" href="{{ url_for('index') }}">
@@ -499,6 +539,7 @@
             <div class="participant">
               <span class="avatar">{{ participant.username[:1]|upper }}</span>
               <strong>{{ participant.username }}</strong>
+              {{ participant_admin_menu(participant) }}
             </div>
           {% endfor %}
         </div>
@@ -522,6 +563,7 @@
               <span class="avatar waiting-avatar">{{ loop.index }}</span>
               <strong>{{ participant.username }}</strong>
               <span class="participant-status">{{ t('waitlisted') }}</span>
+              {{ participant_admin_menu(participant) }}
             </div>
           {% endfor %}
         </div>

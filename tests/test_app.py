@@ -41,6 +41,8 @@ def app(tmp_path):
             "SOCIAL_THUMBNAIL_FONT": "",
             "DEFAULT_COUNTRY_CODE": "TW",
             "TRUST_PROXY_HEADERS": False,
+            "LEAVE_MAX_ATTEMPTS": 5,
+            "LEAVE_LOCKOUT_SECONDS": 900,
         }
     )
     yield app
@@ -1313,6 +1315,123 @@ def test_join_and_leave_with_six_digit_pin(client, app):
         assert get_db().execute("SELECT COUNT(*) FROM participants").fetchone()[0] == 0
 
 
+def test_failed_leave_credentials_are_limited_until_lockout_expires(
+    client, app
+):
+    app.config.update(
+        LEAVE_MAX_ATTEMPTS=3,
+        LEAVE_LOCKOUT_SECONDS=120,
+    )
+    login(client)
+    location = create_court(client)
+    client.post("/admin/logout", data={"csrf_token": csrf(client, "/admin")})
+
+    token = csrf(client, location)
+    client.post(
+        f"{location}/join",
+        data={"csrf_token": token, "username": "Alice", "pin": "123456"},
+    )
+
+    unknown_name = client.post(
+        f"{location}/leave",
+        data={
+            "csrf_token": csrf(client, location),
+            "username": "Mallory",
+            "pin": "123456",
+        },
+        follow_redirects=True,
+    )
+    assert "使用者名稱或 PIN 碼不正確，還可嘗試 2 次".encode() in (
+        unknown_name.data
+    )
+
+    for remaining, pin in ((2, "12345"), (1, "000000")):
+        denied = client.post(
+            f"{location}/leave",
+            data={
+                "csrf_token": csrf(client, location),
+                "username": "Alice",
+                "pin": pin,
+            },
+            follow_redirects=True,
+        )
+        assert f"還可嘗試 {remaining} 次".encode() in denied.data
+
+    locked = client.post(
+        f"{location}/leave",
+        data={
+            "csrf_token": csrf(client, location),
+            "username": "Alice",
+            "pin": "000000",
+        },
+        follow_redirects=True,
+    )
+    assert "退出場次失敗次數過多，請在 2 分鐘後再試".encode() in locked.data
+
+    correct_while_locked = client.post(
+        f"{location}/leave",
+        data={
+            "csrf_token": csrf(client, location),
+            "username": "Alice",
+            "pin": "123456",
+        },
+        follow_redirects=True,
+    )
+    assert "退出場次失敗次數過多".encode() in correct_while_locked.data
+
+    with app.app_context():
+        db = get_db()
+        court_id = db.execute(
+            "SELECT id FROM courts WHERE guid = ?",
+            (location.rsplit("/", 1)[-1],),
+        ).fetchone()["id"]
+        attempts = db.execute(
+            "SELECT username_key, failed_count, locked_until "
+            "FROM login_attempts WHERE scope = ? ORDER BY failed_count",
+            (f"court_leave:{court_id}",),
+        ).fetchall()
+        assert [attempt["failed_count"] for attempt in attempts] == [1, 3]
+        assert all(
+            attempt["username_key"] not in {"alice", "mallory"}
+            for attempt in attempts
+        )
+        assert attempts[-1]["locked_until"] is not None
+        assert db.execute(
+            "SELECT COUNT(*) FROM participants WHERE court_id = ?",
+            (court_id,),
+        ).fetchone()[0] == 1
+        db.execute(
+            "UPDATE login_attempts SET locked_until = '2000-01-01T00:00:00' "
+            "WHERE scope = ? AND failed_count = 3",
+            (f"court_leave:{court_id}",),
+        )
+        db.commit()
+
+    accepted = client.post(
+        f"{location}/leave",
+        data={
+            "csrf_token": csrf(client, location),
+            "username": "Alice",
+            "pin": "123456",
+        },
+        follow_redirects=True,
+    )
+    assert "你已離開此場次".encode() in accepted.data
+    with app.app_context():
+        db = get_db()
+        assert db.execute(
+            "SELECT COUNT(*) FROM participants WHERE court_id = ?",
+            (court_id,),
+        ).fetchone()[0] == 0
+        remaining_attempts = db.execute(
+            "SELECT failed_count FROM login_attempts WHERE scope = ?",
+            (f"court_leave:{court_id}",),
+        ).fetchall()
+        assert [attempt["failed_count"] for attempt in remaining_attempts] == [
+            1
+        ]
+
+
 def test_reserved_nicknames_can_be_hidden_from_public_viewers(client, app):
     login(client)
     location = create_court(client, reserved_names_visible="0")
@@ -1491,6 +1610,202 @@ def test_full_court_uses_fifo_waiting_list_and_promotes_after_leave(client, app)
             "SELECT waitlisted FROM participants WHERE username = 'Bob'"
         ).fetchone()
         assert bob["waitlisted"] == 0
+
+
+def test_admin_can_rename_reset_pin_and_delete_court_participants(
+    client, app, monkeypatch
+):
+    login(client)
+    location = create_court(client)
+    guid = location.rsplit("/", 1)[-1]
+    with app.app_context():
+        db = get_db()
+        db.execute(
+            "UPDATE courts SET member_min = 1, member_max = 3 WHERE guid = ?",
+            (guid,),
+        )
+        db.commit()
+
+    for username, pin in (
+        ("Alice", "123456"),
+        ("Bob", "234567"),
+        ("Charlie", "345678"),
+    ):
+        response = client.post(
+            f"{location}/join",
+            data={
+                "csrf_token": csrf(client, location),
+                "username": username,
+                "pin": pin,
+            },
+        )
+        assert response.status_code == 302
+
+    with app.app_context():
+        participants = get_db().execute(
+            "SELECT id, username, waitlisted, pin_hash FROM participants "
+            "WHERE court_id = (SELECT id FROM courts WHERE guid = ?) "
+            "ORDER BY joined_at, id",
+            (guid,),
+        ).fetchall()
+        alice_id, bob_id, charlie_id = [
+            participant["id"] for participant in participants
+        ]
+        original_alice_pin_hash = participants[0]["pin_hash"]
+        assert [
+            (participant["username"], participant["waitlisted"])
+            for participant in participants
+        ] == [("Alice", 0), ("Bob", 1), ("Charlie", 1)]
+
+    admin_detail = client.get(location)
+    assert admin_detail.data.count(b"data-participant-admin-menu") == 3
+    assert "重新命名球友".encode() in admin_detail.data
+    assert (
+        f"/admin/courts/{guid}/participants/{alice_id}/rename".encode()
+        in admin_detail.data
+    )
+    assert (
+        f"/admin/courts/{guid}/participants/{bob_id}/reset-pin".encode()
+        in admin_detail.data
+    )
+    assert (
+        f"/admin/courts/{guid}/participants/{charlie_id}/delete".encode()
+        in admin_detail.data
+    )
+
+    public_client = app.test_client()
+    public_detail = public_client.get(location)
+    assert b"data-participant-admin-menu" not in public_detail.data
+    assert f"/admin/courts/{guid}/participants/".encode() not in public_detail.data
+    unauthorized = public_client.post(
+        f"/admin/courts/{guid}/participants/{alice_id}/rename",
+        data={
+            "csrf_token": csrf(public_client, location),
+            "username": "Intruder",
+        },
+    )
+    assert unauthorized.status_code == 302
+    assert unauthorized.headers["Location"].startswith("/login")
+
+    missing_csrf = client.post(
+        f"/admin/courts/{guid}/participants/{alice_id}/reset-pin",
+        data={"pin": "654321"},
+    )
+    assert missing_csrf.status_code == 400
+
+    delivered = []
+    monkeypatch.setattr(
+        app_module,
+        "send_court_push_notifications",
+        lambda court_guid, change_type: delivered.append(
+            (court_guid, change_type)
+        ),
+    )
+
+    renamed = client.post(
+        f"/admin/courts/{guid}/participants/{alice_id}/rename",
+        data={
+            "csrf_token": csrf(client, location),
+            "username": "Alicia",
+        },
+        follow_redirects=True,
+    )
+    assert "球友名稱已更新。".encode() in renamed.data
+    assert delivered == [(guid, "members_changed")]
+
+    duplicate = client.post(
+        f"/admin/courts/{guid}/participants/{bob_id}/rename",
+        data={
+            "csrf_token": csrf(client, location),
+            "username": "ALICIA",
+        },
+        follow_redirects=True,
+    )
+    assert "此使用者名稱已加入該場次。".encode() in duplicate.data
+    assert delivered == [(guid, "members_changed")]
+
+    invalid_pin = client.post(
+        f"/admin/courts/{guid}/participants/{alice_id}/reset-pin",
+        data={"csrf_token": csrf(client, location), "pin": "12345"},
+        follow_redirects=True,
+    )
+    assert "PIN 碼必須正好為 6 位數字。".encode() in invalid_pin.data
+
+    pin_reset = client.post(
+        f"/admin/courts/{guid}/participants/{alice_id}/reset-pin",
+        data={"csrf_token": csrf(client, location), "pin": "654321"},
+        follow_redirects=True,
+    )
+    assert "球友 PIN 碼已重設。".encode() in pin_reset.data
+    assert delivered == [(guid, "members_changed")]
+
+    with app.app_context():
+        db = get_db()
+        renamed_participant = db.execute(
+            "SELECT username, username_key, waitlisted, pin_hash "
+            "FROM participants WHERE id = ?",
+            (alice_id,),
+        ).fetchone()
+        bob = db.execute(
+            "SELECT username FROM participants WHERE id = ?", (bob_id,)
+        ).fetchone()
+        assert tuple(renamed_participant)[:3] == ("Alicia", "alicia", 0)
+        assert renamed_participant["pin_hash"] != original_alice_pin_hash
+        assert check_password_hash(
+            renamed_participant["pin_hash"], "654321"
+        )
+        assert not check_password_hash(
+            renamed_participant["pin_hash"], "123456"
+        )
+        assert bob["username"] == "Bob"
+
+    deleted = client.post(
+        f"/admin/courts/{guid}/participants/{alice_id}/delete",
+        data={"csrf_token": csrf(client, location)},
+        follow_redirects=True,
+    )
+    assert "球友已移出場次。".encode() in deleted.data
+    assert delivered == [
+        (guid, "members_changed"),
+        (guid, "members_changed"),
+    ]
+    with app.app_context():
+        remaining = get_db().execute(
+            "SELECT id, username, waitlisted FROM participants "
+            "WHERE court_id = (SELECT id FROM courts WHERE guid = ?) "
+            "ORDER BY joined_at, id",
+            (guid,),
+        ).fetchall()
+        assert [
+            (participant["username"], participant["waitlisted"])
+            for participant in remaining
+        ] == [("Bob", 0), ("Charlie", 1)]
+        assert all(participant["id"] != alice_id for participant in remaining)
+        get_db().execute(
+            "UPDATE courts SET roll_clearing_locked = 1 WHERE guid = ?",
+            (guid,),
+        )
+        get_db().commit()
+
+    read_only_detail = client.get(location)
+    assert b"data-participant-admin-menu" not in read_only_detail.data
+    blocked_rename = client.post(
+        f"/admin/courts/{guid}/participants/{bob_id}/rename",
+        data={
+            "csrf_token": csrf(client, location),
+            "username": "Robert",
+        },
+        follow_redirects=True,
+    )
+    assert "此場次目前為唯讀。".encode() in blocked_rename.data
+    with app.app_context():
+        assert get_db().execute(
+            "SELECT username FROM participants WHERE id = ?", (bob_id,)
+        ).fetchone()["username"] == "Bob"
+    assert delivered == [
+        (guid, "members_changed"),
+        (guid, "members_changed"),
+    ]
 
 
 def test_owner_can_finalize_court_and_record_roll_and_clearing(client, app):
@@ -1686,8 +2001,11 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     assert "羽球場控面板，持續變得更好。".encode() in updates.data
     assert "每個場次連結都有豐富的社群預覽".encode() in updates.data
     assert "公開整理第三方素材授權資訊".encode() in updates.data
+    assert "限制退出場次時重複輸入錯誤暱稱或 PIN 碼".encode() in updates.data
+    assert "直接在場次頁管理球友".encode() in updates.data
+    assert "系統會自動遞補最早加入的候補球友".encode() in updates.data
     assert "2026 年 7 月 28 日".encode() in updates.data
-    assert updates.data.count(b'class="update-entry"') == 5
+    assert updates.data.count(b'class="update-entry"') == 6
     assert updates.data.count(b'class="update-latest"') == 1
     assert b'<time datetime="2026-07-28">' in updates.data
 
@@ -1696,7 +2014,10 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     assert b"The control panel keeps getting better." in english.data
     assert b"Rich previews for every shared court" in english.data
     assert b"Organizes third-party asset licenses publicly" in english.data
-    assert b"Safer sign-in and court notifications" in english.data
+    assert b"Safer access and court notifications" in english.data
+    assert b"Limits repeated incorrect nickname/PIN attempts" in english.data
+    assert b"Manage players without leaving the court page" in english.data
+    assert b"automatically promoting the earliest waiting player" in english.data
     assert b"Changes in this update" in english.data
 
 

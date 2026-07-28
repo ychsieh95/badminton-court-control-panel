@@ -200,6 +200,15 @@ TRANSLATIONS = {
         "leave": "Leave court",
         "participants": "Players",
         "no_participants": "No online sign-ups yet.",
+        "manage_participant": "Manage player",
+        "rename_participant": "Rename player",
+        "participant_new_name": "New username",
+        "participant_renamed": "Player renamed.",
+        "reset_participant_pin": "Reset PIN",
+        "participant_pin_reset": "Player PIN reset.",
+        "remove_participant": "Remove player",
+        "remove_participant_confirm": "Remove this player from the court?",
+        "participant_removed": "Player removed from the court.",
         "participation_history": "Join & leave history",
         "participation_history_eyebrow": "Activity",
         "no_participation_history": "No join or leave activity yet.",
@@ -490,6 +499,8 @@ TRANSLATIONS = {
         "invalid_login": "Incorrect username or password.",
         "login_attempts_remaining": "Incorrect username or password. {count} attempts remaining.",
         "login_locked": "Too many failed attempts. Try again in {minutes} minutes.",
+        "leave_attempts_remaining": "The username or PIN is incorrect. Attempts remaining: {count}.",
+        "leave_locked": "Too many failed leave attempts. Try again in {minutes} minutes.",
         "signed_out": "You are signed out.",
         "invalid_csrf": "Your session expired. Please try again.",
         "turnstile_required": "Complete the Cloudflare Turnstile verification and try again.",
@@ -625,6 +636,15 @@ TRANSLATIONS = {
         "leave": "離開場次",
         "participants": "球友名單",
         "no_participants": "目前尚無線上報名。",
+        "manage_participant": "管理球友",
+        "rename_participant": "重新命名球友",
+        "participant_new_name": "新的使用者名稱",
+        "participant_renamed": "球友名稱已更新。",
+        "reset_participant_pin": "重設 PIN 碼",
+        "participant_pin_reset": "球友 PIN 碼已重設。",
+        "remove_participant": "移除球友",
+        "remove_participant_confirm": "確定要將此球友移出場次嗎？",
+        "participant_removed": "球友已移出場次。",
         "participation_history": "加入與退出紀錄",
         "participation_history_eyebrow": "活動紀錄",
         "no_participation_history": "目前尚無加入或退出紀錄。",
@@ -915,6 +935,8 @@ TRANSLATIONS = {
         "invalid_login": "使用者名稱或密碼錯誤。",
         "login_attempts_remaining": "使用者名稱或密碼錯誤，還可嘗試 {count} 次。",
         "login_locked": "登入失敗次數過多，請在 {minutes} 分鐘後再試。",
+        "leave_attempts_remaining": "使用者名稱或 PIN 碼不正確，還可嘗試 {count} 次。",
+        "leave_locked": "退出場次失敗次數過多，請在 {minutes} 分鐘後再試。",
         "signed_out": "你已登出。",
         "invalid_csrf": "工作階段已過期，請再試一次。",
         "turnstile_required": "請完成 Cloudflare Turnstile 人機驗證後再試一次。",
@@ -931,6 +953,33 @@ TRANSLATIONS = {
 
 
 SITE_UPDATE_HISTORY = (
+    {
+        "date": "2026-07-28",
+        "date_label": {
+            "en-us": "July 28, 2026",
+            "zh-tw": "2026 年 7 月 28 日",
+        },
+        "title": {
+            "en-us": "Manage players without leaving the court page",
+            "zh-tw": "直接在場次頁管理球友",
+        },
+        "summary": {
+            "en-us": "Administrators can now correct participant details and keep the confirmed and waiting lists organized in place.",
+            "zh-tw": "管理員現在可以直接修正球友資料，並即時整理正取與候補名單。",
+        },
+        "items": {
+            "en-us": (
+                "Rename confirmed or waiting players and reset their private six-digit court PINs.",
+                "Remove a player while automatically promoting the earliest waiting player when a confirmed place opens.",
+                "Send member-change notifications for visible rename and removal actions while keeping private PIN resets out of notifications.",
+            ),
+            "zh-tw": (
+                "重新命名正取或候補球友，並重設其私密的 6 位數場次 PIN 碼。",
+                "移除球友；若正取名額釋出，系統會自動遞補最早加入的候補球友。",
+                "重新命名與移除等公開名單變更會發送球友異動通知，私密 PIN 碼重設則不會出現在通知中。",
+            ),
+        },
+    },
     {
         "date": "2026-07-28",
         "date_label": {
@@ -969,22 +1018,24 @@ SITE_UPDATE_HISTORY = (
             "zh-tw": "2026 年 7 月 28 日",
         },
         "title": {
-            "en-us": "Safer sign-in and court notifications",
-            "zh-tw": "更安全的登入與場次通知",
+            "en-us": "Safer access and court notifications",
+            "zh-tw": "更安全的操作與場次通知",
         },
         "summary": {
-            "en-us": "Authentication protection and opt-in court updates now use modern browser and Cloudflare services.",
-            "zh-tw": "登入保護與自選場次通知現在採用現代瀏覽器及 Cloudflare 服務。",
+            "en-us": "Sign-in, public leave protection, and opt-in court updates now use safer modern controls.",
+            "zh-tw": "登入、公開退出保護與自選場次通知現在採用更安全的現代化控制措施。",
         },
         "items": {
             "en-us": (
                 "Replaced hCaptcha with action-bound Cloudflare Turnstile verification for signup and sign-in.",
                 "Added per-court system Web Push subscriptions for event-information and member-list changes.",
+                "Limits repeated incorrect nickname/PIN attempts when leaving a court to reduce credential guessing.",
                 "Kept notification endpoints, credentials, and member nicknames out of public output and lock-screen messages.",
             ),
             "zh-tw": (
                 "以具動作綁定的 Cloudflare Turnstile 取代 hCaptcha，保護註冊與登入。",
                 "新增個別場次系統 Web Push 訂閱，在活動資訊或球友名單變更時通知。",
+                "限制退出場次時重複輸入錯誤暱稱或 PIN 碼的次數，降低憑證猜測風險。",
                 "推播端點、憑證與球友暱稱不會出現在公開內容或鎖定畫面訊息中。",
             ),
         },
@@ -1259,6 +1310,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         TRUST_PROXY_HEADERS=os.environ.get("TRUST_PROXY_HEADERS", "0") == "1",
         LOGIN_MAX_ATTEMPTS=int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5")),
         LOGIN_LOCKOUT_SECONDS=int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "900")),
+        LEAVE_MAX_ATTEMPTS=int(os.environ.get("LEAVE_MAX_ATTEMPTS", "5")),
+        LEAVE_LOCKOUT_SECONDS=int(os.environ.get("LEAVE_LOCKOUT_SECONDS", "900")),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "0") == "1",
@@ -2191,8 +2244,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
         username = clean_username(request.form.get("username", ""))
         pin = request.form.get("pin", "").strip()
-        if not PIN_PATTERN.fullmatch(pin):
-            flash_t("invalid_credentials", "error")
+        leave_attempt_scope = court_leave_attempt_scope(court["id"])
+        locked_minutes = login_lock_minutes(leave_attempt_scope, username)
+        if locked_minutes:
+            flash_leave_locked(locked_minutes)
+            return redirect(url_for("court_detail", guid=guid))
+        if not 2 <= len(username) <= 40 or not PIN_PATTERN.fullmatch(pin):
+            flash_leave_failure(court["id"], username)
             return redirect(url_for("court_detail", guid=guid))
 
         db = get_db()
@@ -2225,9 +2283,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 participant["pin_hash"], pin
             ):
                 db.rollback()
-                flash_t("invalid_credentials", "error")
+                flash_leave_failure(court["id"], username)
                 return redirect(url_for("court_detail", guid=guid))
 
+            db.execute(
+                "DELETE FROM login_attempts WHERE attempt_key = ?",
+                (login_attempt_key(leave_attempt_scope, username),),
+            )
             db.execute(
                 "DELETE FROM participants WHERE id = ?", (participant["id"],)
             )
@@ -2656,6 +2718,125 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             abort(404)
         flash_t("court_deleted", "success")
         return redirect(url_for("admin_dashboard"))
+
+    @app.post(
+        "/admin/courts/<guid>/participants/<int:participant_id>/rename"
+    )
+    @admin_required
+    def admin_rename_participant(guid: str, participant_id: int):
+        verify_csrf()
+        court = fetch_court(guid)
+        if court is None:
+            abort(404)
+        if court["roll_clearing_locked"]:
+            flash_t("court_read_only", "error")
+            return redirect(url_for("court_detail", guid=guid))
+
+        username = clean_username(request.form.get("username", ""))
+        if not 2 <= len(username) <= 40:
+            flash_t("invalid_username", "error")
+            return redirect(url_for("court_detail", guid=guid))
+
+        db = get_db()
+        changed = False
+        try:
+            db.execute("BEGIN IMMEDIATE")
+            participant = db.execute(
+                "SELECT username FROM participants "
+                "WHERE id = ? AND court_id = ?",
+                (participant_id, court["id"]),
+            ).fetchone()
+            if participant is None:
+                db.rollback()
+                abort(404)
+            changed = participant["username"] != username
+            db.execute(
+                "UPDATE participants SET username = ?, username_key = ? "
+                "WHERE id = ? AND court_id = ?",
+                (
+                    username,
+                    username.casefold(),
+                    participant_id,
+                    court["id"],
+                ),
+            )
+            db.commit()
+        except sqlite3.IntegrityError:
+            db.rollback()
+            flash_t("duplicate_username", "error")
+            return redirect(url_for("court_detail", guid=guid))
+        except sqlite3.Error:
+            db.rollback()
+            raise
+
+        if changed:
+            send_court_push_notifications(guid, "members_changed")
+        flash_t("participant_renamed", "success")
+        return redirect(url_for("court_detail", guid=guid))
+
+    @app.post(
+        "/admin/courts/<guid>/participants/<int:participant_id>/reset-pin"
+    )
+    @admin_required
+    def admin_reset_participant_pin(guid: str, participant_id: int):
+        verify_csrf()
+        court = fetch_court(guid)
+        if court is None:
+            abort(404)
+        if court["roll_clearing_locked"]:
+            flash_t("court_read_only", "error")
+            return redirect(url_for("court_detail", guid=guid))
+
+        pin = request.form.get("pin", "").strip()
+        if not PIN_PATTERN.fullmatch(pin):
+            flash_t("invalid_pin", "error")
+            return redirect(url_for("court_detail", guid=guid))
+
+        db = get_db()
+        result = db.execute(
+            "UPDATE participants SET pin_hash = ? "
+            "WHERE id = ? AND court_id = ?",
+            (generate_password_hash(pin), participant_id, court["id"]),
+        )
+        if result.rowcount == 0:
+            db.rollback()
+            abort(404)
+        db.commit()
+        flash_t("participant_pin_reset", "success")
+        return redirect(url_for("court_detail", guid=guid))
+
+    @app.post(
+        "/admin/courts/<guid>/participants/<int:participant_id>/delete"
+    )
+    @admin_required
+    def admin_delete_participant(guid: str, participant_id: int):
+        verify_csrf()
+        court = fetch_court(guid)
+        if court is None:
+            abort(404)
+        if court["roll_clearing_locked"]:
+            flash_t("court_read_only", "error")
+            return redirect(url_for("court_detail", guid=guid))
+
+        db = get_db()
+        try:
+            db.execute("BEGIN IMMEDIATE")
+            result = db.execute(
+                "DELETE FROM participants WHERE id = ? AND court_id = ?",
+                (participant_id, court["id"]),
+            )
+            if result.rowcount == 0:
+                db.rollback()
+                abort(404)
+            rebalance_participants(db, court["id"])
+            db.commit()
+        except sqlite3.Error:
+            db.rollback()
+            raise
+
+        send_court_push_notifications(guid, "members_changed")
+        flash_t("participant_removed", "success")
+        return redirect(url_for("court_detail", guid=guid))
 
     @app.get("/my-courts")
     @member_required
@@ -3296,11 +3477,22 @@ def clear_login_failures(scope: str, username: str) -> None:
     db.commit()
 
 
-def flash_login_failure(scope: str, username: str) -> None:
+def flash_failed_attempt(
+    scope: str,
+    username: str,
+    *,
+    max_attempts_config: str,
+    lockout_seconds_config: str,
+    remaining_translation: str,
+    locked_translation: str,
+    store_username_key: bool,
+) -> None:
     db = get_db()
     now = datetime.now()
     attempt_key = login_attempt_key(scope, username)
-    attempt_window = max(60, int(current_app_config("LOGIN_LOCKOUT_SECONDS")))
+    attempt_window = max(
+        60, int(current_app_config(lockout_seconds_config))
+    )
     cutoff = now - timedelta(seconds=attempt_window)
     db.execute(
         """
@@ -3328,7 +3520,7 @@ def flash_login_failure(scope: str, username: str) -> None:
         (
             attempt_key,
             scope,
-            username.casefold(),
+            username.casefold() if store_username_key else attempt_key,
             now.isoformat(timespec="seconds"),
         ),
     )
@@ -3336,13 +3528,13 @@ def flash_login_failure(scope: str, username: str) -> None:
         "SELECT failed_count FROM login_attempts WHERE attempt_key = ?",
         (attempt_key,),
     ).fetchone()
-    max_attempts = max(1, int(current_app_config("LOGIN_MAX_ATTEMPTS")))
+    max_attempts = max(1, int(current_app_config(max_attempts_config)))
     failed_count = attempt["failed_count"]
     remaining = max(0, max_attempts - failed_count)
     if remaining:
         db.commit()
-        message = TRANSLATIONS[current_language()]["login_attempts_remaining"].format(
-            count=remaining
+        message = TRANSLATIONS[current_language()][remaining_translation].format(
+            count=remaining,
         )
         flash(message, "error")
         return
@@ -3354,11 +3546,52 @@ def flash_login_failure(scope: str, username: str) -> None:
         (locked_until.isoformat(timespec="seconds"), attempt_key),
     )
     db.commit()
-    flash_login_locked(max(1, (lockout_seconds + 59) // 60))
+    flash_attempt_locked(
+        locked_translation,
+        max(1, (lockout_seconds + 59) // 60),
+    )
+
+
+def flash_login_failure(scope: str, username: str) -> None:
+    flash_failed_attempt(
+        scope,
+        username,
+        max_attempts_config="LOGIN_MAX_ATTEMPTS",
+        lockout_seconds_config="LOGIN_LOCKOUT_SECONDS",
+        remaining_translation="login_attempts_remaining",
+        locked_translation="login_locked",
+        store_username_key=True,
+    )
+
+
+def court_leave_attempt_scope(court_id: int) -> str:
+    return f"court_leave:{court_id}"
+
+
+def flash_leave_failure(court_id: int, username: str) -> None:
+    flash_failed_attempt(
+        court_leave_attempt_scope(court_id),
+        username,
+        max_attempts_config="LEAVE_MAX_ATTEMPTS",
+        lockout_seconds_config="LEAVE_LOCKOUT_SECONDS",
+        remaining_translation="leave_attempts_remaining",
+        locked_translation="leave_locked",
+        store_username_key=False,
+    )
 
 
 def flash_login_locked(minutes: int) -> None:
-    message = TRANSLATIONS[current_language()]["login_locked"].format(minutes=minutes)
+    flash_attempt_locked("login_locked", minutes)
+
+
+def flash_leave_locked(minutes: int) -> None:
+    flash_attempt_locked("leave_locked", minutes)
+
+
+def flash_attempt_locked(translation_key: str, minutes: int) -> None:
+    message = TRANSLATIONS[current_language()][translation_key].format(
+        minutes=minutes
+    )
     flash(message, "error")
 
 

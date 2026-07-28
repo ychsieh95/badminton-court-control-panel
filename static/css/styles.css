@@ -2769,10 +2769,121 @@ select:focus-visible {
   font-size: .84rem;
 }
 
+.participant > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .participant-status {
   margin-left: auto;
   color: var(--muted);
   font-size: .7rem;
+}
+
+.participant-admin-menu {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.participant-status + .participant-admin-menu {
+  margin-left: 0;
+}
+
+.participant-admin-menu[open] {
+  z-index: 30;
+}
+
+.participant-admin-trigger {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.participant-admin-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.participant-admin-trigger:hover,
+.participant-admin-trigger:focus-visible {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.participant-admin-trigger svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.participant-admin-controls {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(320px, calc(100vw - 56px));
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.participant-admin-controls > strong {
+  display: block;
+  font-size: .82rem;
+}
+
+.participant-admin-controls form {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.participant-admin-controls label {
+  display: grid;
+  gap: 5px;
+}
+
+.participant-admin-controls label span {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+.participant-admin-controls input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+}
+
+.participant-admin-controls input:focus {
+  border-color: var(--primary);
+  outline: 2px solid color-mix(in srgb, var(--primary) 18%, transparent);
+  outline-offset: 1px;
+}
+
+.participant-admin-controls .button {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: .75rem;
 }
 
 .participation-history-panel {

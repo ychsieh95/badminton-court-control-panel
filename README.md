@@ -30,6 +30,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 ### For administrators
 
 - Create, edit, duplicate, archive, restore, and delete any court.
+- Rename court participants, reset their six-digit PINs, or remove them directly from a court page.
 - Use private, account-owned saved locations from the same new-event form as members.
 - Assign member, sub-admin, admin, or super-admin roles; only super-admins can change roles.
 - Filter all courts with the same controls available on the public listing, including archived and expired events.
@@ -116,6 +117,8 @@ The development bootstrap credentials are `admin` / `change-me`. Always replace 
 | `DEFAULT_COUNTRY_CODE` | Empty | Optional two-letter fallback country. Unknown visitors otherwise use English. |
 | `LOGIN_MAX_ATTEMPTS` | `5` | Failed sign-ins allowed before temporary lockout. |
 | `LOGIN_LOCKOUT_SECONDS` | `900` | Lockout duration in seconds. |
+| `LEAVE_MAX_ATTEMPTS` | `5` | Incorrect nickname/PIN leave attempts allowed per court, nickname, and client IP before temporary lockout. |
+| `LEAVE_LOCKOUT_SECONDS` | `900` | Leave-attempt lockout duration in seconds. |
 
 Values already present in the process environment take precedence over `.env`.
 

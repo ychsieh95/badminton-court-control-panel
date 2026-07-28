@@ -196,7 +196,9 @@
     button.addEventListener('click', () => button.closest('.flash')?.remove());
   });
 
-  const dropdownMenus = document.querySelectorAll('.account-menu, .court-action-menu, .preferences-menu');
+  const dropdownMenus = document.querySelectorAll(
+    '.account-menu, .court-action-menu, .preferences-menu, .participant-admin-menu'
+  );
   document.addEventListener('click', (event) => {
     dropdownMenus.forEach((menu) => {
       if (menu.open && !menu.contains(event.target)) menu.removeAttribute('open');
