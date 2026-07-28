@@ -15,7 +15,7 @@ COPY ./app.py /app/app.py
 COPY ./templates /app/templates
 COPY ./static /app/static
 
-RUN mkdir -p /instance/avatars /instance/court_media \
+RUN mkdir -p /instance/avatars /instance/court_media /instance/social_thumbnails \
     && ln -s /instance /app/instance
 
 VOLUME ["/instance"]

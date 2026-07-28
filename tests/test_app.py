@@ -1,11 +1,14 @@
 import base64
+import html
 import io
 import json
 import re
 from pathlib import Path
-from urllib.parse import parse_qs
+from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 import pytest
+from PIL import Image
 from werkzeug.security import check_password_hash
 
 import app as app_module
@@ -31,7 +34,13 @@ def app(tmp_path):
             "TURNSTILE_VERIFY_TIMEOUT": 1,
             "AVATAR_FOLDER": str(tmp_path / "avatars"),
             "COURT_MEDIA_FOLDER": str(tmp_path / "court-media"),
+            "SOCIAL_THUMBNAIL_FOLDER": str(
+                tmp_path / "social-thumbnails"
+            ),
+            "SOCIAL_THUMBNAIL_FFMPEG": "ffmpeg",
+            "SOCIAL_THUMBNAIL_FONT": "",
             "DEFAULT_COUNTRY_CODE": "TW",
+            "TRUST_PROXY_HEADERS": False,
         }
     )
     yield app
@@ -712,6 +721,166 @@ def test_court_media_gallery_card_cover_and_file_cleanup(client, app):
         for filename in set(filenames + remaining_filenames)
     )
     assert client.get(f"/court-media/{first_image}").status_code == 404
+
+
+def social_thumbnail_path(response):
+    match = re.search(
+        rb'<meta property="og:image" content="([^"]+)">',
+        response.data,
+    )
+    assert match is not None
+    return urlparse(html.unescape(match.group(1).decode())).path
+
+
+def image_bytes(color, image_format="PNG"):
+    output = io.BytesIO()
+    Image.new("RGB", (1600, 900), color).save(output, format=image_format)
+    return output.getvalue()
+
+
+def test_court_social_thumbnail_metadata_and_information_fallback(
+    client, app
+):
+    login(client)
+    location = create_court(
+        client,
+        event_name="Friday Smash Night",
+        badminton_name="Taipei Shuttle Club",
+    )
+    app.config["TRUST_PROXY_HEADERS"] = True
+    detail = client.get(
+        location,
+        headers={
+            "Host": "courts.example",
+            "X-Forwarded-Proto": "https",
+        },
+    )
+    thumbnail_path = social_thumbnail_path(detail)
+
+    assert b'<meta property="og:type" content="website">' in detail.data
+    assert (
+        b'<meta property="og:title" content="Friday Smash Night">'
+        in detail.data
+    )
+    assert b'<meta property="og:image:width" content="1200">' in detail.data
+    assert b'<meta property="og:image:height" content="630">' in detail.data
+    assert (
+        b'<meta name="twitter:card" content="summary_large_image">'
+        in detail.data
+    )
+    assert (
+        b'<link rel="canonical" href="https://courts.example/'
+        in detail.data
+    )
+    assert b'content="https://courts.example/' in detail.data
+    assert thumbnail_path.endswith("/zh-tw.jpg")
+
+    thumbnail = client.get(thumbnail_path)
+    assert thumbnail.status_code == 200
+    assert thumbnail.mimetype == "image/jpeg"
+    assert thumbnail.headers["Cache-Control"] == (
+        "public, max-age=31536000, immutable"
+    )
+    with Image.open(io.BytesIO(thumbnail.data)) as rendered:
+        assert rendered.size == (1200, 630)
+        assert rendered.format == "JPEG"
+
+    with app.app_context():
+        get_db().execute("UPDATE courts SET ordered_count = 3")
+        get_db().commit()
+    updated_detail = client.get(
+        location,
+        headers={
+            "Host": "courts.example",
+            "X-Forwarded-Proto": "https",
+        },
+    )
+    updated_thumbnail_path = social_thumbnail_path(updated_detail)
+    assert updated_thumbnail_path != thumbnail_path
+    stale_response = client.get(thumbnail_path)
+    assert stale_response.status_code == 302
+    assert urlparse(stale_response.headers["Location"]).path == (
+        updated_thumbnail_path
+    )
+    assert client.get(updated_thumbnail_path).status_code == 200
+    cached_thumbnails = Path(app.config["SOCIAL_THUMBNAIL_FOLDER"]).glob(
+        "*.jpg"
+    )
+    assert len(list(cached_thumbnails)) == 1
+
+    guid = location.rsplit("/", 1)[-1]
+    deleted = client.post(
+        f"/admin/courts/{guid}/delete",
+        data={"csrf_token": csrf(client, f"/admin/courts/{guid}/edit")},
+        follow_redirects=False,
+    )
+    assert deleted.status_code == 302
+    assert not list(
+        Path(app.config["SOCIAL_THUMBNAIL_FOLDER"]).glob("*.jpg")
+    )
+    assert client.get(updated_thumbnail_path).status_code == 404
+
+
+def test_court_social_thumbnail_uses_first_event_image(client):
+    login(client)
+    expected_color = (27, 83, 144)
+    location = create_court(
+        client,
+        media=[
+            (
+                io.BytesIO(image_bytes(expected_color)),
+                "first-event-photo.png",
+            )
+        ],
+    )
+    thumbnail = client.get(social_thumbnail_path(client.get(location)))
+    assert thumbnail.status_code == 200
+    with Image.open(io.BytesIO(thumbnail.data)) as rendered:
+        assert rendered.size == (1200, 630)
+        center = rendered.getpixel((600, 315))
+        assert all(
+            abs(actual - expected) <= 3
+            for actual, expected in zip(center, expected_color)
+        )
+
+
+def test_court_social_thumbnail_extracts_first_event_video(
+    client, app, monkeypatch
+):
+    login(client)
+    location = create_court(
+        client,
+        media=[
+            (
+                io.BytesIO(b"\x00\x00\x00\x18ftypmp42video"),
+                "first-event-video.mp4",
+            ),
+            (
+                io.BytesIO(image_bytes((20, 180, 80))),
+                "second-event-photo.png",
+            ),
+        ],
+    )
+    video_frame = image_bytes((190, 45, 60), "JPEG")
+    captured = {}
+
+    def fake_ffmpeg(command, **kwargs):
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return SimpleNamespace(stdout=video_frame)
+
+    monkeypatch.setattr(app_module.subprocess, "run", fake_ffmpeg)
+    thumbnail = client.get(social_thumbnail_path(client.get(location)))
+    assert thumbnail.status_code == 200
+    assert captured["command"][0] == "ffmpeg"
+    assert captured["command"][captured["command"].index("-i") + 1].endswith(
+        ".mp4"
+    )
+    assert captured["kwargs"]["timeout"] == 12
+    with Image.open(io.BytesIO(thumbnail.data)) as rendered:
+        center = rendered.getpixel((600, 315))
+        assert center[0] > center[1] * 3
+        assert center[0] > center[2] * 2
 
 
 def test_invalid_court_media_is_rejected(client, app):
@@ -1508,6 +1677,29 @@ def test_introduction_page_is_bilingual_and_linked_from_footer(client):
     assert b"Ready for your next game?" in english.data
 
 
+def test_update_history_page_is_bilingual_and_linked_from_footer(client):
+    homepage = client.get("/")
+    assert b'class="footer-updates-link" href="/updates"' in homepage.data
+
+    updates = client.get("/updates")
+    assert updates.status_code == 200
+    assert "羽球場控面板，持續變得更好。".encode() in updates.data
+    assert "每個場次連結都有豐富的社群預覽".encode() in updates.data
+    assert "公開整理第三方素材授權資訊".encode() in updates.data
+    assert "2026 年 7 月 28 日".encode() in updates.data
+    assert updates.data.count(b'class="update-entry"') == 5
+    assert updates.data.count(b'class="update-latest"') == 1
+    assert b'<time datetime="2026-07-28">' in updates.data
+
+    client.set_cookie("court_lang", "en-us")
+    english = client.get("/updates")
+    assert b"The control panel keeps getting better." in english.data
+    assert b"Rich previews for every shared court" in english.data
+    assert b"Organizes third-party asset licenses publicly" in english.data
+    assert b"Safer sign-in and court notifications" in english.data
+    assert b"Changes in this update" in english.data
+
+
 def test_first_visit_introduction_prompt_is_bilingual_and_remembered_in_browser(client):
     homepage = client.get("/")
     assert b'class="first-visit-tooltip"' in homepage.data
@@ -1544,6 +1736,24 @@ def test_homepage_shuttle_uses_vector_feathers_band_and_cork(client):
     not_found = client.get("/not-a-real-court-guid")
     assert not_found.status_code == 404
     assert b'class="empty-icon-shuttle"' in not_found.data
+
+
+def test_social_thumbnail_uses_bundled_noto_font(app):
+    expected_path = (
+        Path(app_module.__file__).parent
+        / "static"
+        / "fonts"
+        / "NotoSansTC-VF.ttf"
+    ).resolve()
+
+    with app.app_context():
+        regular = app_module.social_thumbnail_font(48)
+        bold = app_module.social_thumbnail_font(48, bold=True)
+
+    assert Path(regular.path).resolve() == expected_path
+    assert Path(bold.path).resolve() == expected_path
+    assert regular.getbbox("羽球場")[2] > 0
+    assert bytes(regular.getmask("羽")) != bytes(bold.getmask("羽"))
 
 
 def test_theme_picker_includes_each_palette_and_appearance(client):
@@ -1591,6 +1801,28 @@ def test_license_page_credits_assets_and_codex_support(client):
     assert "本網站之內容、營運與最終成果仍由專案擁有者負責".encode() in license_page.data
     assert b'href="https://openai.com/codex/"' in license_page.data
     assert b'class="codex-credit-mark"' in license_page.data
+    assert "Noto Sans 繁體中文字型".encode() in license_page.data
+    assert b'href="https://github.com/notofonts/noto-cjk"' in license_page.data
+    assert b'href="/static/fonts/NotoSansTC-OFL.txt"' in license_page.data
+    assert license_page.data.index(
+        b'data-license-entry="flaticon"'
+    ) < license_page.data.index(
+        b'data-license-entry="noto"'
+    )
+    assert license_page.data.index(
+        b'data-license-entry="noto"'
+    ) < license_page.data.index(
+        b'data-license-entry="codex"'
+    )
+
+    font_license = client.get("/static/fonts/NotoSansTC-OFL.txt")
+    assert font_license.status_code == 200
+    assert b"SIL OPEN FONT LICENSE Version 1.1" in font_license.data
+
+    font = client.get("/static/fonts/NotoSansTC-VF.ttf")
+    assert font.status_code == 200
+    assert font.data.startswith(b"\x00\x01\x00\x00")
+    assert len(font.data) > 11_000_000
 
 
 def test_project_brand_and_grading_asset(client):

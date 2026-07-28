@@ -8,6 +8,7 @@
   <link rel="icon" href="{{ url_for('static', filename='shuttlecock.png') }}" type="image/png" sizes="512x512">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='shuttlecock.png') }}">
   <title>{% block title %}{{ t('brand') }}{% endblock %}</title>
+  {% block meta %}{% endblock %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -196,6 +197,7 @@
         <p>{{ t('footer') }}</p>
         <div class="footer-links">
           <a class="footer-introduction-link" href="{{ url_for('introduction') }}">{{ t('introduction') }}</a>
+          <a class="footer-updates-link" href="{{ url_for('updates') }}">{{ t('updates') }}</a>
           <a class="footer-license-link" href="{{ url_for('licenses') }}">{{ t('licenses') }}</a>
         </div>
       </div>

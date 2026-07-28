@@ -13,6 +13,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 - Enter a FIFO waiting list automatically when confirmed places are full.
 - Opt in to court-specific system push notifications when event information or the member list changes.
 - View the schedule, weekday, hall, location, prices, shuttlecock, levels, organizer, remarks, participant lists, and event media.
+- Share court links with a 1200×630 social preview generated from the first event photo, a frame from the first event video, or the event information when no media exists.
 - Use a floating, accessible join dialog on mobile screens.
 
 ### For organizers
@@ -56,6 +57,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 | --- | --- |
 | `/` | Homepage and upcoming courts |
 | `/introduction` | Public product introduction |
+| `/updates` | Public bilingual update history |
 | `/courts` | Filterable public court listing |
 | `/courts/new` | Shared new-event form for signed-in members and administrators |
 | `/<GUID>` | Public court details and registration |
@@ -106,8 +108,10 @@ The development bootstrap credentials are `admin` / `change-me`. Always replace 
 | `WEB_PUSH_PRIVATE_KEY` | Empty | Secret VAPID private key value or PEM-file path. |
 | `WEB_PUSH_SUBJECT` | Empty | Operator contact URI used in VAPID claims, such as `mailto:admin@example.com`. |
 | `WEB_PUSH_TIMEOUT` | `5` | Per-recipient push delivery timeout in seconds. |
+| `SOCIAL_THUMBNAIL_FFMPEG` | Bundled executable | Optional FFmpeg executable override used to extract the preview frame when the first event-media item is a video. |
+| `SOCIAL_THUMBNAIL_FONT` | Bundled Noto Sans TC | Optional path to a TrueType/OpenType font that overrides the bundled font used for generated information thumbnails. |
 | `SESSION_COOKIE_SECURE` | `0` | Set to `1` when the site is served exclusively over HTTPS. |
-| `TRUST_PROXY_HEADERS` | `0` | Trust the first `X-Forwarded-For` address. Enable only behind a trusted proxy that replaces this header. |
+| `TRUST_PROXY_HEADERS` | `0` | Trust forwarded client-IP and URL-scheme headers. Enable only behind a trusted proxy that replaces them. |
 | `GEOIP_COUNTRY_DB` | Empty | Optional local MaxMind GeoIP2/GeoLite2 country database. |
 | `DEFAULT_COUNTRY_CODE` | Empty | Optional two-letter fallback country. Unknown visitors otherwise use English. |
 | `LOGIN_MAX_ATTEMPTS` | `5` | Failed sign-ins allowed before temporary lockout. |
@@ -211,14 +215,16 @@ The image uses `app.py` as the uWSGI module and serves it through Nginx on port 
 - SQLite data is stored in `instance/courts.sqlite` unless `COURT_DATABASE` is configured.
 - Avatars are stored under `instance/avatars`.
 - Court photos and videos are stored under `instance/court_media`.
+- Versioned social-sharing thumbnails are cached under `instance/social_thumbnails`.
 - Replacing or deleting records cleans up associated uploaded files where applicable.
 
 ## Production
 
 - Set a strong `SECRET_KEY`, bootstrap administrator username, and bootstrap password before the first startup.
 - Serve the application over HTTPS and set `SESSION_COOKIE_SECURE=1`.
-- Set `TRUST_PROXY_HEADERS=1` only when a trusted reverse proxy replaces `X-Forwarded-For`.
+- Set `TRUST_PROXY_HEADERS=1` only when a trusted reverse proxy replaces the forwarded client-IP and URL-scheme headers.
 - Persist and back up the configured SQLite database and `instance` upload directories.
+- The project bundles the FFmpeg executable and Noto Sans TC variable font required to generate media and information thumbnails, both inside and outside Docker.
 - Configure the deployed domain as an allowed Google Maps browser-key referrer.
 
 ## Tests
@@ -231,6 +237,6 @@ Run the complete test suite inside the virtual environment:
 
 ## Attribution and licenses
 
-The website favicon uses [`static/shuttlecock.png`](static/shuttlecock.png), based on the [Shuttlecock icon by Flaticon](https://www.flaticon.com/free-icon/shuttlecock_9719863?term=badminton&page=1&position=51&origin=search&related_id=9719863). Public attribution and license links are available at `/licenses`.
+The website favicon uses [`static/shuttlecock.png`](static/shuttlecock.png), based on the [Shuttlecock icon by Flaticon](https://www.flaticon.com/free-icon/shuttlecock_9719863?term=badminton&page=1&position=51&origin=search&related_id=9719863). Generated information thumbnails use the bundled [Noto Sans TC](https://github.com/notofonts/noto-cjk) variable font under the SIL Open Font License 1.1. Public attribution and license links are available at `/licenses`.
 
 Badminton Court Control Panel was developed with support from [OpenAI Codex](https://openai.com/codex/) for implementation, review, and testing. Responsibility for the website, its operation, and its content remains with the project owner; this acknowledgment does not imply OpenAI endorsement or ownership.

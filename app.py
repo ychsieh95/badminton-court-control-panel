@@ -4,12 +4,14 @@ import base64
 import binascii
 import hmac
 import hashlib
+import io
 import ipaddress
 import json
 import os
 import re
 import secrets
 import sqlite3
+import subprocess
 import uuid
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
@@ -34,6 +36,8 @@ from flask import (
     session,
     url_for,
 )
+from imageio_ffmpeg import get_ffmpeg_exe
+from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
 from pywebpush import WebPushException, webpush
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -49,6 +53,7 @@ AVATAR_FILENAME_PATTERN = re.compile(r"^[a-f0-9]{32}\.(?:jpg|png|webp)$")
 COURT_MEDIA_FILENAME_PATTERN = re.compile(
     r"^[a-f0-9]{32}\.(?:jpg|png|webp|mp4|webm)$"
 )
+SOCIAL_THUMBNAIL_VERSION_PATTERN = re.compile(r"^[a-f0-9]{16}$")
 WEB_PUSH_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]+={0,2}$")
 TRUSTED_PUSH_HOST_SUFFIXES = (
     "fcm.googleapis.com",
@@ -60,6 +65,10 @@ MAX_AVATAR_BYTES = 2 * 1024 * 1024
 MAX_COURT_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_COURT_VIDEO_BYTES = 50 * 1024 * 1024
 MAX_COURT_MEDIA_FILES = 12
+SOCIAL_THUMBNAIL_WIDTH = 1200
+SOCIAL_THUMBNAIL_HEIGHT = 630
+SOCIAL_THUMBNAIL_MAX_SOURCE_PIXELS = 40_000_000
+SOCIAL_THUMBNAIL_RENDER_VERSION = 2
 ACCOUNT_ROLES = {"member", "sub_admin", "admin", "super_admin"}
 ADMIN_ROLES = {"sub_admin", "admin", "super_admin"}
 COURT_EXPIRED_SQL = (
@@ -72,6 +81,12 @@ TRANSLATIONS = {
         "brand": "Badminton Court Control Panel",
         "home": "Courts",
         "introduction": "Introduction",
+        "updates": "Update history",
+        "updates_eyebrow": "What’s new",
+        "updates_title": "The control panel keeps getting better.",
+        "updates_body": "Follow the newest features, security improvements, and experience updates added to Badminton Court Control Panel.",
+        "update_latest": "Latest",
+        "update_details": "Changes in this update",
         "first_visit_intro_title": "New here? Take a quick tour.",
         "first_visit_intro_body": "Would you like to visit the introduction page and see how the control panel works?",
         "first_visit_intro_accept": "View introduction",
@@ -459,6 +474,10 @@ TRANSLATIONS = {
         "codex_support_body": "Badminton Court Control Panel was developed with assistance from Codex, OpenAI’s coding agent, for implementation, review, and testing.",
         "codex_responsibility": "The project owner remains responsible for this website, its operation, and its content. This acknowledgment does not imply OpenAI endorsement or ownership.",
         "codex_official_page": "Official Codex page",
+        "noto_font": "Noto Sans Traditional Chinese font",
+        "noto_font_attribution": "Noto Sans Traditional Chinese is provided by the Noto project and is licensed under the SIL Open Font License 1.1.",
+        "noto_font_usage": "The bundled variable font renders English and Traditional Chinese text in generated social-sharing thumbnails.",
+        "font_license": "Font license",
         "joined_success": "You joined the court.",
         "joined_waitlist_success": "The court is full, so you have been added to the waiting list.",
         "left_success": "You left the court.",
@@ -487,6 +506,12 @@ TRANSLATIONS = {
         "brand": "羽球場控面板",
         "home": "球場",
         "introduction": "網站介紹",
+        "updates": "更新紀錄",
+        "updates_eyebrow": "最新消息",
+        "updates_title": "羽球場控面板，持續變得更好。",
+        "updates_body": "查看羽球場控面板新增的功能、安全性改善與使用體驗更新。",
+        "update_latest": "最新",
+        "update_details": "本次更新內容",
         "first_visit_intro_title": "第一次來嗎？先快速認識網站。",
         "first_visit_intro_body": "是否前往網站介紹頁，了解羽球場控面板的主要功能？",
         "first_visit_intro_accept": "查看網站介紹",
@@ -874,6 +899,10 @@ TRANSLATIONS = {
         "codex_support_body": "Badminton Court Control Panel 在功能實作、程式碼檢查與測試過程中，使用了 OpenAI 的程式設計代理 Codex 提供協助。",
         "codex_responsibility": "本網站之內容、營運與最終成果仍由專案擁有者負責；此說明不代表 OpenAI 對本網站提供背書或擁有權。",
         "codex_official_page": "Codex 官方頁面",
+        "noto_font": "Noto Sans 繁體中文字型",
+        "noto_font_attribution": "Noto Sans 繁體中文由 Noto 專案提供，並採用 SIL Open Font License 1.1 授權。",
+        "noto_font_usage": "專案內附的可變字型用於在社群分享縮圖中繪製英文及繁體中文。",
+        "font_license": "字型授權",
         "joined_success": "你已加入此場次。",
         "joined_waitlist_success": "場次已額滿，你已加入候補名單。",
         "left_success": "你已離開此場次。",
@@ -899,6 +928,149 @@ TRANSLATIONS = {
         "joined_on_site": "線上報名",
     },
 }
+
+
+SITE_UPDATE_HISTORY = (
+    {
+        "date": "2026-07-28",
+        "date_label": {
+            "en-us": "July 28, 2026",
+            "zh-tw": "2026 年 7 月 28 日",
+        },
+        "title": {
+            "en-us": "Rich previews for every shared court",
+            "zh-tw": "每個場次連結都有豐富的社群預覽",
+        },
+        "summary": {
+            "en-us": "Court links now present a useful visual preview when shared to Facebook and other Open Graph clients.",
+            "zh-tw": "將場次連結分享到 Facebook 或其他支援 Open Graph 的服務時，現在會顯示實用的視覺預覽。",
+        },
+        "items": {
+            "en-us": (
+                "Uses the first event photo, or extracts a frame when the first gallery item is a video.",
+                "Creates a branded 1200×630 event-information card when the court has no media.",
+                "Bundles Noto Sans Traditional Chinese so generated event-information cards render bilingual text consistently in every deployment.",
+                "Organizes third-party asset licenses publicly, including the bundled Noto font’s SIL Open Font License.",
+                "Refreshes the versioned preview URL when event, member, status, or media information changes.",
+            ),
+            "zh-tw": (
+                "優先使用第一個活動相片；若相簿第一個項目是影片，則擷取影片畫面。",
+                "場次沒有媒體時，產生包含活動資訊的品牌化 1200×630 圖片。",
+                "專案內附 Noto Sans 繁體中文字型，讓各種部署環境產生的活動資訊圖片都能一致顯示雙語文字。",
+                "公開整理第三方素材授權資訊，包括內附 Noto 字型的 SIL Open Font License。",
+                "活動、球友、狀態或媒體資訊變更時，自動提供新版本的預覽網址。",
+            ),
+        },
+    },
+    {
+        "date": "2026-07-28",
+        "date_label": {
+            "en-us": "July 28, 2026",
+            "zh-tw": "2026 年 7 月 28 日",
+        },
+        "title": {
+            "en-us": "Safer sign-in and court notifications",
+            "zh-tw": "更安全的登入與場次通知",
+        },
+        "summary": {
+            "en-us": "Authentication protection and opt-in court updates now use modern browser and Cloudflare services.",
+            "zh-tw": "登入保護與自選場次通知現在採用現代瀏覽器及 Cloudflare 服務。",
+        },
+        "items": {
+            "en-us": (
+                "Replaced hCaptcha with action-bound Cloudflare Turnstile verification for signup and sign-in.",
+                "Added per-court system Web Push subscriptions for event-information and member-list changes.",
+                "Kept notification endpoints, credentials, and member nicknames out of public output and lock-screen messages.",
+            ),
+            "zh-tw": (
+                "以具動作綁定的 Cloudflare Turnstile 取代 hCaptcha，保護註冊與登入。",
+                "新增個別場次系統 Web Push 訂閱，在活動資訊或球友名單變更時通知。",
+                "推播端點、憑證與球友暱稱不會出現在公開內容或鎖定畫面訊息中。",
+            ),
+        },
+    },
+    {
+        "date": "2026-07",
+        "date_label": {
+            "en-us": "July 2026",
+            "zh-tw": "2026 年 7 月",
+        },
+        "title": {
+            "en-us": "A friendlier first visit",
+            "zh-tw": "更友善的初次使用體驗",
+        },
+        "summary": {
+            "en-us": "New visitors can understand the service quickly and tailor the interface to their preferences.",
+            "zh-tw": "新訪客可以快速認識服務，並依自己的習慣調整介面。",
+        },
+        "items": {
+            "en-us": (
+                "Added a bilingual introduction page and a remembered first-visit invitation.",
+                "Added Taiwan-aware language detection with a persistent English or Traditional Chinese override.",
+                "Expanded appearance controls with four palettes and light, dark, or system modes.",
+            ),
+            "zh-tw": (
+                "新增雙語網站介紹頁，以及會記住選擇的初次造訪提示。",
+                "新增台灣地區語言判斷，並可持續使用手動選擇的英文或繁體中文。",
+                "外觀設定擴充為四種配色，並支援淺色、深色及系統模式。",
+            ),
+        },
+    },
+    {
+        "date": "2026-07",
+        "date_label": {
+            "en-us": "July 2026",
+            "zh-tw": "2026 年 7 月",
+        },
+        "title": {
+            "en-us": "More expressive events and smoother organizing",
+            "zh-tw": "更完整的活動內容與主辦流程",
+        },
+        "summary": {
+            "en-us": "Organizers gained richer event pages and faster tools for publishing and reusing court information.",
+            "zh-tw": "主辦者現在可以建立更豐富的活動頁，並更快速地發布及重複使用場次資訊。",
+        },
+        "items": {
+            "en-us": (
+                "Added event and badminton-group names, photos, videos, gallery covers, prices, shuttlecock information, and remarks.",
+                "Added shared event creation, saved hall locations, duplication, archive/restore, and owner-managed events.",
+                "Added public and administrator filters for date, level, gender range, creator, capacity, and event status.",
+            ),
+            "zh-tw": (
+                "新增活動與羽球團名稱、相片、影片、相簿封面、費用、用球及備註。",
+                "新增共用活動建立頁、儲存球館地點、複製、封存／恢復及主辦者管理功能。",
+                "公開頁與管理後台新增日期、程度、男女範圍、建立者、名額及活動狀態篩選。",
+            ),
+        },
+    },
+    {
+        "date": "2026-07",
+        "date_label": {
+            "en-us": "July 2026",
+            "zh-tw": "2026 年 7 月",
+        },
+        "title": {
+            "en-us": "The complete court-control foundation",
+            "zh-tw": "完整的場控核心功能",
+        },
+        "summary": {
+            "en-us": "The original court workflow grew into a complete platform for players, organizers, and administrators.",
+            "zh-tw": "最初的場次流程已擴充為提供球友、主辦者與管理員使用的完整平台。",
+        },
+        "items": {
+            "en-us": (
+                "Added permanent GUID court links, nickname and PIN registration, capacity limits, waiting lists, and automatic promotion.",
+                "Added reserved members, roll call and clearing, read-only event mode, and join/leave history.",
+                "Added member accounts, role-based administration, password and avatar management, login lockouts, and privacy-focused auditing.",
+            ),
+            "zh-tw": (
+                "新增永久 GUID 場次連結、暱稱與 PIN 報名、人數上限、候補名單及自動遞補。",
+                "新增預訂球友、點名與結清、活動唯讀模式，以及加入／退出紀錄。",
+                "新增會員帳號、角色權限管理、密碼與頭像管理、登入鎖定，以及重視隱私的稽核紀錄。",
+            ),
+        },
+    },
+)
 
 
 SCHEMA = """
@@ -1075,6 +1247,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         WEB_PUSH_TIMEOUT=float(os.environ.get("WEB_PUSH_TIMEOUT", "5")),
         AVATAR_FOLDER=str(Path(app.instance_path) / "avatars"),
         COURT_MEDIA_FOLDER=str(Path(app.instance_path) / "court_media"),
+        SOCIAL_THUMBNAIL_FOLDER=str(
+            Path(app.instance_path) / "social_thumbnails"
+        ),
+        SOCIAL_THUMBNAIL_FFMPEG=os.environ.get(
+            "SOCIAL_THUMBNAIL_FFMPEG", ""
+        ),
+        SOCIAL_THUMBNAIL_FONT=os.environ.get("SOCIAL_THUMBNAIL_FONT", ""),
         GEOIP_COUNTRY_DB=os.environ.get("GEOIP_COUNTRY_DB", ""),
         DEFAULT_COUNTRY_CODE=os.environ.get("DEFAULT_COUNTRY_CODE", "").upper(),
         TRUST_PROXY_HEADERS=os.environ.get("TRUST_PROXY_HEADERS", "0") == "1",
@@ -1090,6 +1269,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
     Path(app.config["AVATAR_FOLDER"]).mkdir(parents=True, exist_ok=True)
     Path(app.config["COURT_MEDIA_FOLDER"]).mkdir(parents=True, exist_ok=True)
+    Path(app.config["SOCIAL_THUMBNAIL_FOLDER"]).mkdir(
+        parents=True, exist_ok=True
+    )
     app.extensions["geoip_country_reader"] = None
     if app.config["GEOIP_COUNTRY_DB"]:
         try:
@@ -1175,6 +1357,23 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.get("/introduction")
     def introduction():
         return render_template("introduction.html")
+
+    @app.get("/updates")
+    def updates():
+        lang = current_language()
+        update_entries = tuple(
+            {
+                "date": entry["date"],
+                "date_label": entry["date_label"][lang],
+                "title": entry["title"][lang],
+                "summary": entry["summary"][lang],
+                "items": entry["items"][lang],
+            }
+            for entry in SITE_UPDATE_HISTORY
+        )
+        return render_template(
+            "updates.html", update_entries=update_entries
+        )
 
     @app.get("/courts")
     def public_courts():
@@ -1582,6 +1781,58 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             max_age=86400,
         )
 
+    @app.get("/<guid>/social-thumbnail/<version>/<lang>.jpg")
+    def court_social_thumbnail(guid: str, version: str, lang: str):
+        if (
+            not SOCIAL_THUMBNAIL_VERSION_PATTERN.fullmatch(version)
+            or lang not in LANGUAGES
+        ):
+            abort(404)
+        court = fetch_court(guid)
+        if court is None:
+            abort(404)
+        first_media = fetch_first_court_media(court["id"])
+        expected_version = court_social_thumbnail_version(court, first_media)
+        if version != expected_version:
+            return redirect(
+                url_for(
+                    "court_social_thumbnail",
+                    guid=guid,
+                    version=expected_version,
+                    lang=lang,
+                ),
+                code=302,
+            )
+
+        cache_key = court_social_thumbnail_cache_key(guid)
+        filename = f"{cache_key}-{version}-{lang}.jpg"
+        thumbnail_folder = Path(app.config["SOCIAL_THUMBNAIL_FOLDER"])
+        thumbnail_path = thumbnail_folder / filename
+        if not thumbnail_path.is_file():
+            thumbnail_data = render_court_social_thumbnail(
+                court, first_media, lang
+            )
+            temporary_path = thumbnail_folder / (
+                f".{filename}.{secrets.token_hex(8)}.tmp"
+            )
+            try:
+                temporary_path.write_bytes(thumbnail_data)
+                os.replace(temporary_path, thumbnail_path)
+            finally:
+                temporary_path.unlink(missing_ok=True)
+            remove_stale_court_social_thumbnails(cache_key, version)
+
+        response = send_from_directory(
+            thumbnail_folder,
+            filename,
+            mimetype="image/jpeg",
+            conditional=True,
+            max_age=31536000,
+        )
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
     @app.get("/service-worker.js")
     def service_worker():
         response = send_from_directory(
@@ -1702,6 +1953,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "ORDER BY occurred_at DESC, id DESC",
                 (court["id"],),
             ).fetchall()
+        court_media = fetch_court_media(court["id"])
+        social_metadata = court_social_metadata(
+            court, court_media[0] if court_media else None
+        )
         return render_template(
             "court.html",
             court=court,
@@ -1709,8 +1964,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             waiting_participants=[p for p in participants if p["waitlisted"]],
             reserved_members=[member for member in all_reserved_members if member["nickname"]],
             all_reserved_members=all_reserved_members,
-            court_media=fetch_court_media(court["id"]),
+            court_media=court_media,
             participation_history=participation_history,
+            social_metadata=social_metadata,
         )
 
     @app.post("/<guid>/roll-clearing/start")
@@ -2878,6 +3134,17 @@ def current_app_config(key: str) -> Any:
     return current_app.config[key]
 
 
+def public_external_url(endpoint: str, **values: Any) -> str:
+    generated_url = url_for(endpoint, _external=True, **values)
+    if not current_app_config("TRUST_PROXY_HEADERS"):
+        return generated_url
+    forwarded_scheme = request.headers.get("X-Forwarded-Proto", "")
+    forwarded_scheme = forwarded_scheme.split(",", 1)[0].strip().lower()
+    if forwarded_scheme not in {"http", "https"}:
+        return generated_url
+    return urlparse(generated_url)._replace(scheme=forwarded_scheme).geturl()
+
+
 def current_language() -> str:
     saved_language = request.cookies.get("court_lang", "").lower()
     if saved_language in LANGUAGES:
@@ -3488,6 +3755,377 @@ def fetch_court_media(court_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def fetch_first_court_media(court_id: int) -> sqlite3.Row | None:
+    return get_db().execute(
+        "SELECT id, filename, original_name, media_type, mime_type, position "
+        "FROM court_media WHERE court_id = ? ORDER BY position, id LIMIT 1",
+        (court_id,),
+    ).fetchone()
+
+
+def court_social_thumbnail_cache_key(guid: str) -> str:
+    return hashlib.sha256(guid.encode("utf-8")).hexdigest()[:32]
+
+
+def court_social_thumbnail_version(
+    court: sqlite3.Row, first_media: sqlite3.Row | None
+) -> str:
+    court_fields = (
+        "event_name",
+        "badminton_name",
+        "court_date",
+        "start_time",
+        "end_time",
+        "hall_name",
+        "location",
+        "court_id",
+        "total_count",
+        "member_max",
+        "archived",
+        "is_expired",
+    )
+    media_fields = ("id", "filename", "media_type", "mime_type", "position")
+    fingerprint = {
+        "renderer": SOCIAL_THUMBNAIL_RENDER_VERSION,
+        "court": {field: court[field] for field in court_fields},
+        "media": (
+            {field: first_media[field] for field in media_fields}
+            if first_media is not None
+            else None
+        ),
+    }
+    serialized = json.dumps(
+        fingerprint, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
+
+
+def court_social_metadata(
+    court: sqlite3.Row, first_media: sqlite3.Row | None
+) -> dict[str, str]:
+    lang = current_language()
+    translations = TRANSLATIONS[lang]
+    title = court["event_name"] or court["hall_name"]
+    date_text = str(court["court_date"]).replace("-", "/")
+    time_text = f"{court['start_time']}–{court['end_time']}"
+    description = " · ".join(
+        (
+            f"{date_text} {time_text}",
+            court["hall_name"],
+            court["location"],
+            f"{translations['members']} {court['total_count']}/{court['member_max']}",
+        )
+    )
+    version = court_social_thumbnail_version(court, first_media)
+    return {
+        "title": title,
+        "description": description,
+        "url": public_external_url("court_detail", guid=court["guid"]),
+        "image_url": public_external_url(
+            "court_social_thumbnail",
+            guid=court["guid"],
+            version=version,
+            lang=lang,
+        ),
+        "image_alt": f"{title} · {translations['event_information']}",
+        "locale": "zh_TW" if lang == "zh-tw" else "en_US",
+        "alternate_locale": "en_US" if lang == "zh-tw" else "zh_TW",
+    }
+
+
+def render_court_social_thumbnail(
+    court: sqlite3.Row,
+    first_media: sqlite3.Row | None,
+    lang: str,
+) -> bytes:
+    thumbnail: Image.Image | None = None
+    if first_media is not None:
+        try:
+            thumbnail = render_court_media_social_thumbnail(first_media)
+        except (
+            OSError,
+            ValueError,
+            UnidentifiedImageError,
+            subprocess.SubprocessError,
+        ) as error:
+            current_app.logger.warning(
+                "Unable to create social thumbnail from court media %s (%s)",
+                first_media["id"],
+                type(error).__name__,
+            )
+    if thumbnail is None:
+        thumbnail = render_court_information_social_thumbnail(court, lang)
+
+    output = io.BytesIO()
+    thumbnail.save(
+        output,
+        format="JPEG",
+        quality=88,
+        optimize=True,
+        progressive=True,
+    )
+    return output.getvalue()
+
+
+def render_court_media_social_thumbnail(media: sqlite3.Row) -> Image.Image:
+    media_path = (
+        Path(current_app_config("COURT_MEDIA_FOLDER")) / media["filename"]
+    )
+    if media["media_type"] == "video":
+        configured_ffmpeg = str(
+            current_app_config("SOCIAL_THUMBNAIL_FFMPEG")
+        ).strip()
+        result = subprocess.run(
+            [
+                configured_ffmpeg or get_ffmpeg_exe(),
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(media_path),
+                "-an",
+                "-sn",
+                "-dn",
+                "-vf",
+                (
+                    "thumbnail=30,"
+                    f"scale={SOCIAL_THUMBNAIL_WIDTH}:"
+                    f"{SOCIAL_THUMBNAIL_HEIGHT}:"
+                    "force_original_aspect_ratio=increase,"
+                    f"crop={SOCIAL_THUMBNAIL_WIDTH}:"
+                    f"{SOCIAL_THUMBNAIL_HEIGHT}"
+                ),
+                "-frames:v",
+                "1",
+                "-f",
+                "image2pipe",
+                "-vcodec",
+                "mjpeg",
+                "pipe:1",
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=12,
+        )
+        if not result.stdout or len(result.stdout) > 16 * 1024 * 1024:
+            raise ValueError("Invalid video thumbnail output")
+        source: str | io.BytesIO = io.BytesIO(result.stdout)
+    else:
+        source = str(media_path)
+
+    with Image.open(source) as opened_image:
+        if (
+            opened_image.width * opened_image.height
+            > SOCIAL_THUMBNAIL_MAX_SOURCE_PIXELS
+        ):
+            raise ValueError("Court media dimensions are too large")
+        image = ImageOps.exif_transpose(opened_image).convert("RGB")
+        return ImageOps.fit(
+            image,
+            (SOCIAL_THUMBNAIL_WIDTH, SOCIAL_THUMBNAIL_HEIGHT),
+            method=Image.Resampling.LANCZOS,
+        )
+
+
+def social_thumbnail_font(
+    size: int, *, bold: bool = False
+) -> ImageFont.FreeTypeFont:
+    configured_font = str(current_app_config("SOCIAL_THUMBNAIL_FONT")).strip()
+    bundled_font = (
+        Path(__file__).with_name("static")
+        / "fonts"
+        / "NotoSansTC-VF.ttf"
+    )
+    candidates = [
+        configured_font,
+        str(bundled_font),
+        (
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
+            if bold
+            else "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
+        ),
+        (
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc"
+            if bold
+            else "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
+        ),
+        (
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+            if bold
+            else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        ),
+    ]
+    for candidate in candidates:
+        if not candidate or not Path(candidate).is_file():
+            continue
+        try:
+            font = ImageFont.truetype(candidate, size=size)
+            try:
+                variation_values = []
+                for axis in font.get_variation_axes():
+                    axis_name = axis.get("name", b"")
+                    if isinstance(axis_name, bytes):
+                        axis_name = axis_name.decode("ascii", errors="ignore")
+                    if axis_name.lower() == "weight":
+                        variation_values.append(700 if bold else 400)
+                    else:
+                        variation_values.append(axis["default"])
+                if variation_values:
+                    font.set_variation_by_axes(variation_values)
+            except (AttributeError, OSError, ValueError):
+                pass
+            return font
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def wrap_social_thumbnail_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.ImageFont,
+    max_width: int,
+    max_lines: int,
+) -> list[str]:
+    normalized = " ".join(str(text).split())
+    if not normalized:
+        return []
+    lines: list[str] = []
+    current = ""
+    consumed = 0
+    for index, character in enumerate(normalized):
+        candidate = current + character
+        width = draw.textbbox((0, 0), candidate, font=font)[2]
+        if current and width > max_width:
+            lines.append(current.rstrip())
+            consumed = index
+            current = character.lstrip()
+            if len(lines) == max_lines:
+                break
+        else:
+            current = candidate
+        consumed = index + 1
+    if len(lines) < max_lines and current:
+        lines.append(current.rstrip())
+    if consumed < len(normalized) and lines:
+        last_line = lines[-1].rstrip()
+        while last_line:
+            candidate = last_line.rstrip() + "…"
+            if draw.textbbox((0, 0), candidate, font=font)[2] <= max_width:
+                lines[-1] = candidate
+                break
+            last_line = last_line[:-1]
+    return lines
+
+
+def render_court_information_social_thumbnail(
+    court: sqlite3.Row, lang: str
+) -> Image.Image:
+    translations = TRANSLATIONS[lang]
+    image = Image.new(
+        "RGB",
+        (SOCIAL_THUMBNAIL_WIDTH, SOCIAL_THUMBNAIL_HEIGHT),
+        "#f7f3e8",
+    )
+    draw = ImageDraw.Draw(image)
+    accent = "#f2c94c"
+    ink = "#171717"
+    muted = "#605d55"
+    white = "#ffffff"
+
+    draw.rounded_rectangle((28, 28, 1172, 602), radius=34, fill=white)
+    draw.rounded_rectangle((28, 28, 54, 602), radius=13, fill=accent)
+    draw.ellipse((965, -120, 1265, 180), fill="#fbefd0")
+    draw.rounded_rectangle(
+        (900, 75, 1110, 315), radius=22, outline="#eadfbf", width=7
+    )
+    draw.line((1005, 75, 1005, 315), fill="#eadfbf", width=5)
+    draw.line((900, 195, 1110, 195), fill="#eadfbf", width=5)
+    draw.ellipse((980, 170, 1030, 220), outline=accent, width=6)
+
+    brand_font = social_thumbnail_font(26, bold=True)
+    title_font = social_thumbnail_font(62, bold=True)
+    subtitle_font = social_thumbnail_font(30)
+    label_font = social_thumbnail_font(22, bold=True)
+    value_font = social_thumbnail_font(30, bold=True)
+
+    brand = translations["brand"].upper()
+    draw.text((82, 64), brand, font=brand_font, fill=muted)
+    title = court["event_name"] or court["hall_name"]
+    title_lines = wrap_social_thumbnail_text(
+        draw, title, title_font, 790, 2
+    )
+    for line_index, line in enumerate(title_lines):
+        draw.text(
+            (78, 122 + line_index * 76),
+            line,
+            font=title_font,
+            fill=ink,
+        )
+
+    subtitle_parts = []
+    if court["event_name"]:
+        subtitle_parts.append(court["hall_name"])
+    if court["badminton_name"]:
+        subtitle_parts.append(court["badminton_name"])
+    subtitle = " · ".join(subtitle_parts) or court["location"]
+    subtitle_line = wrap_social_thumbnail_text(
+        draw, subtitle, subtitle_font, 970, 1
+    )
+    if subtitle_line:
+        draw.text((82, 292), subtitle_line[0], font=subtitle_font, fill=muted)
+    location_line = wrap_social_thumbnail_text(
+        draw, court["location"], subtitle_font, 970, 1
+    )
+    if location_line and court["location"] != subtitle:
+        draw.text((82, 340), location_line[0], font=subtitle_font, fill=muted)
+
+    labels = (
+        translations["date"],
+        translations["time"],
+        translations["court_id"],
+        translations["members"],
+    )
+    values = (
+        str(court["court_date"]).replace("-", "/"),
+        f"{court['start_time']}–{court['end_time']}",
+        str(court["court_id"]),
+        f"{court['total_count']} / {court['member_max']}",
+    )
+    left_positions = (82, 358, 654, 900)
+    widths = (240, 260, 210, 210)
+    for left, column_width, label, value in zip(
+        left_positions, widths, labels, values
+    ):
+        draw.text((left, 458), label, font=label_font, fill=muted)
+        value_line = wrap_social_thumbnail_text(
+            draw, value, value_font, column_width, 1
+        )
+        if value_line:
+            draw.text((left, 500), value_line[0], font=value_font, fill=ink)
+
+    draw.rounded_rectangle((82, 558, 235, 570), radius=6, fill=accent)
+    return image
+
+
+def remove_stale_court_social_thumbnails(
+    cache_key: str, current_version: str
+) -> None:
+    thumbnail_folder = Path(current_app_config("SOCIAL_THUMBNAIL_FOLDER"))
+    current_prefix = f"{cache_key}-{current_version}-"
+    for thumbnail_path in thumbnail_folder.glob(f"{cache_key}-*.jpg"):
+        if not thumbnail_path.name.startswith(current_prefix):
+            thumbnail_path.unlink(missing_ok=True)
+
+
+def remove_court_social_thumbnails(guid: str) -> None:
+    thumbnail_folder = Path(current_app_config("SOCIAL_THUMBNAIL_FOLDER"))
+    cache_key = court_social_thumbnail_cache_key(guid)
+    for thumbnail_path in thumbnail_folder.glob(f"{cache_key}-*.jpg"):
+        thumbnail_path.unlink(missing_ok=True)
+
+
 def store_court_media(
     db: sqlite3.Connection,
     court_id: int,
@@ -3667,6 +4305,7 @@ def delete_court_record(guid: str, owner_id: int | None = None) -> bool:
         return False
     db.commit()
     remove_court_media_files([item["filename"] for item in media])
+    remove_court_social_thumbnails(court["guid"])
     deliver_court_push_notifications(
         guid=court["guid"],
         court_name=court["event_name"] or court["hall_name"],

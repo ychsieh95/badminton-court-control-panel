@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ t('updates') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<section class="page-header updates-header">
+  <div class="shell page-header-inner">
+    <div>
+      <p class="eyebrow">{{ t('updates_eyebrow') }}</p>
+      <h1>{{ t('updates_title') }}</h1>
+      <p>{{ t('updates_body') }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="section shell section-tight updates-shell">
+  <div class="updates-timeline" aria-label="{{ t('updates') }}">
+    {% for entry in update_entries %}
+      <article class="update-entry">
+        <div class="update-rail" aria-hidden="true">
+          <span></span>
+        </div>
+        <div class="panel update-card">
+          <header class="update-card-header">
+            <time datetime="{{ entry.date }}">{{ entry.date_label }}</time>
+            {% if loop.first %}
+              <span class="update-latest">{{ t('update_latest') }}</span>
+            {% endif %}
+          </header>
+          <h2>{{ entry.title }}</h2>
+          <p class="update-summary">{{ entry.summary }}</p>
+          <div class="update-details">
+            <h3>{{ t('update_details') }}</h3>
+            <ul>
+              {% for item in entry['items'] %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

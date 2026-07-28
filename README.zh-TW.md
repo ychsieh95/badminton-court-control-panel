@@ -13,6 +13,7 @@ Badminton Court Control Panel 是一套支援雙語的 Flask 羽球活動管理�
 - 正式名額額滿時，自動依加入順序進入候補名單。
 - 可針對個別場次開啟系統推播通知，在場次資訊或球友名單變更時收到通知。
 - 查看日期、星期、時間、球館、地點、費用、用球、程度、主辦者、備註、球友名單及活動媒體。
+- 分享場次網址時提供 1200×630 社群預覽；依序使用第一個活動相片、第一個活動影片的畫面，或在沒有媒體時使用活動資訊產生圖片。
 - 在行動裝置上透過浮動按鈕開啟無障礙加入視窗。
 
 ### 主辦者功能
@@ -56,6 +57,7 @@ Badminton Court Control Panel 是一套支援雙語的 Flask 羽球活動管理�
 | --- | --- |
 | `/` | 首頁與即將開始的場次 |
 | `/introduction` | 公開網站介紹 |
+| `/updates` | 公開雙語更新紀錄 |
 | `/courts` | 可篩選的公開場次列表 |
 | `/courts/new` | 會員與管理員共用的新增場次表單 |
 | `/<GUID>` | 公開場次詳情及報名 |
@@ -106,8 +108,10 @@ flask --app app run --debug
 | `WEB_PUSH_PRIVATE_KEY` | 空白 | 私密 VAPID 金鑰內容或 PEM 檔案路徑。 |
 | `WEB_PUSH_SUBJECT` | 空白 | VAPID 聲明使用的營運者聯絡 URI，例如 `mailto:admin@example.com`。 |
 | `WEB_PUSH_TIMEOUT` | `5` | 每個推播接收者的傳送逾時秒數。 |
+| `SOCIAL_THUMBNAIL_FFMPEG` | 內附執行檔 | 第一個活動媒體是影片時，用來覆寫擷取預覽畫面的 FFmpeg 執行檔。 |
+| `SOCIAL_THUMBNAIL_FONT` | 內附 Noto Sans TC | 可選用的 TrueType/OpenType 字型路徑，用來覆寫產生活動資訊縮圖時使用的內附字型。 |
 | `SESSION_COOKIE_SECURE` | `0` | 網站完全透過 HTTPS 提供時設為 `1`。 |
-| `TRUST_PROXY_HEADERS` | `0` | 信任 `X-Forwarded-For` 的第一個位址；僅能在會覆寫此標頭的可信任反向代理後啟用。 |
+| `TRUST_PROXY_HEADERS` | `0` | 信任轉送的用戶端 IP 與網址通訊協定標頭；僅能在會覆寫這些標頭的可信任反向代理後啟用。 |
 | `GEOIP_COUNTRY_DB` | 空白 | 選用的本機 MaxMind GeoIP2／GeoLite2 國家資料庫。 |
 | `DEFAULT_COUNTRY_CODE` | 空白 | 選用的兩碼備用國家代碼；未知地區訪客預設使用英文。 |
 | `LOGIN_MAX_ATTEMPTS` | `5` | 暫時鎖定前允許的登入失敗次數。 |
@@ -211,14 +215,16 @@ docker run --rm \
 - 未設定 `COURT_DATABASE` 時，SQLite 資料儲存在 `instance/courts.sqlite`。
 - 頭像儲存在 `instance/avatars`。
 - 場次相片及影片儲存在 `instance/court_media`。
+- 具版本的社群分享縮圖快取於 `instance/social_thumbnails`。
 - 更換或刪除資料時，系統會在適用情況下清理相關上傳檔案。
 
 ## 正式環境
 
 - 第一次啟動前設定高強度的 `SECRET_KEY`、初始管理員名稱及密碼。
 - 使用 HTTPS 提供網站，並設定 `SESSION_COOKIE_SECURE=1`。
-- 僅在可信任反向代理會覆寫 `X-Forwarded-For` 時設定 `TRUST_PROXY_HEADERS=1`。
+- 僅在可信任反向代理會覆寫轉送的用戶端 IP 與網址通訊協定標頭時設定 `TRUST_PROXY_HEADERS=1`。
 - 持久化並備份設定的 SQLite 資料庫及 `instance` 上傳目錄。
+- 專案已內附產生媒體及活動資訊縮圖所需的 FFmpeg 執行檔與 Noto Sans TC 可變字型，無論是否使用 Docker 都可直接使用。
 - 將正式網域加入 Google Maps 瀏覽器金鑰允許的參照網址。
 
 ## 測試
@@ -231,6 +237,6 @@ docker run --rm \
 
 ## 授權標示與致謝
 
-網站圖示使用 [`static/shuttlecock.png`](static/shuttlecock.png)，其來源為 [Flaticon 的 Shuttlecock icon](https://www.flaticon.com/free-icon/shuttlecock_9719863?term=badminton&page=1&position=51&origin=search&related_id=9719863)。公開授權標示及授權連結可於 `/licenses` 查看。
+網站圖示使用 [`static/shuttlecock.png`](static/shuttlecock.png)，其來源為 [Flaticon 的 Shuttlecock icon](https://www.flaticon.com/free-icon/shuttlecock_9719863?term=badminton&page=1&position=51&origin=search&related_id=9719863)。產生活動資訊縮圖時使用內附的 [Noto Sans TC](https://github.com/notofonts/noto-cjk) 可變字型，並依 SIL Open Font License 1.1 授權。公開授權標示及授權連結可於 `/licenses` 查看。
 
 Badminton Court Control Panel 在功能實作、程式碼檢查及測試過程中使用 [OpenAI Codex](https://openai.com/codex/) 協助。網站內容、營運及最終成果仍由專案擁有者負責；此說明不代表 OpenAI 對本網站提供背書或擁有權。

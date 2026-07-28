@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Noto Sans TC Thumbnail";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/static/fonts/NotoSansTC-VF.ttf") format("truetype");
+}
+
 :root {
   --bg: #f6f6f7;
   --surface: #ffffff;
@@ -1672,6 +1680,141 @@ select:focus-visible {
   max-width: 900px;
 }
 
+.updates-header {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 86% 20%, var(--primary-soft), transparent 28%),
+    var(--surface-soft);
+}
+
+.updates-header .page-header-inner > div {
+  max-width: 760px;
+}
+
+.updates-shell {
+  max-width: 980px;
+}
+
+.updates-timeline {
+  position: relative;
+  display: grid;
+  gap: 22px;
+}
+
+.updates-timeline::before {
+  position: absolute;
+  top: 42px;
+  bottom: 42px;
+  left: 19px;
+  width: 2px;
+  background: var(--border-strong);
+  content: "";
+}
+
+.update-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 24px;
+}
+
+.update-rail {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  padding-top: 34px;
+}
+
+.update-rail span {
+  width: 18px;
+  height: 18px;
+  border: 4px solid var(--surface);
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.update-entry:first-child .update-rail span {
+  box-shadow:
+    0 0 0 1px var(--primary),
+    0 0 0 7px var(--primary-soft);
+}
+
+.update-card {
+  padding: 30px 34px 32px;
+  border-radius: 20px;
+}
+
+.update-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 15px;
+}
+
+.update-card time {
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.update-latest {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.update-card h2 {
+  margin-bottom: 10px;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+}
+
+.update-summary {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.update-details {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.update-details h3 {
+  margin-bottom: 12px;
+  font-size: .78rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.update-details ul {
+  display: grid;
+  margin: 0;
+  padding-left: 1.25rem;
+  gap: 9px;
+  color: var(--muted);
+}
+
+.update-details li {
+  padding-left: 4px;
+  line-height: 1.65;
+}
+
+.update-details li::marker {
+  color: var(--primary);
+}
+
 .license-list {
   display: grid;
   gap: 18px;
@@ -1681,6 +1824,38 @@ select:focus-visible {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
   overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .updates-timeline::before {
+    left: 11px;
+  }
+
+  .update-entry {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 13px;
+  }
+
+  .update-rail {
+    padding-top: 28px;
+  }
+
+  .update-rail span {
+    width: 14px;
+    height: 14px;
+    border-width: 3px;
+  }
+
+  .update-card {
+    padding: 24px 22px 26px;
+    border-radius: 16px;
+  }
+
+  .update-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 9px;
+  }
 }
 
 .license-preview {
@@ -1700,6 +1875,20 @@ select:focus-visible {
   background:
     radial-gradient(circle at 35% 28%, var(--primary-soft), transparent 58%),
     var(--surface-soft);
+}
+
+.license-preview-font {
+  background:
+    radial-gradient(circle at 35% 28%, var(--primary-soft), transparent 58%),
+    var(--surface-soft);
+}
+
+.license-preview-font span {
+  color: var(--text);
+  font-family: "Noto Sans TC Thumbnail", "Noto Sans TC", sans-serif;
+  font-size: clamp(2.4rem, 6vw, 4.5rem);
+  font-variation-settings: "wght" 700;
+  letter-spacing: -.06em;
 }
 
 .codex-credit-mark {
