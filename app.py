@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import csv
 import hmac
 import hashlib
 import io
@@ -14,7 +15,7 @@ import sqlite3
 import subprocess
 import uuid
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlparse
+from urllib.parse import quote, unquote, urlencode, urlparse
 from urllib.request import Request, urlopen
 from datetime import date, datetime, timedelta
 from functools import wraps
@@ -32,6 +33,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     send_from_directory,
     session,
     url_for,
@@ -65,12 +67,33 @@ MAX_AVATAR_BYTES = 2 * 1024 * 1024
 MAX_COURT_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_COURT_VIDEO_BYTES = 50 * 1024 * 1024
 MAX_COURT_MEDIA_FILES = 12
+MAX_COURT_INFO_BYTES = 64 * 1024
+MAX_CONTACT_NAME_LENGTH = 100
+MAX_CONTACT_REPLY_LENGTH = 200
+MAX_CONTACT_SUBJECT_LENGTH = 150
+MAX_CONTACT_MESSAGE_LENGTH = 4000
+COURT_INFO_FORMAT = "badminton-court-control-panel/court-info"
+COURT_INFO_VERSION = 1
+COURT_INFO_MARKER = (
+    f"<!-- {COURT_INFO_FORMAT}:v{COURT_INFO_VERSION} -->"
+)
 SOCIAL_THUMBNAIL_WIDTH = 1200
 SOCIAL_THUMBNAIL_HEIGHT = 630
 SOCIAL_THUMBNAIL_MAX_SOURCE_PIXELS = 40_000_000
 SOCIAL_THUMBNAIL_RENDER_VERSION = 2
 ACCOUNT_ROLES = {"member", "sub_admin", "admin", "super_admin"}
 ADMIN_ROLES = {"sub_admin", "admin", "super_admin"}
+PUBLIC_CONTACT_ID_PATTERNS = {
+    "discord": re.compile(r"^[A-Za-z0-9_-]{1,100}$"),
+    "line": re.compile(r"^[A-Za-z0-9._-]{1,100}$"),
+    "telegram": re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$"),
+}
+CONTACT_METHOD_SORT_ORDER = {
+    method_id: index
+    for index, method_id in enumerate(
+        ("discord", "email", "line", "telegram", "website")
+    )
+}
 COURT_EXPIRED_SQL = (
     "(c.court_date || ' ' || c.end_time || ':00') "
     "< strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')"
@@ -82,6 +105,97 @@ TRANSLATIONS = {
         "home": "Courts",
         "introduction": "Introduction",
         "updates": "Update history",
+        "contact": "Contact",
+        "contact_admin": "Contact administrator",
+        "contact_eyebrow": "Support",
+        "contact_title": "Contact the site administrator.",
+        "contact_body": "Get help with account access, technical problems, security, privacy, or using this website.",
+        "contact_operator": "Site operator",
+        "contact_method": "Public contact methods",
+        "contact_method_email_group": "Email",
+        "contact_method_messaging_group": "Messaging",
+        "contact_method_other_group": "Other methods",
+        "contact_unconfigured": "The site administrator has not configured a public contact method yet.",
+        "contact_email": "Email",
+        "contact_website": "Website",
+        "contact_discord": "Discord",
+        "contact_line": "LINE",
+        "contact_telegram": "Telegram",
+        "contact_help_title": "What we can help with",
+        "contact_account_title": "Accounts and access",
+        "contact_account_body": "Report trouble signing in, creating an account, managing your profile, or accessing an event you organize.",
+        "contact_technical_title": "Technical problems",
+        "contact_technical_body": "Tell us about broken pages, unexpected errors, notifications, uploads, or other website behavior.",
+        "contact_privacy_title": "Security and privacy",
+        "contact_privacy_body": "Report a security concern or ask about personal information, access, correction, or deletion.",
+        "contact_event_title": "Questions about a specific event",
+        "contact_event_body": "For schedules, fees, levels, attendance, or roster decisions, contact the event organizer when possible. If you need the site administrator, include the public event link so we can identify it.",
+        "contact_prepare_title": "Help us understand the issue",
+        "contact_prepare_body": "Include the page or event link, what you expected, what happened, and the approximate date and time. A screenshot can help, but remove unrelated personal information first.",
+        "contact_security_title": "Keep private credentials private",
+        "contact_security_body": "Never send your password, administrator credentials, or a player’s 6-digit PIN. The administrator does not need them to investigate a problem.",
+        "contact_form_title": "Leave a message",
+        "contact_form_body": "Your message is stored securely for this site’s administrators to review.",
+        "contact_sender_name": "Your name",
+        "contact_sender_name_placeholder": "How should the administrator address you?",
+        "contact_reply": "Reply contact",
+        "contact_reply_placeholder": "Email address or messaging username",
+        "contact_reply_help": "Optional. Add a way to reach you if you would like a reply.",
+        "contact_subject": "Subject",
+        "contact_subject_placeholder": "A short summary of your request",
+        "contact_message_label": "Message",
+        "contact_message_placeholder": "Describe what you need help with…",
+        "contact_submit": "Send message",
+        "contact_form_privacy": "The site administrators can read this message. Do not include passwords or player PINs.",
+        "contact_message_sent": "Your message has been sent to the site administrator.",
+        "contact_form_required": "Complete all required fields.",
+        "contact_form_invalid": "Check the highlighted fields and try again.",
+        "contact_name_too_long": "Your name must be 100 characters or fewer.",
+        "contact_reply_too_long": "Reply contact must be 200 characters or fewer.",
+        "contact_subject_too_long": "Subject must be 150 characters or fewer.",
+        "contact_message_too_long": "Message must be 4,000 characters or fewer.",
+        "contact_messages": "Messages",
+        "contact_messages_title": "Contact messages",
+        "contact_messages_body": "Review messages submitted through the public administrator-contact page.",
+        "contact_messages_empty": "No contact messages match this view.",
+        "contact_messages_unread": "Unread messages",
+        "contact_message_from": "From",
+        "contact_message_reply": "Reply contact",
+        "contact_message_submitted": "Submitted",
+        "contact_message_read": "Read",
+        "contact_message_unread": "Unread",
+        "contact_mark_read": "Mark as read",
+        "contact_mark_unread": "Mark as unread",
+        "contact_message_status_updated": "Message status updated.",
+        "contact_filter_all": "All messages",
+        "contact_filter_unread": "Unread",
+        "contact_filter_read": "Read",
+        "contact_notification_settings": "Message notifications",
+        "contact_notification_settings_body": "Send a notification when a visitor leaves a new message. Messages are always stored in the inbox, even if delivery fails.",
+        "contact_notification_enable": "Enable new-message notifications",
+        "contact_notification_discord_ready": "Discord webhook configured",
+        "contact_notification_discord_missing": "Discord webhook not configured",
+        "contact_notification_telegram_ready": "Telegram bot and chat configured",
+        "contact_notification_telegram_missing": "Telegram bot or chat not configured",
+        "contact_notification_saved": "Message notification settings saved.",
+        "contact_notification_unavailable": "Configure a valid Discord webhook or Telegram bot and chat before enabling notifications.",
+        "previous_page": "Previous",
+        "next_page": "Next",
+        "privacy": "Privacy",
+        "privacy_title": "Privacy policy",
+        "privacy_body": "How this deployment handles account, court, registration, security, and browser data.",
+        "privacy_last_updated": "Last updated",
+        "privacy_last_updated_value": "July 30, 2026",
+        "privacy_contents": "On this page",
+        "privacy_operator_notice_title": "A note for this deployment",
+        "privacy_operator_notice_body": "Badminton Court Control Panel is self-hosted software. This policy describes the application’s built-in behavior. The operator of this deployment is responsible for its hosting logs, backups, configuration, legal basis, contact details, and any additional processing.",
+        "privacy_deployment_details": "Deployment details",
+        "privacy_operator_name": "Operator",
+        "privacy_operator_unconfigured": "Not configured",
+        "privacy_data_region": "Primary data region",
+        "privacy_data_region_unconfigured": "Not configured",
+        "privacy_contact": "Privacy contact",
+        "privacy_contact_unconfigured": "The deployment operator has not configured a dedicated privacy contact. Use the operator contact method published for this website.",
         "updates_eyebrow": "What’s new",
         "updates_title": "The control panel keeps getting better.",
         "updates_body": "Follow the newest features, security improvements, and experience updates added to Badminton Court Control Panel.",
@@ -409,6 +523,16 @@ TRANSLATIONS = {
         "restore": "Restore",
         "edit": "Edit",
         "duplicate": "Duplicate",
+        "court_info": "Court information file",
+        "court_info_help": "Import a court_info.md file to prefill this form. Court registrations, PINs, history, media files, ownership, and the public link are never imported.",
+        "court_info_choose": "Choose court_info.md",
+        "court_info_import": "Import court_info.md",
+        "court_info_export": "Export",
+        "export_all_courts_csv": "Export all courts (CSV)",
+        "court_info_imported": "Court information imported. Review the form, then save it to create the event.",
+        "court_info_imported_review": "Court information imported. Review the highlighted fields before saving.",
+        "court_info_invalid": "Choose a valid court_info.md file exported by this site.",
+        "court_info_too_large": "court_info.md must be 64 KB or smaller.",
         "delete": "Delete",
         "delete_confirm": "Permanently delete this court and all of its sign-ups?",
         "archive_confirm": "Archive this court?",
@@ -518,6 +642,97 @@ TRANSLATIONS = {
         "home": "球場",
         "introduction": "網站介紹",
         "updates": "更新紀錄",
+        "contact": "聯絡我們",
+        "contact_admin": "聯絡網站管理員",
+        "contact_eyebrow": "支援服務",
+        "contact_title": "聯絡網站管理員。",
+        "contact_body": "如需帳號存取、技術問題、安全性、隱私權或網站使用協助，請透過此頁聯絡。",
+        "contact_operator": "網站營運者",
+        "contact_method": "公開聯絡方式",
+        "contact_method_email_group": "電子郵件",
+        "contact_method_messaging_group": "即時通訊",
+        "contact_method_other_group": "其他聯絡方式",
+        "contact_unconfigured": "網站管理員尚未設定公開聯絡方式。",
+        "contact_email": "電子郵件",
+        "contact_website": "網站",
+        "contact_discord": "Discord",
+        "contact_line": "LINE",
+        "contact_telegram": "Telegram",
+        "contact_help_title": "我們可以協助的事項",
+        "contact_account_title": "帳號與存取",
+        "contact_account_body": "回報登入、建立帳號、管理個人資料，或存取自己主辦場次時遇到的問題。",
+        "contact_technical_title": "技術問題",
+        "contact_technical_body": "告訴我們頁面故障、非預期錯誤、通知、上傳或其他網站功能異常。",
+        "contact_privacy_title": "安全性與隱私權",
+        "contact_privacy_body": "回報安全性疑慮，或詢問個人資料的查詢、更正與刪除事宜。",
+        "contact_event_title": "特定活動的問題",
+        "contact_event_body": "若問題與時間、費用、程度、出席或名單安排有關，請優先聯絡活動主辦者。如需網站管理員協助，請附上公開活動連結，方便辨識場次。",
+        "contact_prepare_title": "協助我們了解問題",
+        "contact_prepare_body": "請附上頁面或活動連結、預期結果、實際情況，以及大約發生日期與時間。螢幕截圖也能協助判斷，但請先移除無關的個人資訊。",
+        "contact_security_title": "請妥善保護私人憑證",
+        "contact_security_body": "請勿傳送密碼、管理員憑證或球友的 6 位數 PIN 碼；網站管理員不需要這些資料即可調查問題。",
+        "contact_form_title": "留言給網站管理員",
+        "contact_form_body": "你的留言會安全地儲存，供此網站的管理員查看。",
+        "contact_sender_name": "你的名稱",
+        "contact_sender_name_placeholder": "管理員應如何稱呼你？",
+        "contact_reply": "回覆聯絡方式",
+        "contact_reply_placeholder": "電子郵件地址或通訊軟體帳號",
+        "contact_reply_help": "選填；如希望收到回覆，請提供可聯絡你的方式。",
+        "contact_subject": "主旨",
+        "contact_subject_placeholder": "簡短說明你的需求",
+        "contact_message_label": "留言內容",
+        "contact_message_placeholder": "請描述需要協助的事項…",
+        "contact_submit": "送出留言",
+        "contact_form_privacy": "網站管理員可以查看此留言。請勿填入密碼或球友 PIN 碼。",
+        "contact_message_sent": "你的留言已送交網站管理員。",
+        "contact_form_required": "請填寫所有必填欄位。",
+        "contact_form_invalid": "請檢查標示的欄位後再試一次。",
+        "contact_name_too_long": "名稱不可超過 100 個字元。",
+        "contact_reply_too_long": "回覆聯絡方式不可超過 200 個字元。",
+        "contact_subject_too_long": "主旨不可超過 150 個字元。",
+        "contact_message_too_long": "留言內容不可超過 4,000 個字元。",
+        "contact_messages": "留言",
+        "contact_messages_title": "聯絡留言",
+        "contact_messages_body": "查看訪客透過公開網站管理員聯絡頁面送出的留言。",
+        "contact_messages_empty": "此檢視目前沒有聯絡留言。",
+        "contact_messages_unread": "未讀留言",
+        "contact_message_from": "留言者",
+        "contact_message_reply": "回覆聯絡方式",
+        "contact_message_submitted": "送出時間",
+        "contact_message_read": "已讀",
+        "contact_message_unread": "未讀",
+        "contact_mark_read": "標示為已讀",
+        "contact_mark_unread": "標示為未讀",
+        "contact_message_status_updated": "留言狀態已更新。",
+        "contact_filter_all": "全部留言",
+        "contact_filter_unread": "未讀",
+        "contact_filter_read": "已讀",
+        "contact_notification_settings": "留言通知",
+        "contact_notification_settings_body": "訪客送出新留言時傳送通知。即使外部通知傳送失敗，留言仍會保存在收件匣。",
+        "contact_notification_enable": "啟用新留言通知",
+        "contact_notification_discord_ready": "Discord Webhook 已設定",
+        "contact_notification_discord_missing": "Discord Webhook 尚未設定",
+        "contact_notification_telegram_ready": "Telegram Bot 與聊天室已設定",
+        "contact_notification_telegram_missing": "Telegram Bot 或聊天室尚未設定",
+        "contact_notification_saved": "留言通知設定已儲存。",
+        "contact_notification_unavailable": "啟用通知前，請先設定有效的 Discord Webhook，或 Telegram Bot 與聊天室。",
+        "previous_page": "上一頁",
+        "next_page": "下一頁",
+        "privacy": "隱私權",
+        "privacy_title": "隱私權政策",
+        "privacy_body": "說明此網站如何處理帳號、場次、報名、安全性及瀏覽器資料。",
+        "privacy_last_updated": "最後更新",
+        "privacy_last_updated_value": "2026 年 7 月 30 日",
+        "privacy_contents": "本頁內容",
+        "privacy_operator_notice_title": "關於此部署網站",
+        "privacy_operator_notice_body": "羽球場控面板是可自行架設的軟體。本政策說明應用程式內建的資料處理方式；此部署網站的營運者仍須負責主機紀錄、備份、設定、法律依據、聯絡資訊及任何額外的資料處理。",
+        "privacy_deployment_details": "部署資訊",
+        "privacy_operator_name": "營運者",
+        "privacy_operator_unconfigured": "尚未設定",
+        "privacy_data_region": "主要資料地區",
+        "privacy_data_region_unconfigured": "尚未設定",
+        "privacy_contact": "隱私權聯絡方式",
+        "privacy_contact_unconfigured": "此部署網站的營運者尚未設定專用的隱私權聯絡方式；請使用本網站公布的營運者聯絡管道。",
         "updates_eyebrow": "最新消息",
         "updates_title": "羽球場控面板，持續變得更好。",
         "updates_body": "查看羽球場控面板新增的功能、安全性改善與使用體驗更新。",
@@ -845,6 +1060,16 @@ TRANSLATIONS = {
         "restore": "重新開放",
         "edit": "編輯",
         "duplicate": "複製",
+        "court_info": "場次資訊檔",
+        "court_info_help": "匯入 court_info.md 以預先填入此表單。報名資料、PIN 碼、歷程、媒體檔案、擁有者與公開連結都不會被匯入。",
+        "court_info_choose": "選擇 court_info.md",
+        "court_info_import": "匯入 court_info.md",
+        "court_info_export": "匯出",
+        "export_all_courts_csv": "匯出所有場次（CSV）",
+        "court_info_imported": "場次資訊已匯入。請檢查表單，儲存後才會建立場次。",
+        "court_info_imported_review": "場次資訊已匯入，請先檢查標示的欄位再儲存。",
+        "court_info_invalid": "請選擇由本網站匯出的有效 court_info.md 檔案。",
+        "court_info_too_large": "court_info.md 不可超過 64 KB。",
         "delete": "刪除",
         "delete_confirm": "確定要永久刪除此場次及所有報名資料嗎？",
         "archive_confirm": "確定要封存此場次嗎？",
@@ -952,176 +1177,317 @@ TRANSLATIONS = {
 }
 
 
-SITE_UPDATE_HISTORY = (
-    {
-        "date": "2026-07-28",
-        "date_label": {
-            "en-us": "July 28, 2026",
-            "zh-tw": "2026 年 7 月 28 日",
-        },
-        "title": {
-            "en-us": "Manage players without leaving the court page",
-            "zh-tw": "直接在場次頁管理球友",
-        },
-        "summary": {
-            "en-us": "Administrators can now correct participant details and keep the confirmed and waiting lists organized in place.",
-            "zh-tw": "管理員現在可以直接修正球友資料，並即時整理正取與候補名單。",
-        },
-        "items": {
-            "en-us": (
-                "Rename confirmed or waiting players and reset their private six-digit court PINs.",
-                "Remove a player while automatically promoting the earliest waiting player when a confirmed place opens.",
-                "Send member-change notifications for visible rename and removal actions while keeping private PIN resets out of notifications.",
-            ),
-            "zh-tw": (
-                "重新命名正取或候補球友，並重設其私密的 6 位數場次 PIN 碼。",
-                "移除球友；若正取名額釋出，系統會自動遞補最早加入的候補球友。",
-                "重新命名與移除等公開名單變更會發送球友異動通知，私密 PIN 碼重設則不會出現在通知中。",
-            ),
-        },
-    },
-    {
-        "date": "2026-07-28",
-        "date_label": {
-            "en-us": "July 28, 2026",
-            "zh-tw": "2026 年 7 月 28 日",
-        },
-        "title": {
-            "en-us": "Rich previews for every shared court",
-            "zh-tw": "每個場次連結都有豐富的社群預覽",
-        },
-        "summary": {
-            "en-us": "Court links now present a useful visual preview when shared to Facebook and other Open Graph clients.",
-            "zh-tw": "將場次連結分享到 Facebook 或其他支援 Open Graph 的服務時，現在會顯示實用的視覺預覽。",
-        },
-        "items": {
-            "en-us": (
-                "Uses the first event photo, or extracts a frame when the first gallery item is a video.",
-                "Creates a branded 1200×630 event-information card when the court has no media.",
-                "Bundles Noto Sans Traditional Chinese so generated event-information cards render bilingual text consistently in every deployment.",
-                "Organizes third-party asset licenses publicly, including the bundled Noto font’s SIL Open Font License.",
-                "Refreshes the versioned preview URL when event, member, status, or media information changes.",
-            ),
-            "zh-tw": (
-                "優先使用第一個活動相片；若相簿第一個項目是影片，則擷取影片畫面。",
-                "場次沒有媒體時，產生包含活動資訊的品牌化 1200×630 圖片。",
-                "專案內附 Noto Sans 繁體中文字型，讓各種部署環境產生的活動資訊圖片都能一致顯示雙語文字。",
-                "公開整理第三方素材授權資訊，包括內附 Noto 字型的 SIL Open Font License。",
-                "活動、球友、狀態或媒體資訊變更時，自動提供新版本的預覽網址。",
-            ),
-        },
-    },
-    {
-        "date": "2026-07-28",
-        "date_label": {
-            "en-us": "July 28, 2026",
-            "zh-tw": "2026 年 7 月 28 日",
-        },
-        "title": {
-            "en-us": "Safer access and court notifications",
-            "zh-tw": "更安全的操作與場次通知",
-        },
-        "summary": {
-            "en-us": "Sign-in, public leave protection, and opt-in court updates now use safer modern controls.",
-            "zh-tw": "登入、公開退出保護與自選場次通知現在採用更安全的現代化控制措施。",
-        },
-        "items": {
-            "en-us": (
-                "Replaced hCaptcha with action-bound Cloudflare Turnstile verification for signup and sign-in.",
-                "Added per-court system Web Push subscriptions for event-information and member-list changes.",
-                "Limits repeated incorrect nickname/PIN attempts when leaving a court to reduce credential guessing.",
-                "Kept notification endpoints, credentials, and member nicknames out of public output and lock-screen messages.",
-            ),
-            "zh-tw": (
-                "以具動作綁定的 Cloudflare Turnstile 取代 hCaptcha，保護註冊與登入。",
-                "新增個別場次系統 Web Push 訂閱，在活動資訊或球友名單變更時通知。",
-                "限制退出場次時重複輸入錯誤暱稱或 PIN 碼的次數，降低憑證猜測風險。",
-                "推播端點、憑證與球友暱稱不會出現在公開內容或鎖定畫面訊息中。",
-            ),
-        },
-    },
-    {
-        "date": "2026-07",
-        "date_label": {
-            "en-us": "July 2026",
-            "zh-tw": "2026 年 7 月",
-        },
-        "title": {
-            "en-us": "A friendlier first visit",
-            "zh-tw": "更友善的初次使用體驗",
-        },
-        "summary": {
-            "en-us": "New visitors can understand the service quickly and tailor the interface to their preferences.",
-            "zh-tw": "新訪客可以快速認識服務，並依自己的習慣調整介面。",
-        },
-        "items": {
-            "en-us": (
-                "Added a bilingual introduction page and a remembered first-visit invitation.",
-                "Added Taiwan-aware language detection with a persistent English or Traditional Chinese override.",
-                "Expanded appearance controls with four palettes and light, dark, or system modes.",
-            ),
-            "zh-tw": (
-                "新增雙語網站介紹頁，以及會記住選擇的初次造訪提示。",
-                "新增台灣地區語言判斷，並可持續使用手動選擇的英文或繁體中文。",
-                "外觀設定擴充為四種配色，並支援淺色、深色及系統模式。",
-            ),
-        },
-    },
-    {
-        "date": "2026-07",
-        "date_label": {
-            "en-us": "July 2026",
-            "zh-tw": "2026 年 7 月",
-        },
-        "title": {
-            "en-us": "More expressive events and smoother organizing",
-            "zh-tw": "更完整的活動內容與主辦流程",
-        },
-        "summary": {
-            "en-us": "Organizers gained richer event pages and faster tools for publishing and reusing court information.",
-            "zh-tw": "主辦者現在可以建立更豐富的活動頁，並更快速地發布及重複使用場次資訊。",
-        },
-        "items": {
-            "en-us": (
-                "Added event and badminton-group names, photos, videos, gallery covers, prices, shuttlecock information, and remarks.",
-                "Added shared event creation, saved hall locations, duplication, archive/restore, and owner-managed events.",
-                "Added public and administrator filters for date, level, gender range, creator, capacity, and event status.",
-            ),
-            "zh-tw": (
-                "新增活動與羽球團名稱、相片、影片、相簿封面、費用、用球及備註。",
-                "新增共用活動建立頁、儲存球館地點、複製、封存／恢復及主辦者管理功能。",
-                "公開頁與管理後台新增日期、程度、男女範圍、建立者、名額及活動狀態篩選。",
-            ),
-        },
-    },
-    {
-        "date": "2026-07",
-        "date_label": {
-            "en-us": "July 2026",
-            "zh-tw": "2026 年 7 月",
-        },
-        "title": {
-            "en-us": "The complete court-control foundation",
-            "zh-tw": "完整的場控核心功能",
-        },
-        "summary": {
-            "en-us": "The original court workflow grew into a complete platform for players, organizers, and administrators.",
-            "zh-tw": "最初的場次流程已擴充為提供球友、主辦者與管理員使用的完整平台。",
-        },
-        "items": {
-            "en-us": (
-                "Added permanent GUID court links, nickname and PIN registration, capacity limits, waiting lists, and automatic promotion.",
-                "Added reserved members, roll call and clearing, read-only event mode, and join/leave history.",
-                "Added member accounts, role-based administration, password and avatar management, login lockouts, and privacy-focused auditing.",
-            ),
-            "zh-tw": (
-                "新增永久 GUID 場次連結、暱稱與 PIN 報名、人數上限、候補名單及自動遞補。",
-                "新增預訂球友、點名與結清、活動唯讀模式，以及加入／退出紀錄。",
-                "新增會員帳號、角色權限管理、密碼與頭像管理、登入鎖定，以及重視隱私的稽核紀錄。",
-            ),
-        },
-    },
+
+SITE_UPDATE_HISTORY_PATH = (
+    Path(__file__).with_name("data") / "update_history.json"
 )
+
+
+def load_site_update_history(
+    path: Path = SITE_UPDATE_HISTORY_PATH,
+) -> tuple[dict[str, Any], ...]:
+    with path.open(encoding="utf-8") as history_file:
+        history = json.load(history_file)
+    if not isinstance(history, list) or not history:
+        raise ValueError("Update history must be a non-empty JSON array.")
+
+    required_fields = {"date", "date_label", "title", "summary", "items"}
+    language_fields = {"en-us", "zh-tw"}
+    previous_date = ""
+    for index, entry in enumerate(history):
+        if not isinstance(entry, dict) or set(entry) != required_fields:
+            raise ValueError(
+                f"Update history entry {index} has invalid fields."
+            )
+        date_value = entry["date"]
+        if not isinstance(date_value, str) or not re.fullmatch(
+            r"\d{4}-\d{2}(?:-\d{2})?", date_value
+        ):
+            raise ValueError(
+                f"Update history entry {index} has an invalid date."
+            )
+        try:
+            datetime.strptime(
+                date_value,
+                "%Y-%m-%d" if len(date_value) == 10 else "%Y-%m",
+            )
+        except ValueError as error:
+            raise ValueError(
+                f"Update history entry {index} has an invalid date."
+            ) from error
+        if previous_date and date_value > previous_date:
+            raise ValueError("Update history must be newest first.")
+        previous_date = date_value
+
+        for field_name in ("date_label", "title", "summary"):
+            localized = entry[field_name]
+            if (
+                not isinstance(localized, dict)
+                or set(localized) != language_fields
+                or not all(
+                    isinstance(value, str) and value.strip()
+                    for value in localized.values()
+                )
+            ):
+                raise ValueError(
+                    f"Update history entry {index} has invalid "
+                    f"{field_name} translations."
+                )
+        localized_items = entry["items"]
+        if (
+            not isinstance(localized_items, dict)
+            or set(localized_items) != language_fields
+            or not all(
+                isinstance(items, list)
+                and items
+                and all(
+                    isinstance(item, str) and item.strip()
+                    for item in items
+                )
+                for items in localized_items.values()
+            )
+        ):
+            raise ValueError(
+                f"Update history entry {index} has invalid item translations."
+            )
+    return tuple(history)
+
+
+SITE_UPDATE_HISTORY = load_site_update_history()
+
+
+PRIVACY_POLICY_SECTIONS = {
+    "en-us": (
+        {
+            "id": "scope",
+            "title": "Scope and responsibility",
+            "paragraphs": (
+                "This policy applies to this deployment of Badminton Court Control Panel and its built-in website features.",
+                "The person or organization operating this deployment determines why and how information is processed. Because the software is self-hosted, hosting providers, reverse proxies, backups, custom changes, and operational practices may add processing that is not visible to the application.",
+            ),
+        },
+        {
+            "id": "information",
+            "title": "Information the application handles",
+            "paragraphs": (
+                "The application handles only the information needed to run accounts, publish court events, accept registrations, protect access, and deliver optional notifications.",
+            ),
+            "items": (
+                "Requests and security: validated IP address, request time, country signals supplied by supported proxies or an optional local GeoIP database, failed-attempt counters, lockout times, and derived attempt identifiers. A User-Agent is reduced to iOS, Android, Mobile, or Web for successful join/leave history; the complete User-Agent and device fingerprints are not stored by the application.",
+                "Accounts: username, password hash, role and account status, creation time, optional avatar, saved hall locations, last successful sign-in time, and last successful sign-in IP address. Plain-text account passwords are not stored.",
+                "Court events: organizer identity, event and group names, date and time, venue and coordinates, court ID, capacity, reserved-player nicknames, levels, prices, shuttlecock information, remarks, status, roll-call/clearing state, and uploaded photos or videos.",
+                "Public registration: nickname, participant PIN hash, confirmed or waiting status, join time, roll-call/clearing state, and successful join/leave history. History contains nickname, action, time, validated IP address, and broad device category. Plain-text participant PINs are not stored.",
+                "Push notifications: the selected court, browser push-service endpoint, encryption keys, language, and creation/update times after a visitor explicitly opts in.",
+                "Contact messages: the name supplied by the visitor, optional reply contact, subject, message, interface language, submission time, and administrator read status.",
+            ),
+        },
+        {
+            "id": "visibility",
+            "title": "What is public and what administrators can see",
+            "paragraphs": (
+                "Court links are public. Event details, organizer name, uploaded event media, confirmed and waiting nicknames, and join/leave nicknames with timestamps can be viewed without signing in.",
+                "Reserved-player nicknames are public only when the organizer enables that setting. Administrators can see join/leave IP addresses and broad device categories, account sign-in information, and other controls needed to operate the service. Organizers and administrators can manage event and participant records within their permissions.",
+                "Administrator CSV exports contain event configuration, public URLs, creator and lifecycle information, counts, reserved nicknames, and media counts. They exclude active participant names, participant PINs, join/leave history, IP addresses, and device information.",
+                "Contact messages and optional reply details are visible only to administrator and super-administrator accounts through the protected message inbox.",
+            ),
+        },
+        {
+            "id": "purposes",
+            "title": "Why information is used",
+            "items": (
+                "Create and authenticate accounts, enforce roles, and manage profiles.",
+                "Publish, discover, share, duplicate, archive, and administer court events.",
+                "Process registration, waiting-list promotion, leaving, roll call, and payment-clearing status.",
+                "Prevent repeated credential guessing, investigate operational problems, and protect the service.",
+                "Deliver court-specific notifications requested by the browser user.",
+                "Receive and respond to support requests, track whether administrators have reviewed them, and optionally alert administrators to new messages.",
+                "Select a language, generate social-sharing previews, and maintain the visitor’s chosen interface preferences.",
+            ),
+        },
+        {
+            "id": "browser-storage",
+            "title": "Cookies and browser storage",
+            "items": (
+                "A signed session cookie supports sign-in state, role checks, and CSRF protection. Production operators should transmit it only over HTTPS.",
+                "The court_lang cookie remembers the selected interface language for up to one year.",
+                "Local storage remembers theme and palette choices and whether the first-visit introduction prompt has been handled.",
+                "When notifications are enabled, the browser and its push service retain a push subscription. Turning notifications off removes this court’s server-side mapping.",
+                "The built-in application does not include advertising or analytics trackers. A deployment operator may add services outside the application and must disclose them separately.",
+            ),
+        },
+        {
+            "id": "services",
+            "title": "External services",
+            "paragraphs": (
+                "Some features contact other providers, which process technical information under their own terms and privacy policies.",
+            ),
+            "items": (
+                "Google Fonts is requested by website pages. Google Maps links are available for venue searches, and Google Maps JavaScript/Places loads on the event form when the operator configures an API key.",
+                "Cloudflare Turnstile loads on signup, sign-in, and contact-message forms and receives verification information when both Turnstile keys are configured.",
+                "Opt-in Web Push sends encrypted notification payloads through the push service selected by the visitor’s browser, such as Apple, Google, Microsoft, or Mozilla.",
+                "When an administrator enables contact-message notifications, the submitted name, reply contact, subject, message, time, and inbox link are sent to the configured Discord webhook and/or Telegram bot chat. A failed delivery does not remove the message from this website’s database.",
+                "When a court link is shared, the chosen social or messaging platform may request its public metadata and generated preview image.",
+                "Following any external link sends the request directly to that external website.",
+            ),
+        },
+        {
+            "id": "retention",
+            "title": "Retention and deletion",
+            "items": (
+                "Account data remains until the account is deleted or an administrator deletes an eligible archived account. Member self-deletion removes the account, avatar, and saved locations, but already-published courts and their displayed creator label remain online without an owner.",
+                "Leaving a court removes the active participant record. Successful join/leave history remains until the court itself is deleted.",
+                "Archiving or expiration does not delete a court. Deleting a court removes its participants, reserved members, media records and files, participation history, push mappings, and generated social-preview cache.",
+                "Turning off push notifications removes the matching court subscription mapping. Endpoints rejected as expired by a push service are removed automatically.",
+                "Successful authentication clears the matching failed-attempt record; administrators can reset member sign-in retries. Other security records remain as needed to enforce current lockouts.",
+                "Contact messages remain in the deployment database until the operator removes them according to its support and retention practices or handles an applicable deletion request.",
+                "Hosting logs and backups are controlled by the deployment operator and may follow different retention and deletion schedules.",
+            ),
+        },
+        {
+            "id": "security",
+            "title": "Security",
+            "paragraphs": (
+                "The application uses password hashing, role and ownership checks, CSRF protection, optional Turnstile verification, upload validation, randomized stored filenames, rate limits, and scoped access to reduce risk. Sensitive push endpoints, Discord webhook URLs, and Telegram bot tokens are not displayed publicly or written to application logs.",
+                "No system is completely secure. The deployment operator is responsible for HTTPS, strong secrets, access controls, updates, backups, proxy configuration, and incident response.",
+            ),
+        },
+        {
+            "id": "choices",
+            "title": "Your choices and requests",
+            "items": (
+                "Members can change their password and avatar, delete saved locations, and permanently delete an eligible member account after password confirmation.",
+                "Organizers can correct or delete courts they own. Public participants can leave an editable court using their nickname and PIN.",
+                "Visitors can decline or disable push notifications, change language and appearance preferences, and clear this site’s cookies or local storage in their browser.",
+                "A contact message requires a name, subject, and message. Reply contact is optional, but administrators may be unable to respond without it. Visitors may use a separately published contact method instead of the stored form.",
+                "Required information is necessary for the related feature: without account credentials a person cannot create or sign in to an account; without a nickname and PIN a person cannot join or leave a court. Optional profile, venue-saving, media, reserved-nickname, reply-contact, and notification features may be left unused.",
+                "Contact the deployment operator to request access, correction, deletion, restriction, or other rights available under applicable law. Some information may need to remain for security, record integrity, legal obligations, or because published court data is no longer attached to a deleted member account.",
+            ),
+        },
+        {
+            "id": "changes",
+            "title": "Changes and contact",
+            "paragraphs": (
+                "This policy may be updated when the application or deployment practices change. The latest revision date appears at the top of this page.",
+                "Questions and privacy requests should be sent to the operator of this deployment using the contact method shown below.",
+            ),
+        },
+    ),
+    "zh-tw": (
+        {
+            "id": "scope",
+            "title": "適用範圍與責任",
+            "paragraphs": (
+                "本政策適用於此一羽球場控面板部署網站及其內建的網站功能。",
+                "此部署網站的營運者決定處理資訊的目的與方式。由於本軟體可自行架設，主機供應商、反向代理、備份、自訂修改及營運方式可能產生應用程式本身無法得知的額外處理。",
+            ),
+        },
+        {
+            "id": "information",
+            "title": "應用程式處理的資訊",
+            "paragraphs": (
+                "應用程式僅處理建立帳號、發布場次、接受報名、保護存取及傳送選用通知所需的資訊。",
+            ),
+            "items": (
+                "請求與安全性：已驗證的 IP 位址、請求時間、支援的代理服務所提供或選用本機 GeoIP 資料庫判斷的國家訊號、失敗次數、鎖定時間及衍生的嘗試識別值。成功加入／退出時，User-Agent 只會轉換為 iOS、Android、行動裝置或網頁；應用程式不保存完整 User-Agent 或裝置指紋。",
+                "帳號：使用者名稱、密碼雜湊、角色與帳號狀態、建立時間、選用頭像、已儲存球館地點，以及最近成功登入時間與 IP 位址。系統不儲存帳號明文密碼。",
+                "場次活動：主辦者身分、活動與羽球團名稱、日期與時間、場館與座標、場地編號、名額、預訂球友暱稱、程度、費用、用球、備註、狀態、點名／結清狀態，以及上傳的相片或影片。",
+                "公開報名：暱稱、參加者 PIN 雜湊、正取或候補狀態、加入時間、點名／結清狀態，以及成功加入／退出歷程。歷程包含暱稱、動作、時間、已驗證 IP 位址與概略裝置類型。系統不儲存參加者明文 PIN。",
+                "推播通知：訪客明確同意後，儲存所選場次、瀏覽器推播服務端點、加密金鑰、語言及建立／更新時間。",
+                "聯絡留言：訪客填寫的名稱、選填回覆聯絡方式、主旨、留言內容、介面語言、送出時間及管理員已讀狀態。",
+            ),
+        },
+        {
+            "id": "visibility",
+            "title": "公開資訊與管理員可見資訊",
+            "paragraphs": (
+                "場次連結是公開的；未登入的訪客也能查看活動內容、主辦者名稱、活動媒體、正取與候補暱稱，以及包含暱稱與時間的加入／退出紀錄。",
+                "預訂球友暱稱只會在主辦者開啟該設定時公開。管理員可查看加入／退出 IP 位址與概略裝置類型、帳號登入資訊，以及營運服務所需的其他控制項。主辦者與管理員可依權限管理活動與參加者紀錄。",
+                "管理員 CSV 匯出包含活動設定、公開網址、建立者與生命週期資訊、人數、預訂球友暱稱及媒體數量；不包含現有參加者暱稱、參加者 PIN、加入／退出歷程、IP 位址或裝置資訊。",
+                "聯絡留言及選填回覆資訊只會透過受保護的留言收件匣提供管理員與最高管理員查看。",
+            ),
+        },
+        {
+            "id": "purposes",
+            "title": "資訊使用目的",
+            "items": (
+                "建立與驗證帳號、執行角色權限及管理個人資料。",
+                "發布、搜尋、分享、複製、封存及管理場次活動。",
+                "處理報名、候補遞補、退出、點名及費用結清狀態。",
+                "防止重複猜測憑證、調查營運問題並保護服務。",
+                "傳送瀏覽器使用者自行要求的個別場次通知。",
+                "接收與回覆支援請求、記錄管理員是否已查看，並選擇性通知管理員有新留言。",
+                "選擇語言、產生社群分享預覽，並維持訪客選擇的介面偏好。",
+            ),
+        },
+        {
+            "id": "browser-storage",
+            "title": "Cookie 與瀏覽器儲存空間",
+            "items": (
+                "經簽章的工作階段 Cookie 用於登入狀態、角色檢查及 CSRF 防護；正式環境營運者應只透過 HTTPS 傳送。",
+                "court_lang Cookie 會記住介面語言選擇，最長一年。",
+                "本機儲存空間會記住主題、配色，以及是否已處理初次造訪的網站介紹提示。",
+                "開啟通知後，瀏覽器及其推播服務會保留推播訂閱；關閉通知會移除此場次在伺服器端的對應關係。",
+                "應用程式內建功能不含廣告或分析追蹤器；部署網站營運者若另外加入服務，必須另行揭露。",
+            ),
+        },
+        {
+            "id": "services",
+            "title": "外部服務",
+            "paragraphs": (
+                "部分功能會連線至其他供應商；供應商會依其條款與隱私權政策處理技術資訊。",
+            ),
+            "items": (
+                "網站頁面會向 Google Fonts 取得字型。場館搜尋提供 Google Maps 連結；營運者設定 API 金鑰後，活動表單會載入 Google Maps JavaScript／Places。",
+                "同時設定兩個 Turnstile 金鑰後，註冊、登入及聯絡留言表單會載入 Cloudflare Turnstile，並傳送驗證資訊。",
+                "選用 Web Push 會透過訪客瀏覽器指定的推播服務（例如 Apple、Google、Microsoft 或 Mozilla）傳送加密通知內容。",
+                "管理員啟用聯絡留言通知後，系統會將填寫的名稱、回覆聯絡方式、主旨、留言、時間及收件匣連結傳送至設定的 Discord Webhook 及／或 Telegram Bot 聊天室；外部傳送失敗不會移除網站資料庫中的留言。",
+                "分享場次連結時，所選社群或通訊平台可能讀取公開中繼資料及產生的預覽圖片。",
+                "開啟任何外部連結時，請求會直接傳送至該外部網站。",
+            ),
+        },
+        {
+            "id": "retention",
+            "title": "保留與刪除",
+            "items": (
+                "帳號資料會保留至帳號被刪除，或管理員刪除符合條件的已封存帳號。會員自行刪除帳號會移除帳號、頭像及已儲存地點；已發布的場次及其顯示的建立者標示會保留，但不再有擁有者。",
+                "退出場次會移除目前的參加者紀錄；成功加入／退出歷程會保留至該場次被刪除。",
+                "封存或過期不等於刪除。刪除場次會移除參加者、預訂球友、媒體紀錄與檔案、參與歷程、推播對應關係及產生的社群預覽快取。",
+                "關閉推播會移除相符的場次訂閱對應；推播服務判定已失效的端點也會自動移除。",
+                "成功驗證會清除相符的失敗嘗試紀錄；管理員也可重設會員登入重試。其他安全紀錄會在執行目前鎖定所需期間保留。",
+                "聯絡留言會保留在此部署網站的資料庫中，直到營運者依支援與保留方式移除，或處理適用的刪除請求。",
+                "主機紀錄與備份由部署網站營運者控制，可能採用不同的保留及刪除時程。",
+            ),
+        },
+        {
+            "id": "security",
+            "title": "資訊安全",
+            "paragraphs": (
+                "應用程式使用密碼雜湊、角色與擁有權檢查、CSRF 防護、選用 Turnstile 驗證、上傳驗證、隨機儲存檔名、頻率限制及範圍化存取來降低風險。敏感的推播端點、Discord Webhook 網址及 Telegram Bot Token 不會公開顯示或寫入應用程式紀錄。",
+                "沒有任何系統能保證絕對安全。部署網站營運者必須負責 HTTPS、高強度密鑰、存取控制、更新、備份、代理設定及事件應變。",
+            ),
+        },
+        {
+            "id": "choices",
+            "title": "您的選擇與請求",
+            "items": (
+                "會員可變更密碼與頭像、刪除已儲存地點，並在確認密碼後永久刪除符合條件的會員帳號。",
+                "主辦者可修正或刪除自己擁有的場次；公開參加者可使用暱稱與 PIN 退出仍可編輯的場次。",
+                "訪客可拒絕或關閉推播、更改語言與外觀偏好，並在瀏覽器中清除此網站的 Cookie 或本機儲存資料。",
+                "聯絡留言必須填寫名稱、主旨與留言內容；回覆聯絡方式為選填，但未提供時管理員可能無法回覆。訪客也可改用另外公布的聯絡方式，不使用儲存式表單。",
+                "相關功能必須提供必要資訊：未提供帳號憑證便無法建立帳號或登入；未提供暱稱與 PIN 便無法加入或退出場次。個人資料選填項目、儲存場館、媒體、預訂暱稱、回覆聯絡方式及通知功能都可選擇不使用。",
+                "如需行使適用法律提供的查詢、存取、更正、刪除、限制或其他權利，請聯絡部署網站營運者。基於安全、紀錄完整性、法律義務，或已發布場次不再附屬於已刪除會員帳號等原因，部分資訊可能需要保留。",
+            ),
+        },
+        {
+            "id": "changes",
+            "title": "政策變更與聯絡",
+            "paragraphs": (
+                "應用程式或部署網站的處理方式變更時，本政策可能隨之更新；最新修訂日期會顯示於本頁頂端。",
+                "如有問題或隱私權請求，請透過下方聯絡方式洽詢此部署網站的營運者。",
+            ),
+        },
+    ),
+}
 
 
 SCHEMA = """
@@ -1274,6 +1640,21 @@ CREATE TABLE IF NOT EXISTS app_settings (
     setting_value TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS contact_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_name TEXT NOT NULL,
+    reply_contact TEXT NOT NULL DEFAULT '',
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'en-us'
+        CHECK(language IN ('en-us', 'zh-tw')),
+    submitted_at TEXT NOT NULL,
+    read_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS contact_messages_status_time_idx
+ON contact_messages(read_at, submitted_at DESC, id DESC);
 """
 
 
@@ -1307,6 +1688,25 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         SOCIAL_THUMBNAIL_FONT=os.environ.get("SOCIAL_THUMBNAIL_FONT", ""),
         GEOIP_COUNTRY_DB=os.environ.get("GEOIP_COUNTRY_DB", ""),
         DEFAULT_COUNTRY_CODE=os.environ.get("DEFAULT_COUNTRY_CODE", "").upper(),
+        PRIVACY_OPERATOR_NAME=os.environ.get("PRIVACY_OPERATOR_NAME", ""),
+        PRIVACY_DATA_REGION=os.environ.get("PRIVACY_DATA_REGION", ""),
+        PRIVACY_CONTACT=os.environ.get("PRIVACY_CONTACT", ""),
+        ADMIN_CONTACT=os.environ.get("ADMIN_CONTACT", ""),
+        ADMIN_CONTACT_DISCORD=os.environ.get("ADMIN_CONTACT_DISCORD", ""),
+        ADMIN_CONTACT_LINE=os.environ.get("ADMIN_CONTACT_LINE", ""),
+        ADMIN_CONTACT_TELEGRAM=os.environ.get("ADMIN_CONTACT_TELEGRAM", ""),
+        CONTACT_DISCORD_WEBHOOK_URL=os.environ.get(
+            "CONTACT_DISCORD_WEBHOOK_URL", ""
+        ),
+        CONTACT_TELEGRAM_BOT_TOKEN=os.environ.get(
+            "CONTACT_TELEGRAM_BOT_TOKEN", ""
+        ),
+        CONTACT_TELEGRAM_CHAT_ID=os.environ.get(
+            "CONTACT_TELEGRAM_CHAT_ID", ""
+        ),
+        CONTACT_NOTIFICATION_TIMEOUT=float(
+            os.environ.get("CONTACT_NOTIFICATION_TIMEOUT", "5")
+        ),
         TRUST_PROXY_HEADERS=os.environ.get("TRUST_PROXY_HEADERS", "0") == "1",
         LOGIN_MAX_ATTEMPTS=int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5")),
         LOGIN_LOCKOUT_SECONDS=int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "900")),
@@ -1350,6 +1750,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             "t": lambda key: TRANSLATIONS[lang].get(key, key),
             "csrf_token": csrf_token,
             "level_label": lambda number: level_label(number, lang),
+            "court_info_export_filename": court_info_export_filename,
             "google_maps_api_key": app.config["GOOGLE_MAPS_API_KEY"],
             "web_push_enabled": web_push_enabled(),
             "web_push_public_key": app.config["WEB_PUSH_PUBLIC_KEY"],
@@ -1406,6 +1807,115 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.get("/licenses")
     def licenses():
         return render_template("licenses.html")
+
+    @app.get("/privacy")
+    def privacy():
+        lang = current_language()
+        contact_uri = validated_contact_uri(
+            app.config["PRIVACY_CONTACT"]
+        )
+        contact_label = (
+            contact_uri.removeprefix("mailto:") if contact_uri else ""
+        )
+        return render_template(
+            "privacy.html",
+            policy_sections=PRIVACY_POLICY_SECTIONS[lang],
+            privacy_operator_name=validated_privacy_label(
+                app.config["PRIVACY_OPERATOR_NAME"]
+            ),
+            privacy_data_region=validated_privacy_label(
+                app.config["PRIVACY_DATA_REGION"]
+            ),
+            privacy_contact_uri=contact_uri,
+            privacy_contact_label=contact_label,
+        )
+
+    @app.route("/contact", methods=["GET", "POST"])
+    def contact():
+        if (
+            request.method == "POST"
+            and request.content_length is not None
+            and request.content_length > 16_384
+        ):
+            abort(413)
+        lang = current_language()
+        member = current_member()
+        form_values = {
+            "sender_name": (
+                request.form.get("sender_name", "").strip()
+                if request.method == "POST"
+                else (member["username"] if member else "")
+            ),
+            "reply_contact": request.form.get("reply_contact", "").strip(),
+            "subject": request.form.get("subject", "").strip(),
+            "message": request.form.get("message", "").strip(),
+        }
+        form_errors: dict[str, str] = {}
+        if request.method == "POST":
+            verify_csrf()
+            for field_name in ("sender_name", "subject", "message"):
+                if not form_values[field_name]:
+                    form_errors[field_name] = "contact_form_required"
+            length_rules = (
+                ("sender_name", MAX_CONTACT_NAME_LENGTH, "contact_name_too_long"),
+                ("reply_contact", MAX_CONTACT_REPLY_LENGTH, "contact_reply_too_long"),
+                ("subject", MAX_CONTACT_SUBJECT_LENGTH, "contact_subject_too_long"),
+                ("message", MAX_CONTACT_MESSAGE_LENGTH, "contact_message_too_long"),
+            )
+            for field_name, maximum, error_key in length_rules:
+                if len(form_values[field_name]) > maximum:
+                    form_errors[field_name] = error_key
+            for field_name, field_value in form_values.items():
+                if contains_disallowed_control_characters(
+                    field_value, multiline=field_name == "message"
+                ):
+                    form_errors[field_name] = "contact_form_invalid"
+            if not form_errors and not verify_turnstile_response(
+                "contact_message"
+            ):
+                form_errors["turnstile"] = "turnstile_required"
+            if not form_errors:
+                submitted_at = datetime.now().isoformat(timespec="seconds")
+                db = get_db()
+                cursor = db.execute(
+                    """
+                    INSERT INTO contact_messages
+                        (sender_name, reply_contact, subject, message,
+                         language, submitted_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        form_values["sender_name"],
+                        form_values["reply_contact"],
+                        form_values["subject"],
+                        form_values["message"],
+                        lang,
+                        submitted_at,
+                    ),
+                )
+                db.commit()
+                send_contact_message_notifications(
+                    {
+                        "id": int(cursor.lastrowid),
+                        **form_values,
+                        "submitted_at": submitted_at,
+                    }
+                )
+                flash_t("contact_message_sent", "success")
+                return redirect(url_for("contact") + "#contact-form")
+            flash_t("contact_form_invalid", "error")
+        response = render_template(
+            "contact.html",
+            contact_operator_name=validated_privacy_label(
+                app.config["PRIVACY_OPERATOR_NAME"]
+            ),
+            contact_method_groups=configured_admin_contact_method_groups(
+                lang
+            ),
+            contact_form_values=form_values,
+            contact_form_errors=form_errors,
+        )
+        return (response, 400) if form_errors else response
 
     @app.get("/introduction")
     def introduction():
@@ -1973,6 +2483,21 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         db.commit()
         return jsonify({"subscribed": False})
 
+    @app.get("/<guid>/court_info.md")
+    @organizer_required
+    def export_court_info(guid: str):
+        court = fetch_managed_court(guid)
+        content = render_court_info_markdown(court)
+        response = send_file(
+            io.BytesIO(content.encode("utf-8")),
+            mimetype="text/markdown",
+            as_attachment=True,
+            download_name=court_info_export_filename(court),
+        )
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
     @app.get("/<guid>")
     def court_detail(guid: str):
         court = fetch_court(guid)
@@ -2450,6 +2975,124 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             ),
         )
 
+    @app.get("/admin/courts/export.csv")
+    @admin_required
+    def admin_export_all_courts_csv():
+        content = render_all_courts_csv()
+        response = send_file(
+            io.BytesIO(content),
+            mimetype="text/csv",
+            as_attachment=True,
+            download_name=f"{date.today().isoformat()}_all_court_events.csv",
+        )
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @app.get("/admin/messages")
+    @account_admin_required
+    def admin_messages():
+        message_status = request.args.get("status", "all").strip().lower()
+        if message_status not in {"all", "unread", "read"}:
+            message_status = "all"
+        try:
+            page = max(1, int(request.args.get("page", "1")))
+        except ValueError:
+            page = 1
+        where_clause = ""
+        if message_status == "unread":
+            where_clause = " WHERE read_at IS NULL"
+        elif message_status == "read":
+            where_clause = " WHERE read_at IS NOT NULL"
+        db = get_db()
+        total_count = db.execute(
+            f"SELECT COUNT(*) AS count FROM contact_messages{where_clause}"
+        ).fetchone()["count"]
+        unread_count = db.execute(
+            "SELECT COUNT(*) AS count FROM contact_messages "
+            "WHERE read_at IS NULL"
+        ).fetchone()["count"]
+        per_page = 50
+        page_count = max(1, (total_count + per_page - 1) // per_page)
+        page = min(page, page_count)
+        messages = db.execute(
+            "SELECT id, sender_name, reply_contact, subject, message, "
+            "language, submitted_at, read_at FROM contact_messages"
+            f"{where_clause} "
+            "ORDER BY submitted_at DESC, id DESC LIMIT ? OFFSET ?",
+            (per_page, (page - 1) * per_page),
+        ).fetchall()
+        notification_channels = contact_notification_channels()
+        return render_template(
+            "admin/messages.html",
+            contact_messages=messages,
+            message_status=message_status,
+            total_count=total_count,
+            unread_count=unread_count,
+            page=page,
+            page_count=page_count,
+            contact_notifications_enabled=get_bool_setting(
+                "contact_notifications_enabled"
+            ),
+            discord_notification_ready=notification_channels[
+                "discord_ready"
+            ],
+            telegram_notification_ready=notification_channels[
+                "telegram_ready"
+            ],
+        )
+
+    @app.post("/admin/messages/<int:message_id>/status")
+    @account_admin_required
+    def admin_update_message_status(message_id: int):
+        verify_csrf()
+        mark_read = request.form.get("read") == "1"
+        read_at = (
+            datetime.now().isoformat(timespec="seconds")
+            if mark_read
+            else None
+        )
+        db = get_db()
+        cursor = db.execute(
+            "UPDATE contact_messages SET read_at = ? WHERE id = ?",
+            (read_at, message_id),
+        )
+        db.commit()
+        if cursor.rowcount == 0:
+            abort(404)
+        flash_t("contact_message_status_updated", "success")
+        message_status = request.form.get("status", "all")
+        page = request.form.get("page", "1")
+        return redirect(
+            url_for(
+                "admin_messages",
+                status=(
+                    message_status
+                    if message_status in {"all", "unread", "read"}
+                    else "all"
+                ),
+                page=page if page.isdigit() else "1",
+            )
+        )
+
+    @app.post("/admin/settings/contact-notifications")
+    @account_admin_required
+    def admin_update_contact_notification_settings():
+        verify_csrf()
+        enabled = request.form.get("enabled") == "1"
+        channels = contact_notification_channels()
+        if enabled and not (
+            channels["discord_ready"] or channels["telegram_ready"]
+        ):
+            flash_t("contact_notification_unavailable", "error")
+            return redirect(url_for("admin_messages"))
+        set_setting(
+            "contact_notifications_enabled",
+            "1" if enabled else "0",
+        )
+        flash_t("contact_notification_saved", "success")
+        return redirect(url_for("admin_messages"))
+
     @app.post("/admin/settings/homepage")
     @account_admin_required
     def admin_update_homepage_settings():
@@ -2898,30 +3541,70 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 )
         if request.method == "POST":
             verify_csrf()
-            save_location = request.form.get("save_location") == "1"
-            values = {key: request.form.get(key, "").strip() for key in values}
-            cleaned, errors = validate_court(values)
-            reserved_nicknames = validate_reserved_nicknames(
-                request.form.getlist("reserved_nickname"),
-                cleaned.get("ordered_count") if "ordered_count" not in errors else None,
-                errors,
-            )
-            media_uploads = validate_court_media_uploads(
-                request.files.getlist("media"), 0, errors
-            )
-            if not errors:
-                guid = create_court_record(
-                    cleaned,
-                    owner_id=member["id"],
-                    creator_name=member["username"],
-                    reserved_nicknames=reserved_nicknames,
-                    media_uploads=media_uploads,
+            if request.form.get("form_action") == "import_court_info":
+                try:
+                    values, reserved_nicknames = parse_court_info_upload(
+                        request.files.get("court_info_file")
+                    )
+                except ValueError as error:
+                    error_key = str(error)
+                    if error_key not in {
+                        "court_info_invalid",
+                        "court_info_too_large",
+                    }:
+                        error_key = "court_info_invalid"
+                    errors["court_info_file"] = error_key
+                    flash_t(error_key, "error")
+                else:
+                    cleaned, errors = validate_court(values)
+                    reserved_nicknames = validate_reserved_nicknames(
+                        reserved_nicknames,
+                        (
+                            cleaned.get("ordered_count")
+                            if "ordered_count" not in errors
+                            else None
+                        ),
+                        errors,
+                    )
+                    flash_t(
+                        (
+                            "court_info_imported_review"
+                            if errors
+                            else "court_info_imported"
+                        ),
+                        "error" if errors else "success",
+                    )
+            else:
+                save_location = request.form.get("save_location") == "1"
+                values = {
+                    key: request.form.get(key, "").strip() for key in values
+                }
+                cleaned, errors = validate_court(values)
+                reserved_nicknames = validate_reserved_nicknames(
+                    request.form.getlist("reserved_nickname"),
+                    (
+                        cleaned.get("ordered_count")
+                        if "ordered_count" not in errors
+                        else None
+                    ),
+                    errors,
                 )
-                if save_location:
-                    save_member_location(member["id"], cleaned)
-                flash_t("court_created", "success")
-                return redirect(url_for("court_detail", guid=guid))
-            flash_t("invalid_form", "error")
+                media_uploads = validate_court_media_uploads(
+                    request.files.getlist("media"), 0, errors
+                )
+                if not errors:
+                    guid = create_court_record(
+                        cleaned,
+                        owner_id=member["id"],
+                        creator_name=member["username"],
+                        reserved_nicknames=reserved_nicknames,
+                        media_uploads=media_uploads,
+                    )
+                    if save_location:
+                        save_member_location(member["id"], cleaned)
+                    flash_t("court_created", "success")
+                    return redirect(url_for("court_detail", guid=guid))
+                flash_t("invalid_form", "error")
         return render_template(
             "admin/new_court.html",
             errors=errors,
@@ -3077,6 +3760,21 @@ def get_int_setting(
     except (TypeError, ValueError):
         value = default
     return min(maximum, max(minimum, value))
+
+
+def get_bool_setting(setting_key: str, default: bool = False) -> bool:
+    setting = get_db().execute(
+        "SELECT setting_value FROM app_settings WHERE setting_key = ?",
+        (setting_key,),
+    ).fetchone()
+    if setting is None:
+        return default
+    return str(setting["setting_value"]).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def set_setting(setting_key: str, setting_value: str) -> None:
@@ -3331,6 +4029,379 @@ def current_language() -> str:
     if saved_language in LANGUAGES:
         return saved_language
     return "zh-tw" if detected_country_code() == "TW" else "en-us"
+
+
+def validated_privacy_label(value: Any) -> str:
+    label = str(value or "").strip()
+    if (
+        not label
+        or len(label) > 200
+        or any(ord(character) < 32 for character in label)
+    ):
+        return ""
+    return label
+
+
+def validated_contact_uri(value: Any) -> str:
+    contact = str(value or "").strip()
+    if (
+        not contact
+        or len(contact) > 500
+        or any(ord(character) < 32 for character in contact)
+    ):
+        return ""
+    parsed = urlparse(contact)
+    if (
+        parsed.scheme == "mailto"
+        and parsed.path
+        and not parsed.netloc
+    ):
+        return contact
+    if parsed.scheme in {"https", "http"} and parsed.netloc:
+        return contact
+    return ""
+
+
+def configured_admin_contact_methods(lang: str) -> list[dict[str, str]]:
+    contact_methods: list[dict[str, str]] = []
+    general_contact = validated_contact_uri(
+        current_app_config("ADMIN_CONTACT")
+    )
+    if general_contact:
+        general_id = (
+            "email"
+            if urlparse(general_contact).scheme == "mailto"
+            else "website"
+        )
+        contact_methods.append(
+            {
+                "id": general_id,
+                "label": TRANSLATIONS[lang][f"contact_{general_id}"],
+                "uri": general_contact,
+                "display": contact_display_label(general_contact),
+            }
+        )
+    for method_id in ("discord", "line", "telegram"):
+        public_contact = configured_public_contact(
+            method_id,
+            current_app_config(f"ADMIN_CONTACT_{method_id.upper()}"),
+        )
+        if public_contact:
+            method_uri, display = public_contact
+            contact_methods.append(
+                {
+                    "id": method_id,
+                    "label": TRANSLATIONS[lang][f"contact_{method_id}"],
+                    "uri": method_uri,
+                    "display": display,
+                }
+            )
+    return sorted(
+        {method["uri"]: method for method in contact_methods}.values(),
+        key=lambda method: (
+            CONTACT_METHOD_SORT_ORDER[method["id"]],
+            method["id"],
+        ),
+    )
+
+
+def configured_admin_contact_method_groups(
+    lang: str,
+) -> list[dict[str, Any]]:
+    methods = configured_admin_contact_methods(lang)
+    groups = (
+        (
+            "email",
+            "contact_method_email_group",
+            [method for method in methods if method["id"] == "email"],
+        ),
+        (
+            "messaging",
+            "contact_method_messaging_group",
+            [
+                method
+                for method in methods
+                if method["id"] in {"discord", "line", "telegram"}
+            ],
+        ),
+        (
+            "other",
+            "contact_method_other_group",
+            [
+                method
+                for method in methods
+                if method["id"]
+                not in {"email", "discord", "line", "telegram"}
+            ],
+        ),
+    )
+    return [
+        {
+            "id": group_id,
+            "label": TRANSLATIONS[lang][label_key],
+            "methods": grouped_methods,
+        }
+        for group_id, label_key, grouped_methods in groups
+        if grouped_methods
+    ]
+
+
+def configured_public_contact(
+    method_id: str, value: Any
+) -> tuple[str, str] | None:
+    contact_id = normalized_public_contact_id(method_id, value)
+    if not contact_id:
+        return None
+    if method_id == "discord":
+        return f"https://discord.gg/{contact_id}", contact_id
+    if method_id == "line":
+        display = f"@{contact_id}"
+        return (
+            f"https://line.me/R/ti/p/{quote(display, safe='')}",
+            display,
+        )
+    if method_id == "telegram":
+        return f"https://t.me/{contact_id}", f"@{contact_id}"
+    return None
+
+
+def normalized_public_contact_id(method_id: str, value: Any) -> str:
+    contact = str(value or "").strip()
+    if (
+        method_id not in PUBLIC_CONTACT_ID_PATTERNS
+        or not contact
+        or len(contact) > 500
+        or any(ord(character) < 32 for character in contact)
+    ):
+        return ""
+
+    parsed = urlparse(contact)
+    if parsed.scheme or parsed.netloc:
+        contact = public_contact_id_from_url(method_id, parsed)
+        if not contact:
+            return ""
+
+    contact = unquote(contact).strip()
+    if method_id in {"line", "telegram"}:
+        contact = contact.removeprefix("@")
+    if not PUBLIC_CONTACT_ID_PATTERNS[method_id].fullmatch(contact):
+        return ""
+    return contact
+
+
+def public_contact_id_from_url(method_id: str, parsed: Any) -> str:
+    try:
+        hostname = (parsed.hostname or "").rstrip(".").lower()
+        has_port = parsed.port is not None
+    except ValueError:
+        return ""
+    if (
+        parsed.scheme.lower() != "https"
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+        or parsed.password
+        or has_port
+    ):
+        return ""
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if method_id == "discord":
+        if hostname == "discord.gg" and len(path_parts) == 1:
+            return path_parts[0]
+        if (
+            hostname in {"discord.com", "discordapp.com"}
+            and len(path_parts) == 2
+            and path_parts[0].lower() == "invite"
+        ):
+            return path_parts[1]
+    elif method_id == "line":
+        if (
+            hostname == "line.me"
+            and len(path_parts) == 4
+            and [part.lower() for part in path_parts[:3]] == ["r", "ti", "p"]
+        ):
+            return path_parts[3]
+    elif (
+        method_id == "telegram"
+        and hostname in {"t.me", "telegram.me"}
+        and len(path_parts) == 1
+    ):
+        return path_parts[0]
+    return ""
+
+
+def contact_display_label(contact_uri: str) -> str:
+    if contact_uri.startswith("mailto:"):
+        return contact_uri.removeprefix("mailto:")
+    return re.sub(r"^https?://", "", contact_uri, flags=re.IGNORECASE)
+
+
+def contains_disallowed_control_characters(
+    value: str, *, multiline: bool = False
+) -> bool:
+    allowed = {"\n", "\r", "\t"} if multiline else set()
+    return any(
+        ord(character) < 32 and character not in allowed
+        for character in value
+    )
+
+
+def validated_discord_webhook_url(value: Any) -> str:
+    webhook_url = str(value or "").strip()
+    if (
+        not webhook_url
+        or len(webhook_url) > 1000
+        or contains_disallowed_control_characters(webhook_url)
+    ):
+        return ""
+    parsed = urlparse(webhook_url)
+    hostname = (parsed.hostname or "").rstrip(".").lower()
+    if (
+        parsed.scheme != "https"
+        or parsed.username
+        or parsed.password
+        or parsed.fragment
+        or not (
+            hostname == "discord.com"
+            or hostname.endswith(".discord.com")
+            or hostname == "discordapp.com"
+            or hostname.endswith(".discordapp.com")
+        )
+        or not re.fullmatch(
+            r"/api(?:/v\d+)?/webhooks/\d+/[A-Za-z0-9._-]+/?",
+            parsed.path,
+        )
+    ):
+        return ""
+    return webhook_url
+
+
+def validated_telegram_bot_token(value: Any) -> str:
+    token = str(value or "").strip()
+    if re.fullmatch(r"\d{5,20}:[A-Za-z0-9_-]{20,100}", token):
+        return token
+    return ""
+
+
+def validated_telegram_chat_id(value: Any) -> str:
+    chat_id = str(value or "").strip()
+    if re.fullmatch(r"-?\d{1,20}|@[A-Za-z][A-Za-z0-9_]{4,31}", chat_id):
+        return chat_id
+    return ""
+
+
+def contact_notification_channels() -> dict[str, Any]:
+    discord_webhook = validated_discord_webhook_url(
+        current_app_config("CONTACT_DISCORD_WEBHOOK_URL")
+    )
+    telegram_token = validated_telegram_bot_token(
+        current_app_config("CONTACT_TELEGRAM_BOT_TOKEN")
+    )
+    telegram_chat_id = validated_telegram_chat_id(
+        current_app_config("CONTACT_TELEGRAM_CHAT_ID")
+    )
+    return {
+        "discord_webhook": discord_webhook,
+        "discord_ready": bool(discord_webhook),
+        "telegram_token": telegram_token,
+        "telegram_chat_id": telegram_chat_id,
+        "telegram_ready": bool(telegram_token and telegram_chat_id),
+    }
+
+
+def format_contact_message_notification(message: dict[str, Any]) -> str:
+    reply_contact = message["reply_contact"] or "—"
+    body = message["message"]
+    if len(body) > 1200:
+        body = body[:1197].rstrip() + "…"
+    notification = (
+        "New contact message / 新聯絡留言\n"
+        f"ID: #{message['id']}\n"
+        f"Name / 名稱: {message['sender_name']}\n"
+        f"Reply / 回覆: {reply_contact}\n"
+        f"Subject / 主旨: {message['subject']}\n"
+        f"Submitted / 送出: {message['submitted_at']}\n\n"
+        f"{body}\n\n"
+        f"Inbox / 收件匣: {public_external_url('admin_messages')}"
+    )
+    return notification[:1900]
+
+
+def post_contact_notification(
+    service: str,
+    endpoint: str,
+    payload: dict[str, Any],
+    *,
+    require_ok_response: bool = False,
+) -> bool:
+    notification_request = Request(
+        endpoint,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "badminton-court-control-panel/contact-notifier",
+        },
+        method="POST",
+    )
+    timeout = min(
+        30.0,
+        max(
+            0.5,
+            float(current_app_config("CONTACT_NOTIFICATION_TIMEOUT")),
+        ),
+    )
+    try:
+        with urlopen(notification_request, timeout=timeout) as response:
+            response_body = response.read(65536)
+            if require_ok_response:
+                response_data = json.loads(response_body.decode("utf-8"))
+                if response_data.get("ok") is not True:
+                    raise ValueError("notification response was not successful")
+    except (
+        HTTPError,
+        URLError,
+        TimeoutError,
+        OSError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as error:
+        current_app.logger.warning(
+            "%s contact-message notification failed: %s",
+            service,
+            error.__class__.__name__,
+        )
+        return False
+    return True
+
+
+def send_contact_message_notifications(message: dict[str, Any]) -> None:
+    if not get_bool_setting("contact_notifications_enabled"):
+        return
+    channels = contact_notification_channels()
+    notification = format_contact_message_notification(message)
+    if channels["discord_ready"]:
+        post_contact_notification(
+            "Discord",
+            channels["discord_webhook"],
+            {
+                "content": notification,
+                "allowed_mentions": {"parse": []},
+            },
+        )
+    if channels["telegram_ready"]:
+        post_contact_notification(
+            "Telegram",
+            (
+                "https://api.telegram.org/bot"
+                f"{channels['telegram_token']}/sendMessage"
+            ),
+            {
+                "chat_id": channels["telegram_chat_id"],
+                "text": notification,
+            },
+            require_ok_response=True,
+        )
 
 
 def detected_country_code() -> str:
@@ -3881,6 +4952,137 @@ def court_query() -> str:
         FROM courts c
         LEFT JOIN users u ON u.id = c.owner_id
     """
+
+
+def spreadsheet_safe_csv_text(value: Any) -> str:
+    text = "" if value is None else str(value)
+    candidate = text.lstrip()
+    if candidate.startswith(("=", "+", "-", "@")) or text.startswith(
+        ("\t", "\r", "\n")
+    ):
+        return "'" + text
+    return text
+
+
+def court_csv_status(court: sqlite3.Row) -> str:
+    if court["archived"]:
+        return "archived"
+    if court["is_expired"]:
+        return "expired"
+    if court["roll_clearing_locked"]:
+        return "read_only"
+    if court["total_count"] >= court["member_max"]:
+        return "full"
+    return "open"
+
+
+def render_all_courts_csv() -> bytes:
+    db = get_db()
+    courts = db.execute(
+        court_query()
+        + " ORDER BY c.court_date DESC, c.start_time DESC, c.id DESC"
+    ).fetchall()
+    reserved_by_court: dict[int, list[str]] = {}
+    for row in db.execute(
+        "SELECT court_id, position, nickname FROM reserved_members "
+        "ORDER BY court_id, position"
+    ).fetchall():
+        reserved_by_court.setdefault(row["court_id"], []).append(row["nickname"])
+    media_counts = {
+        row["court_id"]: row["media_count"]
+        for row in db.execute(
+            "SELECT court_id, COUNT(*) AS media_count FROM court_media "
+            "GROUP BY court_id"
+        ).fetchall()
+    }
+
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\r\n")
+    writer.writerow(
+        (
+            "guid",
+            "public_url",
+            "event_name",
+            "badminton_name",
+            "court_date",
+            "start_time",
+            "end_time",
+            "hall_name",
+            "location",
+            "google_place_id",
+            "latitude",
+            "longitude",
+            "court_id",
+            "creator_username",
+            "created_at",
+            "status",
+            "archived",
+            "expired",
+            "roll_clearing_locked",
+            "member_min",
+            "member_max",
+            "reserved_count",
+            "reserved_names_visible",
+            "reserved_nicknames",
+            "confirmed_signup_count",
+            "waiting_count",
+            "total_confirmed_count",
+            "male_level_min",
+            "male_level_max",
+            "female_level_min",
+            "female_level_max",
+            "male_price",
+            "female_price",
+            "shuttlecock_info",
+            "remark",
+            "media_count",
+        )
+    )
+    for court in courts:
+        writer.writerow(
+            (
+                court["guid"],
+                url_for("court_detail", guid=court["guid"], _external=True),
+                spreadsheet_safe_csv_text(court["event_name"]),
+                spreadsheet_safe_csv_text(court["badminton_name"]),
+                court["court_date"],
+                court["start_time"],
+                court["end_time"],
+                spreadsheet_safe_csv_text(court["hall_name"]),
+                spreadsheet_safe_csv_text(court["location"]),
+                spreadsheet_safe_csv_text(court["google_place_id"]),
+                court["latitude"] if court["latitude"] is not None else "",
+                court["longitude"] if court["longitude"] is not None else "",
+                spreadsheet_safe_csv_text(court["court_id"]),
+                spreadsheet_safe_csv_text(court["creator_username"]),
+                court["created_at"],
+                court_csv_status(court),
+                court["archived"],
+                court["is_expired"],
+                court["roll_clearing_locked"],
+                court["member_min"],
+                court["member_max"],
+                court["ordered_count"],
+                court["reserved_names_visible"],
+                json.dumps(
+                    reserved_by_court.get(court["id"], []),
+                    ensure_ascii=False,
+                ),
+                court["online_count"],
+                court["waiting_count"],
+                court["total_count"],
+                court["male_level_min"],
+                court["male_level_max"],
+                court["female_level_min"],
+                court["female_level_max"],
+                court["male_price"],
+                court["female_price"],
+                spreadsheet_safe_csv_text(court["shuttlecock_info"]),
+                spreadsheet_safe_csv_text(court["remark"]),
+                media_counts.get(court["id"], 0),
+            )
+        )
+    return ("\ufeff" + output.getvalue()).encode("utf-8")
 
 
 def fetch_court(guid: str) -> sqlite3.Row | None:
@@ -4588,6 +5790,107 @@ def court_form_values(court: sqlite3.Row) -> dict[str, str]:
         field: "" if court[field] is None else str(court[field])
         for field in default_court_values()
     }
+
+
+def court_info_export_filename(court: Any) -> str:
+    court_date = str(court["court_date"])
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", court_date):
+        court_date = "0000-00-00"
+
+    def compact_time(value: Any) -> str:
+        time_value = str(value)
+        return time_value.replace(":", "") if TIME_PATTERN.fullmatch(time_value) else "0000"
+
+    name = str(court["event_name"] or court["hall_name"] or "court")
+    name = re.sub(r'[\\/:*?"<>|\x00-\x1f\x7f]+', "_", name)
+    name = " ".join(name.split()).strip(" ._")
+    name = name[:100].rstrip(" ._") or "court"
+    return (
+        f"{court_date}_{compact_time(court['start_time'])}_"
+        f"{compact_time(court['end_time'])}_{name}.md"
+    )
+
+
+def render_court_info_markdown(court: sqlite3.Row) -> str:
+    payload = {
+        "format": COURT_INFO_FORMAT,
+        "version": COURT_INFO_VERSION,
+        "court": court_form_values(court),
+        "reserved_nicknames": reserved_nickname_values(
+            court["id"], court["ordered_count"]
+        ),
+    }
+    payload_json = json.dumps(payload, ensure_ascii=False, indent=2)
+    return (
+        "# Court information / 場次資訊\n\n"
+        "Import this file from the new-court form to prefill another event. "
+        "You may edit values inside the JSON block before importing.\n\n"
+        "請在新增場次表單匯入此檔案，以預先填入另一個場次；匯入前也可編輯 "
+        "JSON 區塊中的內容。\n\n"
+        f"{COURT_INFO_MARKER}\n"
+        "```json\n"
+        f"{payload_json}\n"
+        "```\n"
+    )
+
+
+def parse_court_info_upload(upload: Any) -> tuple[dict[str, str], list[str]]:
+    if upload is None or not upload.filename:
+        raise ValueError("court_info_invalid")
+    data = upload.stream.read(MAX_COURT_INFO_BYTES + 1)
+    if len(data) > MAX_COURT_INFO_BYTES:
+        raise ValueError("court_info_too_large")
+    try:
+        markdown = data.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise ValueError("court_info_invalid") from error
+
+    marker_position = markdown.find(COURT_INFO_MARKER)
+    if marker_position < 0:
+        raise ValueError("court_info_invalid")
+    encoded_block = markdown[
+        marker_position + len(COURT_INFO_MARKER) :
+    ].lstrip()
+    if not encoded_block.startswith("```json"):
+        raise ValueError("court_info_invalid")
+    encoded_payload = encoded_block[len("```json") :].lstrip("\r\n")
+    try:
+        payload, payload_end = json.JSONDecoder().raw_decode(encoded_payload)
+    except json.JSONDecodeError as error:
+        raise ValueError("court_info_invalid") from error
+    if not encoded_payload[payload_end:].lstrip().startswith("```"):
+        raise ValueError("court_info_invalid")
+    if (
+        not isinstance(payload, dict)
+        or payload.get("format") != COURT_INFO_FORMAT
+        or type(payload.get("version")) is not int
+        or payload["version"] != COURT_INFO_VERSION
+        or not isinstance(payload.get("court"), dict)
+    ):
+        raise ValueError("court_info_invalid")
+
+    defaults = default_court_values()
+    values: dict[str, str] = {}
+    for field, default in defaults.items():
+        value = payload["court"].get(field, default)
+        if value is None:
+            value = ""
+        if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+            raise ValueError("court_info_invalid")
+        text_value = str(value).strip()
+        if "\x00" in text_value:
+            raise ValueError("court_info_invalid")
+        values[field] = text_value
+
+    reserved_nicknames = payload.get("reserved_nicknames", [])
+    if (
+        not isinstance(reserved_nicknames, list)
+        or len(reserved_nicknames) > 99
+        or any(not isinstance(value, str) for value in reserved_nicknames)
+        or any("\x00" in value for value in reserved_nicknames)
+    ):
+        raise ValueError("court_info_invalid")
+    return values, reserved_nicknames
 
 
 def fetch_saved_locations(user_id: int) -> list[sqlite3.Row]:

@@ -19,6 +19,33 @@
   <form method="post" class="court-form" enctype="multipart/form-data" novalidate>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
+    {% if not editing %}
+      <article class="panel form-section court-info-import">
+        <div class="form-section-number">MD</div>
+        <div class="form-section-content">
+          <div class="form-section-heading">
+            <h2>{{ t('court_info') }}</h2>
+            <p>{{ t('court_info_help') }}</p>
+          </div>
+          <div class="court-info-import-controls">
+            <label class="field">
+              <span>{{ t('court_info_choose') }}</span>
+              <input
+                type="file"
+                name="court_info_file"
+                accept=".md,text/markdown,text/plain"
+                class="{% if errors.court_info_file %}invalid{% endif %}"
+              >
+              {% if errors.court_info_file %}<small class="field-error">{{ t(errors.court_info_file) }}</small>{% endif %}
+            </label>
+            <button class="button button-secondary" type="submit" name="form_action" value="import_court_info">
+              {{ t('court_info_import') }}
+            </button>
+          </div>
+        </div>
+      </article>
+    {% endif %}
+
     <article class="panel form-section">
       <div class="form-section-number">01</div>
       <div class="form-section-content">

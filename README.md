@@ -24,12 +24,14 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 - Save frequently used hall locations while creating an event, reuse them without searching, and delete them from the profile page.
 - Record reserved-player nicknames and choose whether visitors can see them.
 - Upload up to 12 JPEG, PNG, WebP, MP4, or WebM files. The first image becomes the court-card cover.
+- Export a managed court as `court_info.md` and import it on the new-event form to prefill another event.
 - Edit, duplicate, archive, restore, or delete owned events.
 - Start **Roll call & clearing** to make an event read-only and track attendance and payment-clearing status.
 
 ### For administrators
 
 - Create, edit, duplicate, archive, restore, and delete any court.
+- Export every existing court, including archived and expired events, as a UTF-8 CSV file.
 - Rename court participants, reset their six-digit PINs, or remove them directly from a court page.
 - Use private, account-owned saved locations from the same new-event form as members.
 - Assign member, sub-admin, admin, or super-admin roles; only super-admins can change roles.
@@ -48,6 +50,8 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 - Visitors detected in Taiwan default to Traditional Chinese; other visitors default to English.
 - A manually selected language is stored in a cookie and overrides country detection.
 - First-time visitors can choose whether to open a brief introduction; their choice is remembered in the browser.
+- A public bilingual privacy policy explains application data handling, visibility, retention, browser storage, and optional external services.
+- Visitors can leave stored support messages, and administrators can review them in a protected inbox.
 - Monochrome, Green & Lime, Purple, and Yellow palettes are available in system, light, and dark modes.
 - New visitors use **Yellow · Light** by default. Saved preferences take precedence.
 - Includes the Taiwan Badminton Promotion Association 1–18 grading reference.
@@ -59,16 +63,25 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 | `/` | Homepage and upcoming courts |
 | `/introduction` | Public product introduction |
 | `/updates` | Public bilingual update history |
+| `/contact` | Public bilingual administrator contact page |
+| `/privacy` | Public bilingual privacy policy |
 | `/courts` | Filterable public court listing |
 | `/courts/new` | Shared new-event form for signed-in members and administrators |
 | `/<GUID>` | Public court details and registration |
+| `/<GUID>/court_info.md` | Organizer-only court-configuration export |
 | `/signup` | Member registration |
 | `/login` | Member and administrator sign-in |
 | `/my-courts` | Organizer dashboard |
 | `/account/profile` | Member profile and avatar |
 | `/admin` | Administrator dashboard |
+| `/admin/messages` | Administrator-only contact-message inbox and notification setting |
+| `/admin/courts/export.csv` | Administrator-only export of every court event |
 | `/admin/users` | Member administration |
 | `/licenses` | Asset licenses and development acknowledgments |
+
+## Update history content
+
+The bilingual `/updates` timeline is maintained in `data/update_history.json`, newest entry first. Every entry must provide `date`, `date_label`, `title`, `summary`, and a non-empty `items` list for both `en-us` and `zh-tw`. The application validates this structure when it starts, so malformed, incomplete, invalid-date, or incorrectly ordered history fails early instead of rendering partial content.
 
 ## Local setup
 
@@ -115,6 +128,17 @@ The development bootstrap credentials are `admin` / `change-me`. Always replace 
 | `TRUST_PROXY_HEADERS` | `0` | Trust forwarded client-IP and URL-scheme headers. Enable only behind a trusted proxy that replaces them. |
 | `GEOIP_COUNTRY_DB` | Empty | Optional local MaxMind GeoIP2/GeoLite2 country database. |
 | `DEFAULT_COUNTRY_CODE` | Empty | Optional two-letter fallback country. Unknown visitors otherwise use English. |
+| `PRIVACY_OPERATOR_NAME` | Empty | Public name of the person or organization operating this deployment, displayed on `/privacy` and `/contact`. |
+| `PRIVACY_DATA_REGION` | Empty | Public description of the primary hosting/data region displayed on `/privacy`. |
+| `PRIVACY_CONTACT` | Empty | Optional public `mailto:` or HTTP(S) contact displayed on `/privacy`. |
+| `ADMIN_CONTACT` | Empty | Optional public `mailto:` or HTTP(S) administrator/support contact displayed on `/contact`. |
+| `ADMIN_CONTACT_DISCORD` | Empty | Optional Discord invite code; `/contact` automatically builds its official `discord.gg` link. |
+| `ADMIN_CONTACT_LINE` | Empty | Optional LINE Official Account ID, with or without `@`; `/contact` automatically builds its official `line.me` link. |
+| `ADMIN_CONTACT_TELEGRAM` | Empty | Optional Telegram public username, with or without `@`; `/contact` automatically builds its official `t.me` link. |
+| `CONTACT_DISCORD_WEBHOOK_URL` | Empty | Secret Discord incoming-webhook URL used for enabled new-message alerts. |
+| `CONTACT_TELEGRAM_BOT_TOKEN` | Empty | Secret Telegram Bot API token used for enabled new-message alerts. |
+| `CONTACT_TELEGRAM_CHAT_ID` | Empty | Telegram numeric chat ID or public `@channel` username that receives enabled alerts. |
+| `CONTACT_NOTIFICATION_TIMEOUT` | `5` | Per-service Discord/Telegram delivery timeout in seconds. |
 | `LOGIN_MAX_ATTEMPTS` | `5` | Failed sign-ins allowed before temporary lockout. |
 | `LOGIN_LOCKOUT_SECONDS` | `900` | Lockout duration in seconds. |
 | `LEAVE_MAX_ATTEMPTS` | `5` | Incorrect nickname/PIN leave attempts allowed per court, nickname, and client IP before temporary lockout. |
@@ -124,9 +148,13 @@ Values already present in the process environment take precedence over `.env`.
 
 ## Cloudflare Turnstile
 
-Create a [Turnstile widget](https://developers.cloudflare.com/turnstile/get-started/), allow the deployed hostname, and set both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` to protect `/signup` and the shared `/login` page. The widget uses the `signup` or `login` action, and the server validates both the token and matching action with Cloudflare Siteverify before account creation or credential processing.
+Create a [Turnstile widget](https://developers.cloudflare.com/turnstile/get-started/), allow the deployed hostname, and set both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` to protect `/signup`, the shared `/login` page, and the `/contact` message form. The widget uses the `signup`, `login`, or `contact_message` action, and the server validates both the token and matching action before processing the request.
 
 Missing, rejected, expired, reused, oversized, malformed, action-mismatched, and unverifiable tokens are denied. If either key is empty or Flask debug mode is active, Turnstile is disabled. The secret key is used only for server-to-server verification and is never rendered into HTML. Cloudflare provides [dedicated test sitekeys and secret keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) for automated testing and localhost; never deploy those test credentials to production.
+
+## Contact message notifications
+
+Public messages are always committed to SQLite before optional external delivery. Configure `CONTACT_DISCORD_WEBHOOK_URL` and/or both Telegram settings, then an administrator or super-administrator can enable notifications from `/admin/messages`. Discord URLs must be official HTTPS incoming-webhook endpoints; Telegram bot tokens and chat IDs are validated before the switch becomes available. Webhook URLs and bot tokens remain server-side and are never rendered in the inbox. A timeout or provider error is logged without its secret endpoint and does not discard the stored message.
 
 ## Google hall search
 
@@ -140,6 +168,14 @@ http://localhost:5000/*
 ```
 
 Without a key, the court form remains usable and provides a live Google Maps search link.
+
+## Court information import and export
+
+From a court’s organizer action menu, choose **Export** to download a file named `yyyy-MM-dd_HHmm_HHmm_<name>.md`, where the two times are the event’s start and end times. The final name uses the event name when present and otherwise uses the hall name. Choose that file at the top of `/courts/new` to prefill a new event. Importing only fills the form; the organizer must review and save it before a court is created.
+
+The versioned Markdown file contains reusable court fields and reserved-player nicknames in a readable JSON block. It intentionally excludes registrations, participant PINs, join/leave history, media files, ownership, and the original public GUID. Imports are limited to 64 KB and pass through the normal court validation before saving.
+
+Administrators can also choose **Export all courts (CSV)** on `/admin`. The UTF-8-with-BOM file contains one row for every existing event, including archived and expired courts, with event configuration, organizer/status information, counts, reserved nicknames, media count, and public URL. Participant PINs and join/leave history are not exported.
 
 ## System push notifications
 
@@ -200,9 +236,11 @@ The image uses `app.py` as the uWSGI module and serves it through Nginx on port 
 
 ## Security and privacy
 
+- The public bilingual policy at `/privacy` describes the application’s built-in data handling. Self-hosting operators must review it, configure `PRIVACY_OPERATOR_NAME`, `PRIVACY_DATA_REGION`, and `PRIVACY_CONTACT`, and disclose hosting logs, backups, custom services, or other deployment-specific processing.
 - Account passwords and participant PINs are stored using secure password hashes.
 - Member and administrator sign-ins are temporarily locked after repeated failures from the same username and IP address.
-- When configured, Cloudflare Turnstile is verified before signup or sign-in credentials are processed.
+- When configured, Cloudflare Turnstile is verified before signup, sign-in, or contact-message submission is processed.
+- Contact messages are stored in SQLite and visible only to administrator and super-administrator accounts; optional reply details are not public.
 - Successful member sign-ins record the local timestamp and validated client IP.
 - Successful court joins and leaves record the nickname, action, and timestamp. Administrators additionally see the validated IP and a broad device category.
 - Push subscription endpoints and encryption keys are stored only to deliver opted-in court updates and are never displayed publicly.

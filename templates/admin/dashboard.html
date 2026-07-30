@@ -20,6 +20,12 @@
       <p>{{ t(body_key) }}</p>
     </div>
     <div class="page-actions">
+      {% if mode == 'admin' %}
+        {% if current_user.role in ('admin', 'super_admin') %}
+          <a class="button button-secondary" href="{{ url_for('admin_messages') }}">{{ t('contact_messages') }}</a>
+        {% endif %}
+        <a class="button button-secondary" href="{{ url_for('admin_export_all_courts_csv') }}" download>{{ t('export_all_courts_csv') }}</a>
+      {% endif %}
       {% if mode == 'member' %}
         <a class="button button-secondary" href="{{ url_for('account_change_password') }}">{{ t('change_password') }}</a>
       {% elif current_user.role in ('admin', 'super_admin') %}

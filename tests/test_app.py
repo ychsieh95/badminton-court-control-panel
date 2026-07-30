@@ -1,4 +1,5 @@
 import base64
+import csv
 import html
 import io
 import json
@@ -40,6 +41,17 @@ def app(tmp_path):
             "SOCIAL_THUMBNAIL_FFMPEG": "ffmpeg",
             "SOCIAL_THUMBNAIL_FONT": "",
             "DEFAULT_COUNTRY_CODE": "TW",
+            "PRIVACY_OPERATOR_NAME": "",
+            "PRIVACY_DATA_REGION": "",
+            "PRIVACY_CONTACT": "",
+            "ADMIN_CONTACT": "",
+            "ADMIN_CONTACT_DISCORD": "",
+            "ADMIN_CONTACT_LINE": "",
+            "ADMIN_CONTACT_TELEGRAM": "",
+            "CONTACT_DISCORD_WEBHOOK_URL": "",
+            "CONTACT_TELEGRAM_BOT_TOKEN": "",
+            "CONTACT_TELEGRAM_CHAT_ID": "",
+            "CONTACT_NOTIFICATION_TIMEOUT": 1,
             "TRUST_PROXY_HEADERS": False,
             "LEAVE_MAX_ATTEMPTS": 5,
             "LEAVE_LOCKOUT_SECONDS": 900,
@@ -313,6 +325,117 @@ def create_court(
     )
     assert response.status_code == 302
     return response.headers["Location"]
+
+
+def test_organizer_can_export_and_import_court_info_markdown(client, app):
+    login(client)
+    location = create_court(
+        client,
+        reserved_names_visible="0",
+        event_name="Friday Night 羽球",
+        badminton_name="Shuttle Friends",
+    )
+    guid = location.rsplit("/", 1)[-1]
+
+    detail = client.get(location)
+    export_path = f"/{guid}/court_info.md"
+    assert export_path.encode() in detail.data
+    assert (
+        'download="2026-08-20_1900_2100_Friday Night 羽球.md"'.encode()
+        in detail.data
+    )
+    assert "匯出".encode() in detail.data
+
+    exported = client.get(export_path)
+    assert exported.status_code == 200
+    assert exported.mimetype == "text/markdown"
+    assert (
+        "filename*=UTF-8''2026-08-20_1900_2100_"
+        "Friday%20Night%20%E7%BE%BD%E7%90%83.md"
+        in exported.headers["Content-Disposition"]
+    )
+    assert exported.headers["Cache-Control"] == "private, no-store"
+    assert b"badminton-court-control-panel/court-info:v1" in exported.data
+    assert "Friday Night 羽球".encode() in exported.data
+    assert '"reserved_nicknames": ['.encode() in exported.data
+    assert '"guid"'.encode() not in exported.data
+    assert '"owner_id"'.encode() not in exported.data
+
+    imported = client.post(
+        "/courts/new",
+        data={
+            "csrf_token": csrf(client, "/courts/new"),
+            "form_action": "import_court_info",
+            "court_info_file": (io.BytesIO(exported.data), "court_info.md"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert imported.status_code == 200
+    assert "場次資訊已匯入".encode() in imported.data
+    assert 'value="Friday Night 羽球"'.encode() in imported.data
+    assert b'value="Shuttle Friends"' in imported.data
+    assert b'value="Taipei Sports Center"' in imported.data
+    assert b'value="Coach Lin"' in imported.data
+    assert b'value="Mina"' in imported.data
+    assert b'<option value="0" selected>' in imported.data
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM courts").fetchone()[0] == 1
+
+    hall_location = create_court(client)
+    hall_guid = hall_location.rsplit("/", 1)[-1]
+    hall_export = client.get(f"/{hall_guid}/court_info.md")
+    assert hall_export.headers["Content-Disposition"] == (
+        'attachment; filename="2026-08-20_1900_2100_'
+        'Taipei Sports Center.md"'
+    )
+
+    anonymous_client = app.test_client()
+    unauthorized = anonymous_client.get(export_path)
+    assert unauthorized.status_code == 302
+    assert urlparse(unauthorized.headers["Location"]).path == "/login"
+
+    client.post(
+        "/logout",
+        data={"csrf_token": csrf(client, location)},
+    )
+    signup(client, "unrelated-organizer")
+    assert client.get(export_path).status_code == 404
+
+
+def test_court_info_import_rejects_invalid_and_oversized_files(client, app):
+    login(client)
+
+    invalid = client.post(
+        "/courts/new",
+        data={
+            "csrf_token": csrf(client, "/courts/new"),
+            "form_action": "import_court_info",
+            "court_info_file": (
+                io.BytesIO(b"# unrelated markdown"),
+                "court_info.md",
+            ),
+        },
+        content_type="multipart/form-data",
+    )
+    assert invalid.status_code == 200
+    assert "請選擇由本網站匯出的有效".encode() in invalid.data
+
+    oversized = client.post(
+        "/courts/new",
+        data={
+            "csrf_token": csrf(client, "/courts/new"),
+            "form_action": "import_court_info",
+            "court_info_file": (
+                io.BytesIO(b"x" * (app_module.MAX_COURT_INFO_BYTES + 1)),
+                "court_info.md",
+            ),
+        },
+        content_type="multipart/form-data",
+    )
+    assert oversized.status_code == 200
+    assert "不可超過 64 KB".encode() in oversized.data
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM courts").fetchone()[0] == 0
 
 
 def enable_web_push(app):
@@ -1128,6 +1251,7 @@ def test_super_admin_can_assign_sub_admin_role_with_limited_access(client, app):
     assert signed_in.headers["Location"] == "/admin"
     assert client.get("/admin").status_code == 200
     assert client.get("/admin/users").status_code == 403
+    assert client.get("/admin/messages").status_code == 403
     court_form = client.get("/courts/new")
     assert court_form.status_code == 200
     assert b'name="save_location"' in court_form.data
@@ -1992,6 +2116,438 @@ def test_introduction_page_is_bilingual_and_linked_from_footer(client):
     assert b"Ready for your next game?" in english.data
 
 
+def test_privacy_policy_is_bilingual_public_and_linked_from_footer(client, app):
+    homepage = client.get("/")
+    assert b'class="footer-privacy-link" href="/privacy"' in homepage.data
+
+    privacy = client.get("/privacy")
+    assert privacy.status_code == 200
+    assert "隱私權政策".encode() in privacy.data
+    assert b'<time datetime="2026-07-30">' in privacy.data
+    assert privacy.data.count(b'class="panel privacy-section"') == 10
+    assert "應用程式內建功能不含廣告或分析追蹤器".encode() in privacy.data
+    assert "管理員 CSV 匯出".encode() in privacy.data
+    assert "完整 User-Agent 或裝置指紋".encode() in privacy.data
+    assert "Google Fonts".encode() in privacy.data
+    assert "聯絡留言：訪客填寫的名稱".encode() in privacy.data
+    assert "Discord Webhook 及／或 Telegram Bot".encode() in privacy.data
+    assert "尚未設定專用的隱私權聯絡方式".encode() in privacy.data
+    assert b"PRIVACY_CONTACT" not in privacy.data
+
+    app.config.update(
+        PRIVACY_OPERATOR_NAME="Example Badminton Association",
+        PRIVACY_DATA_REGION="Taiwan",
+        PRIVACY_CONTACT="mailto:privacy@example.test",
+    )
+    client.set_cookie("court_lang", "en-us")
+    english = client.get("/privacy")
+    assert b"Privacy policy" in english.data
+    assert b"Scope and responsibility" in english.data
+    assert b"The built-in application does not include advertising" in english.data
+    assert b"Example Badminton Association" in english.data
+    assert b"<dd>Taiwan</dd>" in english.data
+    assert b'href="mailto:privacy@example.test"' in english.data
+    assert b">privacy@example.test</a>" in english.data
+
+    app.config["PRIVACY_CONTACT"] = "javascript:alert(1)"
+    invalid_contact = client.get("/privacy")
+    assert b"javascript:alert(1)" not in invalid_contact.data
+    assert b"has not configured a dedicated privacy contact" in invalid_contact.data
+
+
+def test_admin_contact_page_is_bilingual_public_and_linked_from_footer(client, app):
+    homepage = client.get("/")
+    assert b'class="footer-contact-link" href="/contact"' in homepage.data
+
+    contact = client.get("/contact")
+    assert contact.status_code == 200
+    assert "聯絡網站管理員。".encode() in contact.data
+    assert "網站管理員尚未設定公開聯絡方式".encode() in contact.data
+    assert "請勿傳送密碼、管理員憑證或球友的 6 位數 PIN 碼".encode() in contact.data
+    assert b"ADMIN_CONTACT" not in contact.data
+
+    app.config.update(
+        PRIVACY_OPERATOR_NAME="Example Badminton Association",
+        ADMIN_CONTACT="mailto:admin@example.test",
+        ADMIN_CONTACT_DISCORD="example-invite",
+        ADMIN_CONTACT_LINE="@example.line",
+        ADMIN_CONTACT_TELEGRAM="@example_bot",
+    )
+    client.set_cookie("court_lang", "en-us")
+    english = client.get("/contact")
+    assert b"Contact the site administrator." in english.data
+    assert b"Example Badminton Association" in english.data
+    assert b'href="mailto:admin@example.test"' in english.data
+    assert (
+        b'<span class="contact-method-value">admin@example.test</span>'
+        in english.data
+    )
+    assert b'href="https://discord.gg/example-invite"' in english.data
+    assert (
+        b'href="https://line.me/R/ti/p/%40example.line"' in english.data
+    )
+    assert b'href="https://t.me/example_bot"' in english.data
+    assert b">example-invite</span>" in english.data
+    assert b">@example.line</span>" in english.data
+    assert b">@example_bot</span>" in english.data
+    assert english.data.count(b'class="contact-method-group ') == 2
+    assert b'id="contact-method-group-email">Email</h3>' in english.data
+    assert (
+        b'id="contact-method-group-messaging">Messaging</h3>'
+        in english.data
+    )
+    assert b'id="contact-method-group-other"' not in english.data
+    assert english.data.count(b'class="contact-method-link"') == 4
+    assert (
+        english.data.index(b'id="contact-method-group-email"')
+        < english.data.index(b">Email</span>")
+        < english.data.index(b'id="contact-method-group-messaging"')
+        < english.data.index(b">Discord</span>")
+        < english.data.index(b">LINE</span>")
+        < english.data.index(b">Telegram</span>")
+    )
+    assert b"Never send your password" in english.data
+
+    app.config["ADMIN_CONTACT"] = "https://support.example.test"
+    website_group = client.get("/contact")
+    assert (
+        b'id="contact-method-group-messaging">Messaging</h3>'
+        in website_group.data
+    )
+    assert (
+        b'id="contact-method-group-other">Other methods</h3>'
+        in website_group.data
+    )
+    assert (
+        website_group.data.index(b'id="contact-method-group-messaging"')
+        < website_group.data.index(b'id="contact-method-group-other"')
+        < website_group.data.index(b">Website</span>")
+    )
+
+    app.config["ADMIN_CONTACT"] = "https://t.me/example_bot"
+    deduplicated_contact = client.get("/contact")
+    assert deduplicated_contact.data.count(
+        b'href="https://t.me/example_bot"'
+    ) == 1
+
+    app.config.update(
+        ADMIN_CONTACT="",
+        ADMIN_CONTACT_DISCORD="https://discord.com/invite/legacy-code",
+        ADMIN_CONTACT_LINE="https://line.me/R/ti/p/%40legacy.line",
+        ADMIN_CONTACT_TELEGRAM="https://telegram.me/legacy_bot",
+    )
+    legacy_links = client.get("/contact")
+    assert (
+        legacy_links.data.count(b'class="contact-method-group ') == 1
+    )
+    assert b'id="contact-method-group-email"' not in legacy_links.data
+    assert b'id="contact-method-group-messaging"' in legacy_links.data
+    assert b'id="contact-method-group-other"' not in legacy_links.data
+    assert b'href="https://discord.gg/legacy-code"' in legacy_links.data
+    assert (
+        b'href="https://line.me/R/ti/p/%40legacy.line"'
+        in legacy_links.data
+    )
+    assert b'href="https://t.me/legacy_bot"' in legacy_links.data
+
+    app.config.update(
+        ADMIN_CONTACT="javascript:alert(1)",
+        ADMIN_CONTACT_DISCORD="https://example.com/not-discord",
+        ADMIN_CONTACT_LINE="http://line.me/not-secure",
+        ADMIN_CONTACT_TELEGRAM="https://example.com/not-telegram",
+    )
+    invalid_contact = client.get("/contact")
+    assert b"javascript:alert(1)" not in invalid_contact.data
+    assert b"not-discord" not in invalid_contact.data
+    assert b"not-secure" not in invalid_contact.data
+    assert b"not-telegram" not in invalid_contact.data
+    assert b"has not configured a public contact method" in invalid_contact.data
+
+
+def test_public_contact_message_is_validated_and_stored(client, app, monkeypatch):
+    def unexpected_urlopen(*_args, **_kwargs):
+        raise AssertionError("Notifications are disabled by default")
+
+    monkeypatch.setattr(app_module, "urlopen", unexpected_urlopen)
+    page = client.get("/contact")
+    assert b'id="contact-form"' in page.data
+    assert b'name="sender_name"' in page.data
+    assert b'name="reply_contact"' in page.data
+    assert b'name="subject"' in page.data
+    assert b'name="message"' in page.data
+
+    missing_csrf = client.post(
+        "/contact",
+        data={
+            "sender_name": "Visitor",
+            "subject": "Help",
+            "message": "Please help.",
+        },
+    )
+    assert missing_csrf.status_code == 400
+
+    invalid = client.post(
+        "/contact",
+        data={
+            "csrf_token": csrf(client, "/contact"),
+            "sender_name": "",
+            "reply_contact": "visitor@example.test",
+            "subject": "",
+            "message": "",
+        },
+    )
+    assert invalid.status_code == 400
+    assert "請填寫所有必填欄位".encode() in invalid.data
+
+    oversized = client.post(
+        "/contact",
+        data={
+            "csrf_token": csrf(client, "/contact"),
+            "sender_name": "Visitor",
+            "subject": "Oversized",
+            "message": "x" * 17_000,
+        },
+    )
+    assert oversized.status_code == 413
+
+    submitted = client.post(
+        "/contact",
+        data={
+            "csrf_token": csrf(client, "/contact"),
+            "sender_name": "訪客 <One>",
+            "reply_contact": "visitor@example.test",
+            "subject": "帳號問題",
+            "message": "登入時看到錯誤。\n請協助。",
+        },
+        follow_redirects=False,
+    )
+    assert submitted.status_code == 302
+    assert submitted.headers["Location"] == "/contact#contact-form"
+    with app.app_context():
+        stored = get_db().execute(
+            "SELECT sender_name, reply_contact, subject, message, language, "
+            "submitted_at, read_at FROM contact_messages"
+        ).fetchone()
+        assert stored["sender_name"] == "訪客 <One>"
+        assert stored["reply_contact"] == "visitor@example.test"
+        assert stored["subject"] == "帳號問題"
+        assert stored["message"] == "登入時看到錯誤。\n請協助。"
+        assert stored["language"] == "zh-tw"
+        assert stored["submitted_at"]
+        assert stored["read_at"] is None
+
+
+def test_contact_message_uses_turnstile_when_configured(
+    client, app, monkeypatch
+):
+    app.config.update(
+        TURNSTILE_SITE_KEY="contact-site-key",
+        TURNSTILE_SECRET_KEY="contact-secret-key",
+    )
+    checked_actions = []
+
+    def verify_action(action):
+        checked_actions.append(action)
+        return True
+
+    monkeypatch.setattr(app_module, "verify_turnstile_response", verify_action)
+    page = client.get("/contact")
+    assert b'class="cf-turnstile"' in page.data
+    assert b'data-action="contact_message"' in page.data
+    assert b'data-sitekey="contact-site-key"' in page.data
+
+    submitted = client.post(
+        "/contact",
+        data={
+            "csrf_token": csrf(client, "/contact"),
+            "sender_name": "Visitor",
+            "subject": "Technical issue",
+            "message": "The page did not load.",
+        },
+    )
+    assert submitted.status_code == 302
+    assert checked_actions == ["contact_message"]
+
+
+def test_admin_can_view_and_mark_contact_messages(client, app):
+    submitted = client.post(
+        "/contact",
+        data={
+            "csrf_token": csrf(client, "/contact"),
+            "sender_name": "Visitor <script>",
+            "reply_contact": "@visitor",
+            "subject": "Question <b>",
+            "message": "Line one\nLine <two>",
+        },
+    )
+    assert submitted.status_code == 302
+    anonymous_inbox = client.get("/admin/messages")
+    assert anonymous_inbox.status_code == 302
+    assert "/login?next=/admin/messages" in anonymous_inbox.headers["Location"]
+
+    login(client)
+    inbox = client.get("/admin/messages")
+    assert inbox.status_code == 200
+    assert "聯絡留言".encode() in inbox.data
+    assert b"Visitor &lt;script&gt;" in inbox.data
+    assert b"Question &lt;b&gt;" in inbox.data
+    assert b"Line &lt;two&gt;" in inbox.data
+    assert b"CONTACT_TELEGRAM_BOT_TOKEN" not in inbox.data
+    assert b"contact-secret" not in inbox.data
+    assert "1 未讀留言".encode() in inbox.data
+
+    updated = client.post(
+        "/admin/messages/1/status",
+        data={
+            "csrf_token": csrf(client, "/admin/messages"),
+            "read": "1",
+            "status": "all",
+            "page": "1",
+        },
+        follow_redirects=True,
+    )
+    assert updated.status_code == 200
+    assert "留言狀態已更新".encode() in updated.data
+    with app.app_context():
+        message = get_db().execute(
+            "SELECT read_at FROM contact_messages WHERE id = 1"
+        ).fetchone()
+        assert message["read_at"]
+
+    unread = client.get("/admin/messages?status=unread")
+    assert "此檢視目前沒有聯絡留言".encode() in unread.data
+
+
+def test_contact_notifications_use_enabled_discord_and_telegram(
+    client, app, monkeypatch
+):
+    bot_token = "123456789:abcdefghijklmnopqrstuvwxyzABCDE"
+    app.config.update(
+        CONTACT_DISCORD_WEBHOOK_URL=(
+            "https://discord.com/api/webhooks/123456/"
+            "abcdefghijklmnopqrstuvwxyz"
+        ),
+        CONTACT_TELEGRAM_BOT_TOKEN=bot_token,
+        CONTACT_TELEGRAM_CHAT_ID="-1001234567890",
+    )
+    login(client)
+    settings_page = client.get("/admin/messages")
+    assert "Discord Webhook 已設定".encode() in settings_page.data
+    assert "Telegram Bot 與聊天室已設定".encode() in settings_page.data
+    assert b"abcdefghijklmnopqrstuvwxyz" not in settings_page.data
+    assert bot_token.encode() not in settings_page.data
+
+    enabled = client.post(
+        "/admin/settings/contact-notifications",
+        data={
+            "csrf_token": csrf(client, "/admin/messages"),
+            "enabled": "1",
+        },
+        follow_redirects=True,
+    )
+    assert "留言通知設定已儲存".encode() in enabled.data
+    with app.app_context():
+        assert get_db().execute(
+            "SELECT setting_value FROM app_settings "
+            "WHERE setting_key = 'contact_notifications_enabled'"
+        ).fetchone()["setting_value"] == "1"
+
+    captured_requests = []
+
+    class FakeResponse:
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _limit):
+            return self.body
+
+    def fake_urlopen(notification_request, timeout):
+        captured_requests.append((notification_request, timeout))
+        body = (
+            b'{"ok": true}'
+            if "api.telegram.org" in notification_request.full_url
+            else b""
+        )
+        return FakeResponse(body)
+
+    monkeypatch.setattr(app_module, "urlopen", fake_urlopen)
+    submitted = client.post(
+        "/contact",
+        data={
+            "csrf_token": csrf(client, "/contact"),
+            "sender_name": "Notifier",
+            "reply_contact": "notify@example.test",
+            "subject": "Notification test",
+            "message": "Please notify both channels.",
+        },
+    )
+    assert submitted.status_code == 302
+    assert len(captured_requests) == 2
+    discord_request = next(
+        item[0]
+        for item in captured_requests
+        if "discord.com" in item[0].full_url
+    )
+    discord_payload = json.loads(discord_request.data)
+    assert discord_payload["allowed_mentions"] == {"parse": []}
+    assert "Notification test" in discord_payload["content"]
+    assert "notify@example.test" in discord_payload["content"]
+    telegram_request = next(
+        item[0]
+        for item in captured_requests
+        if "api.telegram.org" in item[0].full_url
+    )
+    telegram_payload = json.loads(telegram_request.data)
+    assert telegram_payload["chat_id"] == "-1001234567890"
+    assert "Please notify both channels." in telegram_payload["text"]
+    assert all(timeout == 1 for _, timeout in captured_requests)
+
+    def unavailable_urlopen(*_args, **_kwargs):
+        raise app_module.URLError("offline")
+
+    monkeypatch.setattr(app_module, "urlopen", unavailable_urlopen)
+    still_stored = client.post(
+        "/contact",
+        data={
+            "csrf_token": csrf(client, "/contact"),
+            "sender_name": "Stored",
+            "subject": "Delivery can fail",
+            "message": "This must remain in SQLite.",
+        },
+    )
+    assert still_stored.status_code == 302
+    with app.app_context():
+        assert get_db().execute(
+            "SELECT COUNT(*) AS count FROM contact_messages"
+        ).fetchone()["count"] == 2
+
+
+def test_admin_cannot_enable_contact_notifications_without_a_channel(
+    client, app
+):
+    login(client)
+    response = client.post(
+        "/admin/settings/contact-notifications",
+        data={
+            "csrf_token": csrf(client, "/admin/messages"),
+            "enabled": "1",
+        },
+        follow_redirects=True,
+    )
+    assert "啟用通知前".encode() in response.data
+    with app.app_context():
+        assert get_db().execute(
+            "SELECT 1 FROM app_settings "
+            "WHERE setting_key = 'contact_notifications_enabled'"
+        ).fetchone() is None
+
+
 def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     homepage = client.get("/")
     assert b'class="footer-updates-link" href="/updates"' in homepage.data
@@ -1999,19 +2555,37 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     updates = client.get("/updates")
     assert updates.status_code == 200
     assert "羽球場控面板，持續變得更好。".encode() in updates.data
+    assert "更清楚的隱私權說明".encode() in updates.data
+    assert "區分公開資訊、主辦者與管理員存取範圍".encode() in updates.data
+    assert "部署網站營運者、主要資料地區".encode() in updates.data
+    assert "新增網站管理員聯絡頁面".encode() in updates.data
+    assert "訪客可留下儲存在 SQLite 的留言".encode() in updates.data
+    assert "可攜式場次檔案與完整 CSV 匯出".encode() in updates.data
+    assert "yyyy-MM-dd_HHmm_HHmm_&lt;活動或球館&gt;.md".encode() in updates.data
+    assert "先預填並確認內容，再建立活動".encode() in updates.data
+    assert "管理員可將所有現有場次".encode() in updates.data
     assert "每個場次連結都有豐富的社群預覽".encode() in updates.data
     assert "公開整理第三方素材授權資訊".encode() in updates.data
     assert "限制退出場次時重複輸入錯誤暱稱或 PIN 碼".encode() in updates.data
     assert "直接在場次頁管理球友".encode() in updates.data
     assert "系統會自動遞補最早加入的候補球友".encode() in updates.data
     assert "2026 年 7 月 28 日".encode() in updates.data
-    assert updates.data.count(b'class="update-entry"') == 6
+    assert updates.data.count(b'class="update-entry"') == 8
     assert updates.data.count(b'class="update-latest"') == 1
-    assert b'<time datetime="2026-07-28">' in updates.data
+    assert b'<time datetime="2026-07-30">' in updates.data
 
     client.set_cookie("court_lang", "en-us")
     english = client.get("/updates")
     assert b"The control panel keeps getting better." in english.data
+    assert b"A clearer view of privacy" in english.data
+    assert b"Distinguishes public information from organizer" in english.data
+    assert b"configured deployment operator, primary data region" in english.data
+    assert b"dedicated administrator-contact page" in english.data
+    assert b"visitors leave messages stored in SQLite" in english.data
+    assert b"Portable court files and complete CSV exports" in english.data
+    assert b"yyyy-MM-dd_HHmm_HHmm_&lt;event-or-hall&gt;.md" in english.data
+    assert b"prefill details for review before anything is created" in english.data
+    assert b"Lets administrators export every existing court" in english.data
     assert b"Rich previews for every shared court" in english.data
     assert b"Organizes third-party asset licenses publicly" in english.data
     assert b"Safer access and court notifications" in english.data
@@ -2019,6 +2593,33 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     assert b"Manage players without leaving the court page" in english.data
     assert b"automatically promoting the earliest waiting player" in english.data
     assert b"Changes in this update" in english.data
+
+
+def test_update_history_is_loaded_and_validated_from_json(tmp_path):
+    history_path = Path(app_module.__file__).with_name(
+        "data"
+    ) / "update_history.json"
+    source_history = json.loads(history_path.read_text(encoding="utf-8"))
+    assert tuple(source_history) == app_module.SITE_UPDATE_HISTORY
+    assert app_module.SITE_UPDATE_HISTORY_PATH == history_path
+    assert len(source_history) == 8
+
+    invalid_history_path = tmp_path / "invalid-update-history.json"
+    invalid_history_path.write_text(
+        json.dumps(list(reversed(source_history))),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="newest first"):
+        app_module.load_site_update_history(invalid_history_path)
+
+    missing_translation = json.loads(json.dumps(source_history))
+    del missing_translation[0]["title"]["zh-tw"]
+    invalid_history_path.write_text(
+        json.dumps(missing_translation),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="title translations"):
+        app_module.load_site_update_history(invalid_history_path)
 
 
 def test_first_visit_introduction_prompt_is_bilingual_and_remembered_in_browser(client):
@@ -2208,6 +2809,67 @@ def test_admin_can_configure_homepage_court_limit(client, app):
             "WHERE setting_key = 'homepage_court_limit'"
         ).fetchone()
         assert setting["setting_value"] == "5"
+
+
+def test_admin_can_export_every_court_as_utf8_csv(client, app):
+    login(client)
+    active_location = create_court(
+        client,
+        event_name="CSV 羽球",
+        badminton_name="北區球團",
+    )
+    archived_location = create_court(client, event_name="Archived Event")
+    expired_location = create_court(client, event_name="Temporary")
+    active_guid = active_location.rsplit("/", 1)[-1]
+    archived_guid = archived_location.rsplit("/", 1)[-1]
+    expired_guid = expired_location.rsplit("/", 1)[-1]
+    with app.app_context():
+        db = get_db()
+        db.execute(
+            "UPDATE courts SET archived = 1, court_date = '2026-09-12' "
+            "WHERE guid = ?",
+            (archived_guid,),
+        )
+        db.execute(
+            "UPDATE courts SET event_name = '=2+2', court_date = '2000-01-01', "
+            "end_time = '09:00' WHERE guid = ?",
+            (expired_guid,),
+        )
+        db.commit()
+
+    dashboard = client.get("/admin")
+    assert b'href="/admin/courts/export.csv"' in dashboard.data
+    assert "匯出所有場次（CSV）".encode() in dashboard.data
+    assert b"=2+2" not in dashboard.data
+
+    exported = client.get("/admin/courts/export.csv")
+    assert exported.status_code == 200
+    assert exported.mimetype == "text/csv"
+    assert exported.data.startswith(b"\xef\xbb\xbf")
+    assert exported.headers["Cache-Control"] == "private, no-store"
+    assert "_all_court_events.csv" in exported.headers["Content-Disposition"]
+
+    rows = list(
+        csv.DictReader(io.StringIO(exported.data.decode("utf-8-sig")))
+    )
+    assert len(rows) == 3
+    rows_by_guid = {row["guid"]: row for row in rows}
+    active = rows_by_guid[active_guid]
+    assert active["event_name"] == "CSV 羽球"
+    assert active["badminton_name"] == "北區球團"
+    assert active["status"] == "open"
+    assert active["reserved_nicknames"] == '["Coach Lin", "Mina"]'
+    assert active["confirmed_signup_count"] == "0"
+    assert active["total_confirmed_count"] == "2"
+    assert active["public_url"].endswith(f"/{active_guid}")
+    assert rows_by_guid[archived_guid]["status"] == "archived"
+    assert rows_by_guid[expired_guid]["status"] == "expired"
+    assert rows_by_guid[expired_guid]["event_name"] == "'=2+2"
+
+    anonymous_client = app.test_client()
+    unauthorized = anonymous_client.get("/admin/courts/export.csv")
+    assert unauthorized.status_code == 302
+    assert urlparse(unauthorized.headers["Location"]).path == "/login"
 
 
 def test_admin_can_filter_all_courts(client, app):

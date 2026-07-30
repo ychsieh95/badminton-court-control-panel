@@ -1,0 +1,232 @@
+[
+  {
+    "date": "2026-07-30",
+    "date_label": {
+      "en-us": "July 30, 2026",
+      "zh-tw": "2026 年 7 月 30 日"
+    },
+    "title": {
+      "en-us": "A clearer view of privacy",
+      "zh-tw": "更清楚的隱私權說明"
+    },
+    "summary": {
+      "en-us": "A new public policy explains the application’s built-in data handling in plain English and Traditional Chinese.",
+      "zh-tw": "新的公開政策以英文及繁體中文清楚說明應用程式內建的資料處理方式。"
+    },
+    "items": {
+      "en-us": [
+        "Explains account, event, registration, security, push-notification, cookie, and browser-storage data.",
+        "Distinguishes public information from organizer and administrator access, including the privacy boundaries of exported files.",
+        "Documents optional external services, retention and deletion behavior, security measures, and visitor choices.",
+        "Shows the configured deployment operator, primary data region, and validated privacy-contact link while reminding self-hosting operators to disclose deployment-specific logs, backups, and services.",
+        "Adds a dedicated administrator-contact page for account, technical, security, and privacy help, grouping Email, Messaging, and Other methods while Discord, LINE, and Telegram identifiers automatically become official links.",
+        "Lets visitors leave messages stored in SQLite, gives administrators a protected read/unread inbox, and optionally sends new-message alerts through a validated Discord webhook and/or Telegram bot chat."
+      ],
+      "zh-tw": [
+        "說明帳號、活動、報名、安全性、推播通知、Cookie 及瀏覽器儲存資料。",
+        "區分公開資訊、主辦者與管理員存取範圍，並說明匯出檔案的隱私界線。",
+        "記錄選用外部服務、保留與刪除方式、安全措施及訪客選擇。",
+        "顯示已設定的部署網站營運者、主要資料地區及經驗證的隱私權聯絡連結，並提醒自行架設者揭露部署特有的紀錄、備份及服務。",
+        "新增網站管理員聯絡頁面，將電子郵件、即時通訊與其他聯絡方式分組顯示，並把 Discord、LINE 及 Telegram 識別碼自動組成官方連結，提供帳號、技術、安全性及隱私權協助，並提醒不要分享私人憑證。",
+        "訪客可留下儲存在 SQLite 的留言；管理員可在受保護的收件匣中管理已讀狀態，並選擇透過經驗證的 Discord Webhook 及／或 Telegram Bot 聊天室接收新留言通知。"
+      ]
+    }
+  },
+  {
+    "date": "2026-07-30",
+    "date_label": {
+      "en-us": "July 30, 2026",
+      "zh-tw": "2026 年 7 月 30 日"
+    },
+    "title": {
+      "en-us": "Portable court files and complete CSV exports",
+      "zh-tw": "可攜式場次檔案與完整 CSV 匯出"
+    },
+    "summary": {
+      "en-us": "Organizers can move one reusable court configuration between events, while administrators can download a complete event inventory.",
+      "zh-tw": "主辦者可在活動之間搬移單一場次設定，管理員則可下載完整的活動清冊。"
+    },
+    "items": {
+      "en-us": [
+        "Exports a managed event and its reserved-player nicknames as a readable Markdown file named yyyy-MM-dd_HHmm_HHmm_<event-or-hall>.md.",
+        "Imports court_info.md on the new-event form to prefill details for review before anything is created.",
+        "Excludes registrations, PINs, history, media files, ownership, and public links while validating the versioned file format and size.",
+        "Lets administrators export every existing court—including archived and expired events, statuses, counts, reserved nicknames, media counts, and public URLs—as an injection-conscious UTF-8 CSV file."
+      ],
+      "zh-tw": [
+        "將管理中的活動及預訂球友暱稱匯出為易讀的 Markdown 檔案，檔名格式為 yyyy-MM-dd_HHmm_HHmm_<活動或球館>.md。",
+        "在新增場次表單匯入 court_info.md，先預填並確認內容，再建立活動。",
+        "不包含報名資料、PIN 碼、歷程、媒體檔案、擁有者及公開連結，並驗證檔案版本與大小。",
+        "管理員可將所有現有場次（包含已封存與已過期活動、狀態、人數、預訂暱稱、媒體數量及公開網址）匯出為防範公式注入的 UTF-8 CSV 檔案。"
+      ]
+    }
+  },
+  {
+    "date": "2026-07-28",
+    "date_label": {
+      "en-us": "July 28, 2026",
+      "zh-tw": "2026 年 7 月 28 日"
+    },
+    "title": {
+      "en-us": "Manage players without leaving the court page",
+      "zh-tw": "直接在場次頁管理球友"
+    },
+    "summary": {
+      "en-us": "Administrators can now correct participant details and keep the confirmed and waiting lists organized in place.",
+      "zh-tw": "管理員現在可以直接修正球友資料，並即時整理正取與候補名單。"
+    },
+    "items": {
+      "en-us": [
+        "Rename confirmed or waiting players and reset their private six-digit court PINs.",
+        "Remove a player while automatically promoting the earliest waiting player when a confirmed place opens.",
+        "Send member-change notifications for visible rename and removal actions while keeping private PIN resets out of notifications."
+      ],
+      "zh-tw": [
+        "重新命名正取或候補球友，並重設其私密的 6 位數場次 PIN 碼。",
+        "移除球友；若正取名額釋出，系統會自動遞補最早加入的候補球友。",
+        "重新命名與移除等公開名單變更會發送球友異動通知，私密 PIN 碼重設則不會出現在通知中。"
+      ]
+    }
+  },
+  {
+    "date": "2026-07-28",
+    "date_label": {
+      "en-us": "July 28, 2026",
+      "zh-tw": "2026 年 7 月 28 日"
+    },
+    "title": {
+      "en-us": "Rich previews for every shared court",
+      "zh-tw": "每個場次連結都有豐富的社群預覽"
+    },
+    "summary": {
+      "en-us": "Court links now present a useful visual preview when shared to Facebook and other Open Graph clients.",
+      "zh-tw": "將場次連結分享到 Facebook 或其他支援 Open Graph 的服務時，現在會顯示實用的視覺預覽。"
+    },
+    "items": {
+      "en-us": [
+        "Uses the first event photo, or extracts a frame when the first gallery item is a video.",
+        "Creates a branded 1200×630 event-information card when the court has no media.",
+        "Bundles Noto Sans Traditional Chinese so generated event-information cards render bilingual text consistently in every deployment.",
+        "Organizes third-party asset licenses publicly, including the bundled Noto font’s SIL Open Font License.",
+        "Refreshes the versioned preview URL when event, member, status, or media information changes."
+      ],
+      "zh-tw": [
+        "優先使用第一個活動相片；若相簿第一個項目是影片，則擷取影片畫面。",
+        "場次沒有媒體時，產生包含活動資訊的品牌化 1200×630 圖片。",
+        "專案內附 Noto Sans 繁體中文字型，讓各種部署環境產生的活動資訊圖片都能一致顯示雙語文字。",
+        "公開整理第三方素材授權資訊，包括內附 Noto 字型的 SIL Open Font License。",
+        "活動、球友、狀態或媒體資訊變更時，自動提供新版本的預覽網址。"
+      ]
+    }
+  },
+  {
+    "date": "2026-07-28",
+    "date_label": {
+      "en-us": "July 28, 2026",
+      "zh-tw": "2026 年 7 月 28 日"
+    },
+    "title": {
+      "en-us": "Safer access and court notifications",
+      "zh-tw": "更安全的操作與場次通知"
+    },
+    "summary": {
+      "en-us": "Sign-in, public leave protection, and opt-in court updates now use safer modern controls.",
+      "zh-tw": "登入、公開退出保護與自選場次通知現在採用更安全的現代化控制措施。"
+    },
+    "items": {
+      "en-us": [
+        "Replaced hCaptcha with action-bound Cloudflare Turnstile verification for signup and sign-in.",
+        "Added per-court system Web Push subscriptions for event-information and member-list changes.",
+        "Limits repeated incorrect nickname/PIN attempts when leaving a court to reduce credential guessing.",
+        "Kept notification endpoints, credentials, and member nicknames out of public output and lock-screen messages."
+      ],
+      "zh-tw": [
+        "以具動作綁定的 Cloudflare Turnstile 取代 hCaptcha，保護註冊與登入。",
+        "新增個別場次系統 Web Push 訂閱，在活動資訊或球友名單變更時通知。",
+        "限制退出場次時重複輸入錯誤暱稱或 PIN 碼的次數，降低憑證猜測風險。",
+        "推播端點、憑證與球友暱稱不會出現在公開內容或鎖定畫面訊息中。"
+      ]
+    }
+  },
+  {
+    "date": "2026-07-26",
+    "date_label": {
+      "en-us": "July 26, 2026",
+      "zh-tw": "2026 年 7 月 26 日"
+    },
+    "title": {
+      "en-us": "A friendlier first visit",
+      "zh-tw": "更友善的初次使用體驗"
+    },
+    "summary": {
+      "en-us": "New visitors can understand the service quickly and tailor the interface to their preferences.",
+      "zh-tw": "新訪客可以快速認識服務，並依自己的習慣調整介面。"
+    },
+    "items": {
+      "en-us": [
+        "Added a bilingual introduction page and a remembered first-visit invitation.",
+        "Added Taiwan-aware language detection with a persistent English or Traditional Chinese override.",
+        "Expanded appearance controls with four palettes and light, dark, or system modes."
+      ],
+      "zh-tw": [
+        "新增雙語網站介紹頁，以及會記住選擇的初次造訪提示。",
+        "新增台灣地區語言判斷，並可持續使用手動選擇的英文或繁體中文。",
+        "外觀設定擴充為四種配色，並支援淺色、深色及系統模式。"
+      ]
+    }
+  },
+  {
+    "date": "2026-07-26",
+    "date_label": {
+      "en-us": "July 26, 2026",
+      "zh-tw": "2026 年 7 月 26 日"
+    },
+    "title": {
+      "en-us": "More expressive events and smoother organizing",
+      "zh-tw": "更完整的活動內容與主辦流程"
+    },
+    "summary": {
+      "en-us": "Organizers gained richer event pages and faster tools for publishing and reusing court information.",
+      "zh-tw": "主辦者現在可以建立更豐富的活動頁，並更快速地發布及重複使用場次資訊。"
+    },
+    "items": {
+      "en-us": [
+        "Added event and badminton-group names, photos, videos, gallery covers, prices, shuttlecock information, and remarks.",
+        "Added shared event creation, saved hall locations, duplication, archive/restore, and owner-managed events.",
+        "Added public and administrator filters for date, level, gender range, creator, capacity, and event status."
+      ],
+      "zh-tw": [
+        "新增活動與羽球團名稱、相片、影片、相簿封面、費用、用球及備註。",
+        "新增共用活動建立頁、儲存球館地點、複製、封存／恢復及主辦者管理功能。",
+        "公開頁與管理後台新增日期、程度、男女範圍、建立者、名額及活動狀態篩選。"
+      ]
+    }
+  },
+  {
+    "date": "2026-07-26",
+    "date_label": {
+      "en-us": "July 26, 2026",
+      "zh-tw": "2026 年 7 月 26 日"
+    },
+    "title": {
+      "en-us": "The complete court-control foundation",
+      "zh-tw": "完整的場控核心功能"
+    },
+    "summary": {
+      "en-us": "The original court workflow grew into a complete platform for players, organizers, and administrators.",
+      "zh-tw": "最初的場次流程已擴充為提供球友、主辦者與管理員使用的完整平台。"
+    },
+    "items": {
+      "en-us": [
+        "Added permanent GUID court links, nickname and PIN registration, capacity limits, waiting lists, and automatic promotion.",
+        "Added reserved members, roll call and clearing, read-only event mode, and join/leave history.",
+        "Added member accounts, role-based administration, password and avatar management, login lockouts, and privacy-focused auditing."
+      ],
+      "zh-tw": [
+        "新增永久 GUID 場次連結、暱稱與 PIN 報名、人數上限、候補名單及自動遞補。",
+        "新增預訂球友、點名與結清、活動唯讀模式，以及加入／退出紀錄。",
+        "新增會員帳號、角色權限管理、密碼與頭像管理、登入鎖定，以及重視隱私的稽核紀錄。"
+      ]
+    }
+  }
+]

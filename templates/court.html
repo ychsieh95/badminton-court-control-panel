@@ -146,6 +146,10 @@
                   {{ t('duplicate') }}
                 </button>
               </form>
+              <a href="{{ url_for('export_court_info', guid=court.guid) }}" download="{{ court_info_export_filename(court) }}">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                {{ t('court_info_export') }}
+              </a>
               {% if not court.roll_clearing_locked %}
                 <form method="post" action="{{ url_for('start_roll_clearing', guid=court.guid) }}" data-confirm="{{ t('roll_and_clearing_confirm') }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

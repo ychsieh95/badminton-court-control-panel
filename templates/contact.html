@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}{{ t('contact_admin') }} · {{ t('brand') }}{% endblock %}
+{% block meta %}
+  <meta name="description" content="{{ t('contact_body') }}">
+{% endblock %}
+{% block content %}
+<section class="page-header page-header-small contact-header">
+  <div class="shell">
+    <p class="eyebrow">{{ t('contact_eyebrow') }}</p>
+    <h1>{{ t('contact_title') }}</h1>
+    <p>{{ t('contact_body') }}</p>
+  </div>
+</section>
+
+<section class="section shell section-tight contact-shell">
+  <article class="panel contact-card">
+    <div class="contact-card-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24">
+        <path d="M4 4h16v13H7l-3 3V4Z"/>
+        <path d="m7 8 5 4 5-4"/>
+      </svg>
+    </div>
+    <div class="contact-card-copy">
+      <p class="eyebrow">{{ t('contact_admin') }}</p>
+      <h2>{{ contact_operator_name or t('contact_admin') }}</h2>
+      <dl>
+        <div>
+          <dt>{{ t('contact_operator') }}</dt>
+          <dd>{{ contact_operator_name or t('privacy_operator_unconfigured') }}</dd>
+        </div>
+        <div>
+          <dt>{{ t('contact_method') }}</dt>
+          <dd>
+            {% if contact_method_groups %}
+              <div class="contact-method-groups">
+                {% for group in contact_method_groups %}
+                  <section class="contact-method-group contact-method-group-{{ group.id }}" aria-labelledby="contact-method-group-{{ group.id }}">
+                    <h3 id="contact-method-group-{{ group.id }}">{{ group.label }}</h3>
+                    <ul class="contact-method-list">
+                      {% for method in group.methods %}
+                        <li>
+                          <a class="contact-method-link" href="{{ method.uri }}" rel="nofollow noreferrer">
+                            <span class="contact-method-badge" aria-hidden="true">{{ method.label[:1] }}</span>
+                            <span class="contact-method-name">{{ method.label }}</span>
+                            <span class="contact-method-value">{{ method.display }}</span>
+                            <svg aria-hidden="true" viewBox="0 0 24 24">
+                              <path d="m9 18 6-6-6-6"/>
+                            </svg>
+                          </a>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </section>
+                {% endfor %}
+              </div>
+            {% else %}
+              {{ t('contact_unconfigured') }}
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </article>
+
+  <article class="panel contact-message-panel" id="contact-form">
+    <div class="contact-message-intro">
+      <p class="eyebrow">{{ t('contact_form_title') }}</p>
+      <h2>{{ t('contact_form_title') }}</h2>
+      <p>{{ t('contact_form_body') }}</p>
+    </div>
+    <form class="contact-message-form" method="post" action="{{ url_for('contact') }}#contact-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-grid form-grid-2">
+        <label class="field">
+          <span>{{ t('contact_sender_name') }}</span>
+          <input
+            name="sender_name"
+            type="text"
+            value="{{ contact_form_values.sender_name }}"
+            class="{{ 'invalid' if contact_form_errors.get('sender_name') else '' }}"
+            maxlength="100"
+            autocomplete="name"
+            placeholder="{{ t('contact_sender_name_placeholder') }}"
+            {% if contact_form_errors.get('sender_name') %}aria-invalid="true"{% endif %}
+            required
+          >
+          {% if contact_form_errors.get('sender_name') %}
+            <small class="field-error">{{ t(contact_form_errors.sender_name) }}</small>
+          {% endif %}
+        </label>
+        <label class="field">
+          <span>{{ t('contact_reply') }} <small>{{ t('optional') }}</small></span>
+          <input
+            name="reply_contact"
+            type="text"
+            value="{{ contact_form_values.reply_contact }}"
+            class="{{ 'invalid' if contact_form_errors.get('reply_contact') else '' }}"
+            maxlength="200"
+            placeholder="{{ t('contact_reply_placeholder') }}"
+            {% if contact_form_errors.get('reply_contact') %}aria-invalid="true"{% endif %}
+          >
+          {% if contact_form_errors.get('reply_contact') %}
+            <small class="field-error">{{ t(contact_form_errors.reply_contact) }}</small>
+          {% else %}
+            <small class="field-help">{{ t('contact_reply_help') }}</small>
+          {% endif %}
+        </label>
+      </div>
+      <label class="field">
+        <span>{{ t('contact_subject') }}</span>
+        <input
+          name="subject"
+          type="text"
+          value="{{ contact_form_values.subject }}"
+          class="{{ 'invalid' if contact_form_errors.get('subject') else '' }}"
+          maxlength="150"
+          placeholder="{{ t('contact_subject_placeholder') }}"
+          {% if contact_form_errors.get('subject') %}aria-invalid="true"{% endif %}
+          required
+        >
+        {% if contact_form_errors.get('subject') %}
+          <small class="field-error">{{ t(contact_form_errors.subject) }}</small>
+        {% endif %}
+      </label>
+      <label class="field">
+        <span>{{ t('contact_message_label') }}</span>
+        <textarea
+          name="message"
+          class="{{ 'invalid' if contact_form_errors.get('message') else '' }}"
+          rows="8"
+          maxlength="4000"
+          placeholder="{{ t('contact_message_placeholder') }}"
+          {% if contact_form_errors.get('message') %}aria-invalid="true"{% endif %}
+          required
+        >{{ contact_form_values.message }}</textarea>
+        {% if contact_form_errors.get('message') %}
+          <small class="field-error">{{ t(contact_form_errors.message) }}</small>
+        {% endif %}
+      </label>
+      {% if turnstile_enabled %}
+        <div class="turnstile-wrap">
+          <div
+            class="cf-turnstile"
+            data-sitekey="{{ turnstile_site_key }}"
+            data-action="contact_message"
+            data-language="{{ 'zh-tw' if lang == 'zh-tw' else 'en-us' }}"
+            data-theme="auto"
+            data-size="flexible"
+          ></div>
+          {% if contact_form_errors.get('turnstile') %}
+            <small class="field-error">{{ t(contact_form_errors.turnstile) }}</small>
+          {% endif %}
+        </div>
+      {% endif %}
+      <div class="contact-message-actions">
+        <p>
+          {{ t('contact_form_privacy') }}
+          <a href="{{ url_for('privacy') }}">{{ t('privacy_title') }}</a>
+        </p>
+        <button class="button button-primary" type="submit">{{ t('contact_submit') }}</button>
+      </div>
+    </form>
+  </article>
+
+  <div class="contact-content-grid">
+    <article class="panel contact-help">
+      <p class="eyebrow">{{ t('contact_help_title') }}</p>
+      <div class="contact-help-list">
+        {% for number, title, body in [
+          ('01', 'contact_account_title', 'contact_account_body'),
+          ('02', 'contact_technical_title', 'contact_technical_body'),
+          ('03', 'contact_privacy_title', 'contact_privacy_body')
+        ] %}
+          <div class="contact-help-item">
+            <span>{{ number }}</span>
+            <div>
+              <h2>{{ t(title) }}</h2>
+              <p>{{ t(body) }}</p>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </article>
+
+    <div class="contact-notes">
+      <article class="panel contact-note">
+        <div class="contact-note-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/></svg>
+        </div>
+        <div>
+          <h2>{{ t('contact_event_title') }}</h2>
+          <p>{{ t('contact_event_body') }}</p>
+        </div>
+      </article>
+      <article class="panel contact-note">
+        <div class="contact-note-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
+        <div>
+          <h2>{{ t('contact_prepare_title') }}</h2>
+          <p>{{ t('contact_prepare_body') }}</p>
+        </div>
+      </article>
+      <article class="panel contact-note contact-note-security">
+        <div class="contact-note-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-3 8-10V5l-8-3-8 3v7c0 7 8 10 8 10Z"/><path d="m9 12 2 2 4-5"/></svg>
+        </div>
+        <div>
+          <h2>{{ t('contact_security_title') }}</h2>
+          <p>{{ t('contact_security_body') }}</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+  {% if turnstile_enabled %}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  {% endif %}
+{% endblock %}

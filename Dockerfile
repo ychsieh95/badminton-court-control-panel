@@ -12,6 +12,7 @@ EXPOSE 8080
 
 COPY ./uwsgi.ini /app/uwsgi.ini
 COPY ./app.py /app/app.py
+COPY ./data /app/data
 COPY ./templates /app/templates
 COPY ./static /app/static
 

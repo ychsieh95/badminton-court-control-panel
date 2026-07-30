@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ t('contact_messages_title') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div class="shell page-header-inner">
+    <div>
+      <p class="eyebrow">{{ t('admin_console') }}</p>
+      <h1>{{ t('contact_messages_title') }}</h1>
+      <p>{{ t('contact_messages_body') }}</p>
+    </div>
+    <div class="page-actions">
+      <a class="button button-secondary" href="{{ url_for('admin_dashboard') }}">{{ t('dashboard') }}</a>
+    </div>
+  </div>
+</section>
+
+<section class="section shell section-tight admin-message-shell">
+  <article class="panel contact-notification-settings">
+    <div>
+      <p class="eyebrow">{{ t('contact_notification_settings') }}</p>
+      <h2>{{ t('contact_notification_settings') }}</h2>
+      <p>{{ t('contact_notification_settings_body') }}</p>
+      <div class="notification-channel-statuses">
+        <span class="notification-channel-status {{ 'ready' if discord_notification_ready else 'missing' }}">
+          <i aria-hidden="true"></i>
+          {{ t('contact_notification_discord_ready' if discord_notification_ready else 'contact_notification_discord_missing') }}
+        </span>
+        <span class="notification-channel-status {{ 'ready' if telegram_notification_ready else 'missing' }}">
+          <i aria-hidden="true"></i>
+          {{ t('contact_notification_telegram_ready' if telegram_notification_ready else 'contact_notification_telegram_missing') }}
+        </span>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('admin_update_contact_notification_settings') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="contact-notification-toggle">
+        <input
+          name="enabled"
+          type="checkbox"
+          value="1"
+          {% if contact_notifications_enabled %}checked{% endif %}
+          {% if not discord_notification_ready and not telegram_notification_ready %}disabled{% endif %}
+        >
+        <span class="push-toggle-track" aria-hidden="true"><i></i></span>
+        <strong>{{ t('contact_notification_enable') }}</strong>
+      </label>
+      <button class="button button-secondary" type="submit">{{ t('save_settings') }}</button>
+    </form>
+  </article>
+
+  <div class="admin-message-toolbar">
+    <div>
+      <h2>{{ t('contact_messages') }}</h2>
+      <span class="count-badge">{{ total_count }}</span>
+      {% if unread_count %}
+        <span class="status status-open"><i></i>{{ unread_count }} {{ t('contact_messages_unread') }}</span>
+      {% endif %}
+    </div>
+    <nav class="message-filter-tabs" aria-label="{{ t('contact_messages') }}">
+      {% for status_value, status_label in [
+        ('all', 'contact_filter_all'),
+        ('unread', 'contact_filter_unread'),
+        ('read', 'contact_filter_read')
+      ] %}
+        <a
+          href="{{ url_for('admin_messages', status=status_value) }}"
+          {% if message_status == status_value %}class="active" aria-current="page"{% endif %}
+        >{{ t(status_label) }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+
+  {% if contact_messages %}
+    <div class="admin-message-list">
+      {% for contact_message in contact_messages %}
+        <article class="panel admin-message-card {{ 'is-unread' if not contact_message.read_at else '' }}">
+          <header>
+            <div>
+              <div class="admin-message-title-row">
+                <span class="status {{ 'status-open' if not contact_message.read_at else 'status-archived' }}">
+                  {% if not contact_message.read_at %}<i></i>{% endif %}
+                  {{ t('contact_message_unread' if not contact_message.read_at else 'contact_message_read') }}
+                </span>
+                <span class="court-id-chip">#{{ contact_message.id }}</span>
+                <span class="message-language">{{ contact_message.language }}</span>
+              </div>
+              <h2>{{ contact_message.subject }}</h2>
+            </div>
+            <form method="post" action="{{ url_for('admin_update_message_status', message_id=contact_message.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="read" value="{{ '0' if contact_message.read_at else '1' }}">
+              <input type="hidden" name="status" value="{{ message_status }}">
+              <input type="hidden" name="page" value="{{ page }}">
+              <button class="button button-ghost button-small" type="submit">
+                {{ t('contact_mark_unread' if contact_message.read_at else 'contact_mark_read') }}
+              </button>
+            </form>
+          </header>
+          <dl class="admin-message-meta">
+            <div>
+              <dt>{{ t('contact_message_from') }}</dt>
+              <dd>{{ contact_message.sender_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('contact_message_reply') }}</dt>
+              <dd>{{ contact_message.reply_contact or '—' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('contact_message_submitted') }}</dt>
+              <dd><time datetime="{{ contact_message.submitted_at }}">{{ contact_message.submitted_at|audit_datetime }}</time></dd>
+            </div>
+          </dl>
+          <div class="admin-message-body">{{ contact_message.message }}</div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="panel empty-state">
+      <h3>{{ t('contact_messages_empty') }}</h3>
+    </div>
+  {% endif %}
+
+  {% if page_count > 1 %}
+    <nav class="message-pagination" aria-label="{{ t('contact_messages') }}">
+      {% if page > 1 %}
+        <a class="button button-ghost" href="{{ url_for('admin_messages', status=message_status, page=page - 1) }}">{{ t('previous_page') }}</a>
+      {% endif %}
+      <span>{{ page }} / {{ page_count }}</span>
+      {% if page < page_count %}
+        <a class="button button-ghost" href="{{ url_for('admin_messages', status=message_status, page=page + 1) }}">{{ t('next_page') }}</a>
+      {% endif %}
+    </nav>
+  {% endif %}
+</section>
+{% endblock %}
