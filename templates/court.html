@@ -659,6 +659,15 @@
     <div class="tab-content active" data-panel="join">
       <h2>{{ t('join_waitlist') if court.total_count >= court.member_max else t('join_title') }}</h2>
       <p>{{ t('join_waitlist_body') if court.total_count >= court.member_max else t('join_body') }}</p>
+      {% if court.leave_deadline_enabled %}
+        <p class="leave-deadline-notice">
+          {% if court.leave_deadline_passed %}
+            {{ t('leave_deadline_passed') }}
+          {% else %}
+            {{ t('leave_deadline_notice')|replace('{deadline}', court.leave_deadline_at|replace('T', ' ')) }}
+          {% endif %}
+        </p>
+      {% endif %}
       <form method="post" action="{{ url_for('join_court', guid=court.guid) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label class="field">
@@ -675,20 +684,28 @@
       </form>
     </div>
     <div class="tab-content" data-panel="leave" hidden>
-      <h2>{{ t('leave_title') }}</h2>
-      <p>{{ t('leave_body') }}</p>
-      <form method="post" action="{{ url_for('leave_court', guid=court.guid) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label class="field">
-          <span>{{ t('username') }}</span>
-          <input name="username" minlength="2" maxlength="40" autocomplete="nickname" required>
-        </label>
-        <label class="field">
-          <span>{{ t('pin') }}</span>
-          <input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
-        </label>
-        <button class="button button-danger-outline button-block" type="submit">{{ t('leave') }}</button>
-      </form>
+      {% if court.leave_deadline_passed %}
+        <h2>{{ t('leave_deadline_passed_title') }}</h2>
+        <p>{{ t('leave_deadline_passed_body') }}</p>
+      {% else %}
+        <h2>{{ t('leave_title') }}</h2>
+        <p>{{ t('leave_body') }}</p>
+        {% if court.leave_deadline_enabled %}
+          <p class="leave-deadline-notice">{{ t('leave_deadline_notice')|replace('{deadline}', court.leave_deadline_at|replace('T', ' ')) }}</p>
+        {% endif %}
+        <form method="post" action="{{ url_for('leave_court', guid=court.guid) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="field">
+            <span>{{ t('username') }}</span>
+            <input name="username" minlength="2" maxlength="40" autocomplete="nickname" required>
+          </label>
+          <label class="field">
+            <span>{{ t('pin') }}</span>
+            <input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
+          </label>
+          <button class="button button-danger-outline button-block" type="submit">{{ t('leave') }}</button>
+        </form>
+      {% endif %}
     </div>
     {% endif %}
   </aside>

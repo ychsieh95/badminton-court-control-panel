@@ -4,6 +4,7 @@ import html
 import io
 import json
 import re
+from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
@@ -284,6 +285,8 @@ def create_court(
     event_name="",
     badminton_name="",
     save_location=False,
+    leave_deadline_enabled="0",
+    leave_deadline_at="",
 ):
     token = csrf(client, "/courts/new")
     data = {
@@ -304,6 +307,8 @@ def create_court(
         "female_price": "220",
         "shuttlecock_info": "YONEX AS-30",
         "reserved_names_visible": reserved_names_visible,
+        "leave_deadline_enabled": leave_deadline_enabled,
+        "leave_deadline_at": leave_deadline_at,
         "member_min": "4",
         "member_max": "8",
         "ordered_count": "2",
@@ -325,6 +330,127 @@ def create_court(
     )
     assert response.status_code == 302
     return response.headers["Location"]
+
+
+def test_owner_can_enable_leave_deadline_and_it_blocks_leaving(
+    client, app
+):
+    login(client)
+    future_deadline = (datetime.now() + timedelta(days=1)).strftime(
+        "%Y-%m-%dT%H:%M"
+    )
+    location = create_court(
+        client,
+        leave_deadline_enabled="1",
+        leave_deadline_at=future_deadline,
+    )
+    guid = location.rsplit("/", 1)[-1]
+
+    with app.app_context():
+        court = get_db().execute(
+            "SELECT leave_deadline_enabled, leave_deadline_at FROM courts "
+            "WHERE guid = ?",
+            (guid,),
+        ).fetchone()
+        assert court["leave_deadline_enabled"] == 1
+        assert court["leave_deadline_at"] == future_deadline
+
+    detail = client.get(location)
+    assert b'name="leave_deadline_enabled"' not in detail.data
+    assert future_deadline.replace("T", " ").encode() in detail.data
+    assert f'action="/{guid}/leave"'.encode() in detail.data
+
+    joined = client.post(
+        f"/{guid}/join",
+        data={
+            "csrf_token": csrf(client, location),
+            "username": "Deadline Player",
+            "pin": "123456",
+        },
+        follow_redirects=False,
+    )
+    assert joined.status_code == 302
+
+    with app.app_context():
+        db = get_db()
+        db.execute(
+            "UPDATE courts SET leave_deadline_at = '2000-01-01T00:00' "
+            "WHERE guid = ?",
+            (guid,),
+        )
+        db.commit()
+
+    closed_detail = client.get(location)
+    assert "退出期限已過".encode() in closed_detail.data
+    assert f'action="/{guid}/leave"'.encode() not in closed_detail.data
+
+    blocked = client.post(
+        f"/{guid}/leave",
+        data={
+            "csrf_token": csrf(client, location),
+            "username": "Deadline Player",
+            "pin": "123456",
+        },
+        follow_redirects=True,
+    )
+    assert "此場次的退出期限已過。".encode() in blocked.data
+    with app.app_context():
+        db = get_db()
+        assert db.execute(
+            "SELECT COUNT(*) FROM participants WHERE court_id = "
+            "(SELECT id FROM courts WHERE guid = ?)",
+            (guid,),
+        ).fetchone()[0] == 1
+        assert db.execute(
+            "SELECT COUNT(*) FROM participation_history "
+            "WHERE court_id = (SELECT id FROM courts WHERE guid = ?) "
+            "AND event_type = 'leave'",
+            (guid,),
+        ).fetchone()[0] == 0
+
+
+def test_leave_deadline_is_disabled_by_default_and_requires_valid_datetime(
+    client, app
+):
+    login(client)
+    form = client.get("/courts/new")
+    assert b'name="leave_deadline_enabled"' in form.data
+    assert b'data-leave-deadline-toggle' in form.data
+    assert not re.search(
+        rb'name="leave_deadline_enabled"[^>]*checked', form.data
+    )
+
+    data = {
+        "csrf_token": csrf(client, "/courts/new"),
+        "court_date": "2026-08-20",
+        "start_time": "19:00",
+        "end_time": "21:00",
+        "hall_name": "Taipei Sports Center",
+        "location": "Taipei City",
+        "court_id": "A1",
+        "member_min": "4",
+        "member_max": "8",
+        "ordered_count": "0",
+        "male_level_min": "1",
+        "male_level_max": "18",
+        "female_level_min": "1",
+        "female_level_max": "18",
+        "leave_deadline_enabled": "1",
+        "leave_deadline_at": "not-a-date",
+    }
+    invalid = client.post("/courts/new", data=data, follow_redirects=True)
+    assert invalid.status_code == 200
+    assert b"Use a valid date and time" in invalid.data
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM courts").fetchone()[0] == 0
+
+    location = create_court(client)
+    with app.app_context():
+        court = get_db().execute(
+            "SELECT leave_deadline_enabled, leave_deadline_at FROM courts"
+        ).fetchone()
+        assert court["leave_deadline_enabled"] == 0
+        assert court["leave_deadline_at"] == ""
 
 
 def test_organizer_can_export_and_import_court_info_markdown(client, app):
@@ -405,6 +531,10 @@ def test_organizer_can_export_and_import_court_info_markdown(client, app):
 def test_court_info_import_rejects_invalid_and_oversized_files(client, app):
     login(client)
 
+    new_court_form = client.get("/courts/new")
+    assert b'<details class="panel court-info-import" >' in new_court_form.data
+    assert b'<details class="panel court-info-import" open>' not in new_court_form.data
+
     invalid = client.post(
         "/courts/new",
         data={
@@ -419,6 +549,7 @@ def test_court_info_import_rejects_invalid_and_oversized_files(client, app):
     )
     assert invalid.status_code == 200
     assert "請選擇由本網站匯出的有效".encode() in invalid.data
+    assert b'<details class="panel court-info-import" open>' in invalid.data
 
     oversized = client.post(
         "/courts/new",
@@ -2555,6 +2686,9 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     updates = client.get("/updates")
     assert updates.status_code == 200
     assert "羽球場控面板，持續變得更好。".encode() in updates.data
+    assert "更清楚的退出規則與場次表單".encode() in updates.data
+    assert "活動主辦者可啟用精確的本地退出期限".encode() in updates.data
+    assert "場次資訊檔匯入工具預設收合".encode() in updates.data
     assert "更清楚的隱私權說明".encode() in updates.data
     assert "區分公開資訊、主辦者與管理員存取範圍".encode() in updates.data
     assert "部署網站營運者、主要資料地區".encode() in updates.data
@@ -2570,13 +2704,16 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     assert "直接在場次頁管理球友".encode() in updates.data
     assert "系統會自動遞補最早加入的候補球友".encode() in updates.data
     assert "2026 年 7 月 28 日".encode() in updates.data
-    assert updates.data.count(b'class="update-entry"') == 8
+    assert updates.data.count(b'class="update-entry"') == 9
     assert updates.data.count(b'class="update-latest"') == 1
-    assert b'<time datetime="2026-07-30">' in updates.data
+    assert b'<time datetime="2026-08-13">' in updates.data
 
     client.set_cookie("court_lang", "en-us")
     english = client.get("/updates")
     assert b"The control panel keeps getting better." in english.data
+    assert b"Clearer leave rules and cleaner event forms" in english.data
+    assert b"event owner enable an exact local leave deadline" in english.data
+    assert b"file importer by default" in english.data
     assert b"A clearer view of privacy" in english.data
     assert b"Distinguishes public information from organizer" in english.data
     assert b"configured deployment operator, primary data region" in english.data
@@ -2602,7 +2739,7 @@ def test_update_history_is_loaded_and_validated_from_json(tmp_path):
     source_history = json.loads(history_path.read_text(encoding="utf-8"))
     assert tuple(source_history) == app_module.SITE_UPDATE_HISTORY
     assert app_module.SITE_UPDATE_HISTORY_PATH == history_path
-    assert len(source_history) == 8
+    assert len(source_history) == 9
 
     invalid_history_path = tmp_path / "invalid-update-history.json"
     invalid_history_path.write_text(

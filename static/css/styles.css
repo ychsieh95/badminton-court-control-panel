@@ -4531,18 +4531,71 @@ select:focus-visible {
   border-top: 1px solid var(--border);
 }
 
-.saved-location-checkbox {
+.checkbox-field {
+  position: relative;
+  display: flex;
   align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
 
-.saved-location-checkbox span {
+.checkbox-field:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.checkbox-field:has(input:checked) {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+  background: var(--primary-soft);
+}
+
+.checkbox-field > input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.checkbox-field .push-toggle-track {
+  margin-top: 1px;
+}
+
+.checkbox-field input:checked + .push-toggle-track {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.checkbox-field input:checked + .push-toggle-track i {
+  background: #fff;
+  transform: translateX(18px);
+}
+
+.checkbox-field input:focus-visible + .push-toggle-track {
+  outline: 3px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.checkbox-copy {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
-.saved-location-checkbox small {
+.checkbox-copy strong {
+  font-size: .82rem;
+  line-height: 1.4;
+}
+
+.checkbox-copy small {
   color: var(--muted);
+  font-size: .74rem;
   font-weight: 400;
+  line-height: 1.5;
 }
 
 .saved-locations-card {
@@ -5005,11 +5058,65 @@ td small {
   font-size: .82rem;
 }
 
+.court-info-import {
+  overflow: hidden;
+}
+
+.court-info-import-summary {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 24px 28px;
+  cursor: pointer;
+  list-style: none;
+  transition: background .16s ease;
+}
+
+.court-info-import-summary::-webkit-details-marker {
+  display: none;
+}
+
+.court-info-import-summary:hover {
+  background: var(--surface-soft);
+}
+
+.court-info-import-summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  outline-offset: -3px;
+}
+
+.court-info-import-summary .form-section-number,
+.court-info-import-summary .form-section-heading {
+  margin: 0;
+}
+
+.court-info-import-summary .form-section-heading h2 {
+  margin-bottom: 5px;
+}
+
+.court-info-import-chevron {
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+  transition: transform .16s ease;
+}
+
+.court-info-import[open] .court-info-import-chevron {
+  transform: rotate(180deg);
+}
+
+.court-info-import-body {
+  padding: 0 28px 28px 100px;
+}
+
 .court-info-import-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 14px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
 }
 
 .court-info-import-controls .field {
@@ -5018,6 +5125,29 @@ td small {
 
 .event-name-fields {
   margin-bottom: 22px;
+}
+
+.leave-deadline-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, .65fr);
+  align-items: end;
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.leave-deadline-editor .checkbox-field,
+.leave-deadline-editor .field {
+  margin-bottom: 0;
+}
+
+.leave-deadline-notice {
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--primary-soft);
+  color: var(--text);
+  font-size: .78rem;
 }
 
 .form-subsection-title {
@@ -5560,11 +5690,22 @@ td small {
 
   .form-grid-2,
   .form-grid-3,
+  .leave-deadline-editor,
   .court-info-import-controls,
   .reserved-nickname-list,
   .media-editor-grid,
   .media-upload-preview {
     grid-template-columns: 1fr;
+  }
+
+  .court-info-import-summary {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    gap: 14px;
+    padding: 22px;
+  }
+
+  .court-info-import-body {
+    padding: 0 22px 22px;
   }
 
   .event-gallery-thumbnail {

@@ -10,6 +10,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 
 - Browse active courts and filter by keyword, creator, date range, player level, gender range, capacity, and event status.
 - Join or leave with a nickname and private 6-digit PIN—no account required.
+- See an organizer-defined leave deadline before joining or leaving; after it passes, self-service departure is no longer available.
 - Enter a FIFO waiting list automatically when confirmed places are full.
 - Opt in to court-specific system push notifications when event information or the member list changes.
 - View the schedule, weekday, hall, location, prices, shuttlecock, levels, organizer, remarks, participant lists, and event media.
@@ -21,6 +22,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 - Create an account and manage personal events from `/my-courts`.
 - Publish optional event and badminton-group names with permanent UUID links in the form `https://your-domain.example/<GUID>`.
 - Configure the date, 24-hour start/end time, Google Place hall, court ID, capacity range, reserved places, male/female level ranges, prices, shuttlecock, and remarks.
+- Optionally set an exact local date and time after which players cannot leave the event themselves. This restriction is disabled by default.
 - Save frequently used hall locations while creating an event, reuse them without searching, and delete them from the profile page.
 - Record reserved-player nicknames and choose whether visitors can see them.
 - Upload up to 12 JPEG, PNG, WebP, MP4, or WebM files. The first image becomes the court-card cover.
@@ -171,7 +173,7 @@ Without a key, the court form remains usable and provides a live Google Maps sea
 
 ## Court information import and export
 
-From a court’s organizer action menu, choose **Export** to download a file named `yyyy-MM-dd_HHmm_HHmm_<name>.md`, where the two times are the event’s start and end times. The final name uses the event name when present and otherwise uses the hall name. Choose that file at the top of `/courts/new` to prefill a new event. Importing only fills the form; the organizer must review and save it before a court is created.
+From a court’s organizer action menu, choose **Export** to download a file named `yyyy-MM-dd_HHmm_HHmm_<name>.md`, where the two times are the event’s start and end times. The final name uses the event name when present and otherwise uses the hall name. Expand the collapsed **Court information file** section at the top of `/courts/new` and choose that file to prefill a new event. Importing only fills the form; the organizer must review and save it before a court is created. The section automatically opens when an import error needs attention.
 
 The versioned Markdown file contains reusable court fields and reserved-player nicknames in a readable JSON block. It intentionally excludes registrations, participant PINs, join/leave history, media files, ownership, and the original public GUID. Imports are limited to 64 KB and pass through the normal court validation before saving.
 
@@ -234,6 +236,32 @@ docker run --rm \
 
 The image uses `app.py` as the uWSGI module and serves it through Nginx on port `8080`.
 
+### Nginx reverse proxy and client IP addresses
+
+When another Nginx instance proxies to the published Docker port, the container sees the Docker bridge gateway (often `172.18.0.1`) as the direct peer. To record the visitor address, set `TRUST_PROXY_HEADERS=1` in `.env` and make the public-facing trusted proxy replace—not append untrusted input to—the forwarded headers:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8080;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Validate and reload Nginx, then recreate the app container so Compose reloads `.env`:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+docker compose up -d --force-recreate app
+docker compose exec app printenv TRUST_PROXY_HEADERS
+```
+
+The final command must print `1`. Enable this setting only when the application is reachable exclusively through a trusted proxy that overwrites these headers. If Cloudflare or another proxy is in front of Nginx, configure Nginx’s real-IP module with that provider’s trusted address ranges first.
+
 ## Security and privacy
 
 - The public bilingual policy at `/privacy` describes the application’s built-in data handling. Self-hosting operators must review it, configure `PRIVACY_OPERATOR_NAME`, `PRIVACY_DATA_REGION`, and `PRIVACY_CONTACT`, and disclose hosting logs, backups, custom services, or other deployment-specific processing.
@@ -252,6 +280,7 @@ The image uses `app.py` as the uWSGI module and serves it through Nginx on port 
 ## Event lifecycle and storage
 
 - Events expire automatically after their configured date and end time. Expired events become read-only and are hidden from default listings.
+- An enabled leave deadline is enforced independently before event expiry; players may still join, but cannot remove themselves at or after the configured local minute.
 - Archived events remain available through direct links and organizer or administrator dashboards.
 - SQLite data is stored in `instance/courts.sqlite` unless `COURT_DATABASE` is configured.
 - Avatars are stored under `instance/avatars`.

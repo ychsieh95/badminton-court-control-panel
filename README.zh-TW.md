@@ -10,6 +10,7 @@ Badminton Court Control Panel 是一套支援雙語的 Flask 羽球活動管理�
 
 - 瀏覽開放場次，並依關鍵字、建立者、日期範圍、球員程度、男女程度範圍、名額及活動狀態篩選。
 - 使用暱稱及私密 6 位數 PIN 碼加入或退出場次，不需要註冊會員。
+- 加入或退出前可查看主辦者設定的退出期限；期限過後將無法自行退出場次。
 - 正式名額額滿時，自動依加入順序進入候補名單。
 - 可針對個別場次開啟系統推播通知，在場次資訊或球友名單變更時收到通知。
 - 查看日期、星期、時間、球館、地點、費用、用球、程度、主辦者、備註、球友名單及活動媒體。
@@ -21,6 +22,7 @@ Badminton Court Control Panel 是一套支援雙語的 Flask 羽球活動管理�
 - 建立會員帳號，並從 `/my-courts` 管理自己的活動。
 - 設定選填的活動名稱與羽球團名稱，並取得 `https://your-domain.example/<GUID>` 格式的永久 UUID 連結。
 - 設定日期、24 小時制起訖時間、Google 地點球館、場地編號、人數範圍、預訂名額、男女程度範圍、費用、用球及備註。
+- 可選擇設定精確的本地日期與時間，超過後球友無法自行退出活動；此限制預設停用。
 - 建立活動時儲存常用球館地點，日後無須搜尋即可重複使用，並可在個人資料頁刪除。
 - 記錄預訂球友的暱稱，並決定是否向訪客顯示。
 - 最多上傳 12 個 JPEG、PNG、WebP、MP4 或 WebM 檔案；第一張圖片會作為場次卡片封面。
@@ -171,7 +173,7 @@ http://localhost:5000/*
 
 ## 場次資訊匯入與匯出
 
-從場次頁的主辦者操作選單選擇「匯出」，即可下載名稱為 `yyyy-MM-dd_HHmm_HHmm_<名稱>.md` 的檔案；兩組時間依序為活動開始與結束時間。有活動名稱時使用活動名稱，否則使用球館名稱。再於 `/courts/new` 頂端選擇該檔案，即可預填新活動。匯入只會填入表單；主辦者仍須檢查內容並儲存，系統才會建立場次。
+從場次頁的主辦者操作選單選擇「匯出」，即可下載名稱為 `yyyy-MM-dd_HHmm_HHmm_<名稱>.md` 的檔案；兩組時間依序為活動開始與結束時間。有活動名稱時使用活動名稱，否則使用球館名稱。在 `/courts/new` 頂端展開預設收合的「場次資訊檔」區塊並選擇該檔案，即可預填新活動。匯入只會填入表單；主辦者仍須檢查內容並儲存，系統才會建立場次。匯入發生錯誤時，此區塊會自動展開以供處理。
 
 此版本化 Markdown 檔案以易讀的 JSON 區塊保存可重複使用的場次欄位及預訂球友暱稱，不包含報名資料、參加者 PIN 碼、加入／退出歷程、媒體檔案、擁有者及原始公開 GUID。匯入檔案上限為 64 KB，儲存前仍會套用一般場次驗證。
 
@@ -234,6 +236,32 @@ docker run --rm \
 
 映像檔使用 `app.py` 作為 uWSGI 模組，並透過 Nginx 的 `8080` 連接埠提供服務。
 
+### Nginx 反向代理與用戶端 IP 位址
+
+另一個 Nginx 執行個體反向代理至 Docker 發布的連接埠時，容器會將 Docker 橋接閘道（通常是 `172.18.0.1`）視為直接連線來源。若要記錄訪客位址，請在 `.env` 設定 `TRUST_PROXY_HEADERS=1`，並讓對外且可信任的代理覆寫轉送標頭，而不是將不可信任的輸入附加在後方：
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8080;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+驗證並重新載入 Nginx，再重新建立應用程式容器，讓 Compose 重新讀取 `.env`：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+docker compose up -d --force-recreate app
+docker compose exec app printenv TRUST_PROXY_HEADERS
+```
+
+最後一個指令必須顯示 `1`。只有應用程式完全透過會覆寫這些標頭的可信任代理存取時，才能啟用此設定。若 Nginx 前方另有 Cloudflare 或其他代理，請先使用該供應商的可信任位址範圍設定 Nginx real-IP 模組。
+
 ## 安全性與隱私
 
 - `/privacy` 的公開雙語政策會說明應用程式內建的資料處理。自行架設的營運者必須檢查內容、設定 `PRIVACY_OPERATOR_NAME`、`PRIVACY_DATA_REGION` 與 `PRIVACY_CONTACT`，並揭露主機紀錄、備份、自訂服務或其他部署特有的處理。
@@ -252,6 +280,7 @@ docker run --rm \
 ## 活動生命週期與儲存
 
 - 活動會在設定日期及結束時間後自動過期；過期場次會變成唯讀，並從預設列表隱藏。
+- 啟用退出期限後，系統會在活動過期前獨立執行限制；球友仍可加入，但在設定的本地分鐘時間到達或超過後將無法自行退出。
 - 已封存活動仍可透過直接連結、主辦者面板或管理後台查看。
 - 未設定 `COURT_DATABASE` 時，SQLite 資料儲存在 `instance/courts.sqlite`。
 - 頭像儲存在 `instance/avatars`。

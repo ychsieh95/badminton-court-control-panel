@@ -20,13 +20,16 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     {% if not editing %}
-      <article class="panel form-section court-info-import">
-        <div class="form-section-number">MD</div>
-        <div class="form-section-content">
+      <details class="panel court-info-import" {% if errors.court_info_file %}open{% endif %}>
+        <summary class="court-info-import-summary">
+          <span class="form-section-number">MD</span>
           <div class="form-section-heading">
             <h2>{{ t('court_info') }}</h2>
             <p>{{ t('court_info_help') }}</p>
           </div>
+          <svg class="court-info-import-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+        </summary>
+        <div class="court-info-import-body">
           <div class="court-info-import-controls">
             <label class="field">
               <span>{{ t('court_info_choose') }}</span>
@@ -43,7 +46,7 @@
             </button>
           </div>
         </div>
-      </article>
+      </details>
     {% endif %}
 
     <article class="panel form-section">
@@ -92,6 +95,37 @@
             <input type="text" name="end_time" value="{{ values.end_time }}" inputmode="numeric" pattern="(?:[01]\d|2[0-3]):[0-5]\d" minlength="5" maxlength="5" placeholder="21:00" required data-time24 class="{% if errors.end_time %}invalid{% endif %}">
             {% if errors.end_time %}<small class="field-error">{{ errors.end_time }}</small>{% endif %}
           </label>
+        </div>
+        <div class="leave-deadline-editor">
+          <label class="checkbox-field saved-location-checkbox">
+            <input
+              type="checkbox"
+              name="leave_deadline_enabled"
+              value="1"
+              data-leave-deadline-toggle
+              role="switch"
+              {% if values.leave_deadline_enabled|string == '1' %}checked{% endif %}
+            >
+            <span class="push-toggle-track" aria-hidden="true"><i></i></span>
+            <span class="checkbox-copy">
+              <strong>{{ t('leave_deadline_enable') }}</strong>
+              <small>{{ t('leave_deadline_help') }}</small>
+            </span>
+          </label>
+          <label class="field" data-leave-deadline-field {% if values.leave_deadline_enabled|string != '1' %}hidden{% endif %}>
+            <span>{{ t('leave_deadline') }}</span>
+            <input
+              type="datetime-local"
+              name="leave_deadline_at"
+              value="{{ values.leave_deadline_at }}"
+              step="60"
+              class="{% if errors.leave_deadline_at %}invalid{% endif %}"
+              data-leave-deadline-input
+              {% if values.leave_deadline_enabled|string == '1' %}required{% endif %}
+            >
+            {% if errors.leave_deadline_at %}<small class="field-error">{{ errors.leave_deadline_at }}</small>{% endif %}
+          </label>
+          {% if errors.leave_deadline_enabled %}<small class="field-error">{{ errors.leave_deadline_enabled }}</small>{% endif %}
         </div>
       </div>
     </article>
@@ -146,8 +180,9 @@
           <input id="hall-longitude" type="hidden" name="longitude" value="{{ values.longitude }}">
           {% if allow_save_location|default(false) %}
           <label class="checkbox-field field-wide saved-location-checkbox">
-            <input type="checkbox" name="save_location" value="1" {% if save_location|default(false) %}checked{% endif %}>
-            <span>
+            <input type="checkbox" name="save_location" value="1" role="switch" {% if save_location|default(false) %}checked{% endif %}>
+            <span class="push-toggle-track" aria-hidden="true"><i></i></span>
+            <span class="checkbox-copy">
               <strong>{{ t('save_this_location') }}</strong>
               <small>{{ t('save_location_help') }}</small>
             </span>

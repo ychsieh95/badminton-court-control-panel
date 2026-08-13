@@ -1,5 +1,34 @@
 [
   {
+    "date": "2026-08-13",
+    "date_label": {
+      "en-us": "August 13, 2026",
+      "zh-tw": "2026 年 8 月 13 日"
+    },
+    "title": {
+      "en-us": "Clearer leave rules and cleaner event forms",
+      "zh-tw": "更清楚的退出規則與場次表單"
+    },
+    "summary": {
+      "en-us": "Organizers can set an optional leave deadline, while a more compact event form keeps advanced tools easy to reach.",
+      "zh-tw": "主辦者可設定選用的退出期限，並透過更精簡的場次表單輕鬆使用進階工具。"
+    },
+    "items": {
+      "en-us": [
+        "Lets an event owner enable an exact local leave deadline; the option remains disabled by default for existing and new events.",
+        "Shows the deadline before players join or leave and prevents self-service departures after it passes, including direct submission attempts.",
+        "Collapses the court-information file importer by default on the new-event form and automatically reopens it when an import error needs attention.",
+        "Refreshes checkbox options as accessible themed switch cards with clear hover, selected, keyboard-focus, and mobile states."
+      ],
+      "zh-tw": [
+        "活動主辦者可啟用精確的本地退出期限；現有及新建立的場次皆預設停用此選項。",
+        "球友加入或退出前會看見期限；期限過後，系統會阻止自行退出及直接送出的退出請求。",
+        "新增場次表單中的場次資訊檔匯入工具預設收合，匯入發生錯誤時則會自動展開以供處理。",
+        "將核取方塊更新為支援無障礙操作的主題化開關卡片，並提供清楚的懸停、選取、鍵盤焦點及行動版狀態。"
+      ]
+    }
+  },
+  {
     "date": "2026-07-30",
     "date_label": {
       "en-us": "July 30, 2026",

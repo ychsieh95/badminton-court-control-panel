@@ -414,6 +414,18 @@
   courtDateInput?.addEventListener('change', updateCourtWeekday);
   updateCourtWeekday();
 
+  const leaveDeadlineToggle = document.querySelector('[data-leave-deadline-toggle]');
+  const leaveDeadlineField = document.querySelector('[data-leave-deadline-field]');
+  const leaveDeadlineInput = document.querySelector('[data-leave-deadline-input]');
+  const updateLeaveDeadline = () => {
+    if (!leaveDeadlineToggle || !leaveDeadlineField || !leaveDeadlineInput) return;
+    const enabled = leaveDeadlineToggle.checked;
+    leaveDeadlineField.hidden = !enabled;
+    leaveDeadlineInput.required = enabled;
+  };
+  leaveDeadlineToggle?.addEventListener('change', updateLeaveDeadline);
+  updateLeaveDeadline();
+
   filterDateInputs.forEach((input) => {
     input.addEventListener('input', () => {
       input.value = formatDateDigits(input.value);

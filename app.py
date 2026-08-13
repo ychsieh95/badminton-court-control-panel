@@ -98,6 +98,10 @@ COURT_EXPIRED_SQL = (
     "(c.court_date || ' ' || c.end_time || ':00') "
     "< strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')"
 )
+LEAVE_DEADLINE_PASSED_SQL = (
+    "(c.leave_deadline_enabled = 1 AND c.leave_deadline_at != '' AND "
+    "c.leave_deadline_at <= strftime('%Y-%m-%dT%H:%M', 'now', 'localtime'))"
+)
 
 TRANSLATIONS = {
     "en-us": {
@@ -308,6 +312,13 @@ TRANSLATIONS = {
         "join_waitlist_body": "This court is full. Join the waiting list and you will be promoted automatically when a place opens.",
         "leave_title": "Leave this court",
         "leave_body": "Use the same username and PIN you joined with.",
+        "leave_deadline": "Leave deadline",
+        "leave_deadline_enable": "Stop players from leaving after a deadline",
+        "leave_deadline_help": "After this local date and time, players can no longer leave this court themselves.",
+        "leave_deadline_notice": "You can leave until {deadline}.",
+        "leave_deadline_passed_title": "The leave deadline has passed",
+        "leave_deadline_passed_body": "Players can no longer leave this court themselves. Contact the event organizer if you need help.",
+        "leave_deadline_passed": "The deadline for leaving this court has passed.",
         "username": "Username",
         "pin": "6-digit PIN",
         "join": "Join court",
@@ -845,6 +856,13 @@ TRANSLATIONS = {
         "join_waitlist_body": "此場次已額滿。加入候補後，如有名額釋出，系統會自動依序遞補。",
         "leave_title": "離開場次",
         "leave_body": "請輸入報名時使用的名稱與 PIN 碼。",
+        "leave_deadline": "最後退出期限",
+        "leave_deadline_enable": "超過期限後不允許球友自行退出",
+        "leave_deadline_help": "超過此本地日期與時間後，球友將無法自行退出此場次。",
+        "leave_deadline_notice": "可於 {deadline} 前退出場次。",
+        "leave_deadline_passed_title": "退出期限已過",
+        "leave_deadline_passed_body": "球友已無法自行退出此場次；如需協助，請聯絡活動主辦者。",
+        "leave_deadline_passed": "此場次的退出期限已過。",
         "username": "使用者名稱",
         "pin": "6 位數 PIN 碼",
         "join": "加入場次",
@@ -1534,6 +1552,8 @@ CREATE TABLE IF NOT EXISTS courts (
     male_level_max INTEGER NOT NULL CHECK(male_level_max BETWEEN 1 AND 18),
     female_level_min INTEGER NOT NULL CHECK(female_level_min BETWEEN 1 AND 18),
     female_level_max INTEGER NOT NULL CHECK(female_level_max BETWEEN 1 AND 18),
+    leave_deadline_enabled INTEGER NOT NULL DEFAULT 0 CHECK(leave_deadline_enabled IN (0, 1)),
+    leave_deadline_at TEXT NOT NULL DEFAULT '',
     roll_clearing_locked INTEGER NOT NULL DEFAULT 0 CHECK(roll_clearing_locked IN (0, 1)),
     archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0, 1)),
     created_at TEXT NOT NULL,
@@ -2766,6 +2786,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if court["roll_clearing_locked"]:
             flash_t("court_read_only", "error")
             return redirect(url_for("court_detail", guid=guid))
+        if court["leave_deadline_passed"]:
+            flash_t("leave_deadline_passed", "error")
+            return redirect(url_for("court_detail", guid=guid))
 
         username = clean_username(request.form.get("username", ""))
         pin = request.form.get("pin", "").strip()
@@ -2784,7 +2807,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             current = db.execute(
                 "SELECT roll_clearing_locked, CASE WHEN "
                 + COURT_EXPIRED_SQL
-                + " THEN 1 ELSE 0 END AS is_expired "
+                + " THEN 1 ELSE 0 END AS is_expired, CASE WHEN "
+                + LEAVE_DEADLINE_PASSED_SQL
+                + " THEN 1 ELSE 0 END AS leave_deadline_passed "
                 "FROM courts c WHERE id = ?",
                 (court["id"],),
             ).fetchone()
@@ -2798,6 +2823,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             if current["roll_clearing_locked"]:
                 db.rollback()
                 flash_t("court_read_only", "error")
+                return redirect(url_for("court_detail", guid=guid))
+            if current["leave_deadline_passed"]:
+                db.rollback()
+                flash_t("leave_deadline_passed", "error")
                 return redirect(url_for("court_detail", guid=guid))
             participant = db.execute(
                 "SELECT id, pin_hash FROM participants "
@@ -3862,6 +3891,16 @@ def init_db() -> None:
         db.execute(
             "ALTER TABLE courts ADD COLUMN roll_clearing_locked "
             "INTEGER NOT NULL DEFAULT 0"
+        )
+    if "leave_deadline_enabled" not in columns:
+        db.execute(
+            "ALTER TABLE courts ADD COLUMN leave_deadline_enabled "
+            "INTEGER NOT NULL DEFAULT 0"
+        )
+    if "leave_deadline_at" not in columns:
+        db.execute(
+            "ALTER TABLE courts ADD COLUMN leave_deadline_at "
+            "TEXT NOT NULL DEFAULT ''"
         )
     participant_columns = {
         row["name"]
@@ -4935,6 +4974,8 @@ def court_query() -> str:
                    AS creator_username,
                CASE WHEN {COURT_EXPIRED_SQL}
                     THEN 1 ELSE 0 END AS is_expired,
+               CASE WHEN {LEAVE_DEADLINE_PASSED_SQL}
+                    THEN 1 ELSE 0 END AS leave_deadline_passed,
                (SELECT COUNT(*) FROM participants p
                 WHERE p.court_id = c.id AND p.waitlisted = 0)
                    AS online_count,
@@ -5019,6 +5060,8 @@ def render_all_courts_csv() -> bytes:
             "archived",
             "expired",
             "roll_clearing_locked",
+            "leave_deadline_enabled",
+            "leave_deadline_at",
             "member_min",
             "member_max",
             "reserved_count",
@@ -5060,6 +5103,8 @@ def render_all_courts_csv() -> bytes:
                 court["archived"],
                 court["is_expired"],
                 court["roll_clearing_locked"],
+                court["leave_deadline_enabled"],
+                court["leave_deadline_at"],
                 court["member_min"],
                 court["member_max"],
                 court["ordered_count"],
@@ -5775,6 +5820,8 @@ def default_court_values() -> dict[str, str]:
         "female_price": "0",
         "shuttlecock_info": "",
         "reserved_names_visible": "1",
+        "leave_deadline_enabled": "0",
+        "leave_deadline_at": "",
         "member_min": "4",
         "member_max": "8",
         "ordered_count": "0",
@@ -5940,9 +5987,10 @@ def create_court_record(
             guid, event_name, badminton_name, court_date, start_time, end_time, hall_name,
             location, google_place_id, latitude, longitude, owner_id, creator_name, remark,
             court_id, male_price, female_price, shuttlecock_info,
-            reserved_names_visible, member_min, member_max, ordered_count, male_level_min,
+            reserved_names_visible, leave_deadline_enabled, leave_deadline_at,
+            member_min, member_max, ordered_count, male_level_min,
             male_level_max, female_level_min, female_level_max, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             guid,
@@ -5964,6 +6012,8 @@ def create_court_record(
             cleaned["female_price"],
             cleaned["shuttlecock_info"],
             cleaned["reserved_names_visible"],
+            cleaned["leave_deadline_enabled"],
+            cleaned["leave_deadline_at"],
             cleaned["member_min"],
             cleaned["member_max"],
             cleaned["ordered_count"],
@@ -6010,7 +6060,8 @@ def update_court_record(
                 hall_name = ?, location = ?, google_place_id = ?,
                 latitude = ?, longitude = ?, remark = ?, court_id = ?,
                 male_price = ?, female_price = ?, shuttlecock_info = ?,
-                reserved_names_visible = ?,
+                reserved_names_visible = ?, leave_deadline_enabled = ?,
+                leave_deadline_at = ?,
                 member_min = ?, member_max = ?, ordered_count = ?,
                 male_level_min = ?, male_level_max = ?,
                 female_level_min = ?, female_level_max = ?
@@ -6033,6 +6084,8 @@ def update_court_record(
                 cleaned["female_price"],
                 cleaned["shuttlecock_info"],
                 cleaned["reserved_names_visible"],
+                cleaned["leave_deadline_enabled"],
+                cleaned["leave_deadline_at"],
                 cleaned["member_min"],
                 cleaned["member_max"],
                 cleaned["ordered_count"],
@@ -6181,6 +6234,7 @@ def validate_court(values: dict[str, str]) -> tuple[dict[str, Any], dict[str, st
         "male_price",
         "female_price",
         "reserved_names_visible",
+        "leave_deadline_enabled",
         "male_level_min",
         "male_level_max",
         "female_level_min",
@@ -6193,6 +6247,8 @@ def validate_court(values: dict[str, str]) -> tuple[dict[str, Any], dict[str, st
                 raw_value = "0"
             if field == "reserved_names_visible" and not raw_value:
                 raw_value = "1"
+            if field == "leave_deadline_enabled" and not raw_value:
+                raw_value = "0"
             cleaned[field] = int(raw_value)
         except (KeyError, TypeError, ValueError):
             errors[field] = "Use a whole number"
@@ -6216,6 +6272,23 @@ def validate_court(values: dict[str, str]) -> tuple[dict[str, Any], dict[str, st
         and cleaned["reserved_names_visible"] not in {0, 1}
     ):
         errors["reserved_names_visible"] = "Choose show or hide"
+
+    if (
+        "leave_deadline_enabled" not in errors
+        and cleaned["leave_deadline_enabled"] not in {0, 1}
+    ):
+        errors["leave_deadline_enabled"] = "Choose enabled or disabled"
+
+    cleaned["leave_deadline_at"] = ""
+    if cleaned.get("leave_deadline_enabled") == 1:
+        try:
+            deadline = datetime.strptime(
+                values.get("leave_deadline_at", ""), "%Y-%m-%dT%H:%M"
+            )
+        except ValueError:
+            errors["leave_deadline_at"] = "Use a valid date and time"
+        else:
+            cleaned["leave_deadline_at"] = deadline.strftime("%Y-%m-%dT%H:%M")
 
     for gender in ("male", "female"):
         min_key = f"{gender}_level_min"
