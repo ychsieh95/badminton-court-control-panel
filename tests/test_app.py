@@ -75,6 +75,13 @@ def csrf(client, path="/"):
         return session["csrf_token"]
 
 
+def test_health_check(client):
+    response = client.get("/healthz")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "ok"}
+
+
 def test_turnstile_widgets_render_on_signup_and_login_pages(client, app):
     app.config.update(
         TURNSTILE_SITE_KEY="test-site-key",

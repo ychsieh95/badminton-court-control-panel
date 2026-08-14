@@ -1824,6 +1824,11 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         ).fetchall()
         return render_template("index.html", courts=courts)
 
+    @app.get("/healthz")
+    def healthz():
+        get_db().execute("SELECT 1").fetchone()
+        return {"status": "ok"}
+
     @app.get("/licenses")
     def licenses():
         return render_template("licenses.html")
