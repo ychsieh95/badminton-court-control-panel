@@ -239,12 +239,21 @@
             class="reserved-nickname-list"
             data-label="{{ t('reserved_nickname') }}"
             data-placeholder="{{ t('reserved_nickname_placeholder') }}"
+            data-delete-label="{{ t('delete') }}"
           >
             {% for nickname in reserved_nicknames %}
-              <label class="field reserved-nickname-field">
-                <span>{{ t('reserved_nickname') }} {{ loop.index }}</span>
-                <input name="reserved_nickname" value="{{ nickname }}" maxlength="40" placeholder="{{ t('reserved_nickname_placeholder') }}">
-              </label>
+              <div class="field reserved-nickname-field">
+                <span class="reserved-nickname-field-heading">
+                  <label for="reserved-nickname-{{ loop.index0 }}">{{ t('reserved_nickname') }} {{ loop.index }}</label>
+                  <button
+                    type="button"
+                    class="reserved-nickname-delete"
+                    data-delete-reserved-nickname
+                    aria-label="{{ t('delete') }} {{ t('reserved_nickname') }} {{ loop.index }}"
+                  >{{ t('delete') }}</button>
+                </span>
+                <input id="reserved-nickname-{{ loop.index0 }}" name="reserved_nickname" value="{{ nickname }}" maxlength="40" placeholder="{{ t('reserved_nickname_placeholder') }}">
+              </div>
             {% endfor %}
           </div>
           {% if errors.reserved_nicknames %}<small class="field-error">{{ t(errors.reserved_nicknames) }}</small>{% endif %}

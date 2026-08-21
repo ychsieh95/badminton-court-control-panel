@@ -1721,6 +1721,64 @@ def test_reserved_nicknames_can_be_hidden_from_public_viewers(client, app):
         assert visibility == 0
 
 
+def test_edit_court_can_delete_a_reserved_nickname(client, app):
+    login(client)
+    location = create_court(client)
+    guid = location.rsplit("/", 1)[-1]
+    edit_url = f"/admin/courts/{guid}/edit"
+
+    edit_form = client.get(edit_url)
+    assert edit_form.data.count(b"data-delete-reserved-nickname") == 2
+    assert b"data-delete-label=" in edit_form.data
+    assert b'id="reserved-nickname-0"' in edit_form.data
+
+    token = csrf(client, edit_url)
+    saved = client.post(
+        edit_url,
+        data={
+            "csrf_token": token,
+            "court_date": "2026-08-20",
+            "start_time": "19:00",
+            "end_time": "21:00",
+            "hall_name": "Taipei Sports Center",
+            "location": "Taipei City",
+            "google_place_id": "taipei-sports-center",
+            "latitude": "25.0480",
+            "longitude": "121.5160",
+            "remark": "Bring your own racket.",
+            "court_id": "A1",
+            "male_price": "250",
+            "female_price": "220",
+            "shuttlecock_info": "YONEX AS-30",
+            "reserved_names_visible": "1",
+            "member_min": "4",
+            "member_max": "8",
+            "ordered_count": "1",
+            "male_level_min": "6",
+            "male_level_max": "12",
+            "female_level_min": "4",
+            "female_level_max": "10",
+            "reserved_nickname": ["Mina"],
+        },
+        follow_redirects=False,
+    )
+    assert saved.status_code == 302
+
+    with app.app_context():
+        court = get_db().execute(
+            "SELECT id, ordered_count FROM courts WHERE guid = ?", (guid,)
+        ).fetchone()
+        reserved = get_db().execute(
+            "SELECT position, nickname FROM reserved_members "
+            "WHERE court_id = ? ORDER BY position",
+            (court["id"],),
+        ).fetchall()
+        assert court["ordered_count"] == 1
+        assert [(row["position"], row["nickname"]) for row in reserved] == [
+            (0, "Mina")
+        ]
+
+
 def test_rejects_duplicate_username_and_invalid_pin(client, app):
     login(client)
     location = create_court(client)
@@ -2696,6 +2754,7 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     assert "更清楚的退出規則與場次表單".encode() in updates.data
     assert "活動主辦者可啟用精確的本地退出期限".encode() in updates.data
     assert "場次資訊檔匯入工具預設收合".encode() in updates.data
+    assert "每個預訂球友暱稱旁皆新增「刪除」操作".encode() in updates.data
     assert "更清楚的隱私權說明".encode() in updates.data
     assert "區分公開資訊、主辦者與管理員存取範圍".encode() in updates.data
     assert "部署網站營運者、主要資料地區".encode() in updates.data
@@ -2713,7 +2772,7 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     assert "2026 年 7 月 28 日".encode() in updates.data
     assert updates.data.count(b'class="update-entry"') == 9
     assert updates.data.count(b'class="update-latest"') == 1
-    assert b'<time datetime="2026-08-13">' in updates.data
+    assert b'<time datetime="2026-08-21">' in updates.data
 
     client.set_cookie("court_lang", "en-us")
     english = client.get("/updates")
@@ -3177,6 +3236,7 @@ def test_admin_form_enforces_24_hour_time_and_loads_places_widget(client, app):
     assert b'id="hall-autocomplete-host"' in form.data
     assert b'id="ordered-count"' in form.data
     assert b'id="reserved-nickname-list"' in form.data
+    assert b"data-delete-label=" in form.data
     assert b"data-api-error=" in form.data
     assert b'name="google_place_id"' in form.data
     assert b'name="hall_name"' in form.data
@@ -3210,6 +3270,7 @@ def test_admin_form_enforces_24_hour_time_and_loads_places_widget(client, app):
         },
     )
     assert invalid.status_code == 200
+    assert invalid.data.count(b"data-delete-reserved-nickname") == 2
     with app.app_context():
         count = get_db().execute("SELECT COUNT(*) FROM courts").fetchone()[0]
     assert count == 0

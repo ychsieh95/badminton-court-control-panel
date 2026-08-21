@@ -5183,6 +5183,32 @@ td small {
   gap: 14px;
 }
 
+.reserved-nickname-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.reserved-nickname-delete {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 650;
+}
+
+.reserved-nickname-delete:hover {
+  text-decoration: underline;
+}
+
+.reserved-nickname-delete:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--danger) 25%, transparent);
+  outline-offset: 3px;
+}
+
 .reserved-visibility-field {
   max-width: 360px;
   margin-bottom: 16px;

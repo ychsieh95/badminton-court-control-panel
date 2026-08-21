@@ -24,7 +24,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 - Configure the date, 24-hour start/end time, Google Place hall, court ID, capacity range, reserved places, male/female level ranges, prices, shuttlecock, and remarks.
 - Optionally set an exact local date and time after which players cannot leave the event themselves. This restriction is disabled by default.
 - Save frequently used hall locations while creating an event, reuse them without searching, and delete them from the profile page.
-- Record reserved-player nicknames and choose whether visitors can see them.
+- Add or remove individual reserved-player nickname rows while creating or editing an event, and choose whether visitors can see the names.
 - Upload up to 12 JPEG, PNG, WebP, MP4, or WebM files. The first image becomes the court-card cover.
 - Export a managed court as `court_info.md` and import it on the new-event form to prefill another event.
 - Edit, duplicate, archive, restore, or delete owned events.

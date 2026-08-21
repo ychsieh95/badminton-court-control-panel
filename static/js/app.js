@@ -517,6 +517,25 @@
 
   const orderedCount = document.querySelector('#ordered-count');
   const reservedNicknameList = document.querySelector('#reserved-nickname-list');
+  const updateReservedNicknameLabels = (fields) => {
+    fields.forEach((field, index) => {
+      const input = field.querySelector('input[name="reserved_nickname"]');
+      const label = field.querySelector('.reserved-nickname-field-heading label');
+      const deleteButton = field.querySelector('[data-delete-reserved-nickname]');
+      const fieldLabel = `${reservedNicknameList?.dataset.label || ''} ${index + 1}`;
+      if (input) input.id = `reserved-nickname-${index}`;
+      if (label) {
+        label.htmlFor = input?.id || '';
+        label.textContent = fieldLabel;
+      }
+      if (deleteButton) {
+        deleteButton.setAttribute(
+          'aria-label',
+          `${reservedNicknameList?.dataset.deleteLabel || ''} ${fieldLabel}`
+        );
+      }
+    });
+  };
   const syncReservedNicknameFields = () => {
     if (!orderedCount || !reservedNicknameList) return;
     // Preserve existing names while the organizer temporarily clears the
@@ -533,25 +552,41 @@
       fields.pop().remove();
     }
     while (fields.length < count) {
-      const field = document.createElement('label');
+      const field = document.createElement('div');
       field.className = 'field reserved-nickname-field';
-      const label = document.createElement('span');
+      const heading = document.createElement('span');
+      heading.className = 'reserved-nickname-field-heading';
+      const label = document.createElement('label');
       const input = document.createElement('input');
       input.name = 'reserved_nickname';
       input.maxLength = 40;
       input.placeholder = reservedNicknameList.dataset.placeholder || '';
-      field.append(label, input);
+      heading.append(label);
+      if (reservedNicknameList.dataset.deleteLabel) {
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'reserved-nickname-delete';
+        deleteButton.dataset.deleteReservedNickname = '';
+        deleteButton.textContent = reservedNicknameList.dataset.deleteLabel;
+        heading.append(deleteButton);
+      }
+      field.append(heading, input);
       reservedNicknameList.append(field);
       fields.push(field);
     }
-    fields.forEach((field, index) => {
-      const label = field.querySelector('span');
-      if (label) {
-        label.textContent = `${reservedNicknameList.dataset.label || ''} ${index + 1}`;
-      }
-    });
+    updateReservedNicknameLabels(fields);
   };
   orderedCount?.addEventListener('input', syncReservedNicknameFields);
+  reservedNicknameList?.addEventListener('click', (event) => {
+    const deleteButton = event.target.closest('[data-delete-reserved-nickname]');
+    if (!deleteButton) return;
+    deleteButton.closest('.reserved-nickname-field')?.remove();
+    const fields = Array.from(
+      reservedNicknameList.querySelectorAll('.reserved-nickname-field')
+    );
+    orderedCount.value = String(fields.length);
+    updateReservedNicknameLabels(fields);
+  });
   syncReservedNicknameFields();
 })();
 
