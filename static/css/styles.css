@@ -4513,6 +4513,33 @@ select:focus-visible {
   gap: 9px;
 }
 
+.profile-preferences-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, .65fr);
+  align-items: end;
+  gap: 24px;
+  padding: 30px 34px;
+}
+
+.profile-preferences-card h2 {
+  margin-bottom: 8px;
+  font-size: 1.35rem;
+}
+
+.profile-preferences-card p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+}
+
+.profile-preferences-card form {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-preferences-card .field {
+  margin: 0;
+}
+
 .file-picker {
   display: inline-flex;
 }
@@ -5138,8 +5165,25 @@ td small {
 }
 
 .leave-deadline-editor .checkbox-field,
-.leave-deadline-editor .field {
+.leave-deadline-editor .field,
+.leave-deadline-field {
   margin-bottom: 0;
+}
+
+.leave-deadline-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.leave-deadline-inputs {
+  display: grid;
+  grid-template-columns: minmax(145px, 1fr) minmax(125px, .75fr);
+  gap: 10px;
 }
 
 .leave-deadline-notice {
@@ -5724,6 +5768,10 @@ td small {
     grid-template-columns: 1fr;
   }
 
+  .leave-deadline-inputs {
+    grid-template-columns: minmax(0, 1fr) minmax(125px, .6fr);
+  }
+
   .court-info-import-summary {
     grid-template-columns: 38px minmax(0, 1fr) auto;
     gap: 14px;
@@ -5769,6 +5817,12 @@ td small {
     grid-template-columns: 1fr;
     align-items: stretch;
     gap: 24px;
+    padding: 24px;
+  }
+
+  .profile-preferences-card {
+    grid-template-columns: 1fr;
+    align-items: stretch;
     padding: 24px;
   }
 

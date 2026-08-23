@@ -48,6 +48,7 @@ load_dotenv(Path(__file__).with_name(".env"))
 
 
 LANGUAGES = {"en-us", "zh-tw"}
+TIME_FORMATS = {"12h", "24h"}
 PIN_PATTERN = re.compile(r"^\d{6}$")
 TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 ACCOUNT_USERNAME_PATTERN = re.compile(r"^[^\s<>]{3,40}$")
@@ -380,6 +381,12 @@ TRANSLATIONS = {
         "profile": "Profile",
         "profile_title": "Your profile",
         "profile_body": "Personalize how your account appears.",
+        "datetime_format": "Date and time format",
+        "datetime_format_help": "Choose how times are displayed when you are signed in.",
+        "time_format_12h": "12-hour (AM/PM)",
+        "time_format_24h": "24-hour",
+        "profile_preferences_saved": "Your profile preferences have been saved.",
+        "invalid_datetime_format": "Choose a valid date and time format.",
         "profile_picture": "Profile picture",
         "upload_picture": "Upload picture",
         "replace_picture": "Replace picture",
@@ -924,6 +931,12 @@ TRANSLATIONS = {
         "profile": "個人資料",
         "profile_title": "你的個人資料",
         "profile_body": "設定會員帳號的顯示方式。",
+        "datetime_format": "日期與時間格式",
+        "datetime_format_help": "設定登入後顯示時間所使用的格式。",
+        "time_format_12h": "12 小時制（AM/PM）",
+        "time_format_24h": "24 小時制",
+        "profile_preferences_saved": "個人偏好設定已儲存。",
+        "invalid_datetime_format": "請選擇有效的日期與時間格式。",
         "profile_picture": "個人照片",
         "upload_picture": "上傳照片",
         "replace_picture": "更換照片",
@@ -1516,6 +1529,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'member',
     avatar_filename TEXT NOT NULL DEFAULT '',
+    time_format TEXT NOT NULL DEFAULT '24h' CHECK(time_format IN ('12h', '24h')),
     last_login_at TEXT,
     last_login_ip TEXT,
     archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0, 1)),
@@ -1764,6 +1778,11 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     def inject_globals() -> dict[str, Any]:
         lang = current_language()
         member = current_member()
+        g.time_format = (
+            member["time_format"]
+            if member is not None and member["time_format"] in TIME_FORMATS
+            else "24h"
+        )
         turnstile_is_enabled = turnstile_enabled()
         return {
             "lang": lang,
@@ -1809,9 +1828,26 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.template_filter("audit_datetime")
     def audit_datetime(value: str) -> str:
         try:
-            return datetime.fromisoformat(value).strftime("%Y/%m/%d %H:%M:%S")
+            parsed = datetime.fromisoformat(value)
         except (TypeError, ValueError):
             return value
+        return f"{parsed:%Y/%m/%d} {format_clock_time(parsed, True)}"
+
+    @app.template_filter("profile_datetime")
+    def profile_datetime(value: str) -> str:
+        try:
+            parsed = datetime.fromisoformat(value)
+        except (TypeError, ValueError):
+            return value
+        return f"{parsed:%Y-%m-%d} {format_clock_time(parsed)}"
+
+    @app.template_filter("court_time")
+    def court_time(value: str) -> str:
+        try:
+            parsed = datetime.strptime(value, "%H:%M")
+        except (TypeError, ValueError):
+            return value
+        return format_clock_time(parsed)
 
     @app.get("/")
     def index():
@@ -2296,6 +2332,24 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         db.commit()
         remove_avatar_file(member["avatar_filename"])
         flash_t("avatar_removed", "success")
+        return redirect(url_for("account_profile"))
+
+    @app.post("/account/profile/preferences")
+    @member_required
+    def account_update_profile_preferences():
+        verify_csrf()
+        time_format = request.form.get("time_format", "").strip().lower()
+        if time_format not in TIME_FORMATS:
+            flash_t("invalid_datetime_format", "error")
+            return redirect(url_for("account_profile"))
+        member = current_member()
+        db = get_db()
+        db.execute(
+            "UPDATE users SET time_format = ? WHERE id = ?",
+            (time_format, member["id"]),
+        )
+        db.commit()
+        flash_t("profile_preferences_saved", "success")
         return redirect(url_for("account_profile"))
 
     @app.post("/account/profile/saved-locations/<int:location_id>/delete")
@@ -3317,9 +3371,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         selected_remove_media: set[int] = set()
         if request.method == "POST":
             verify_csrf()
-            values = {
-                field: request.form.get(field, "").strip() for field in field_names
-            }
+            values = submitted_court_values(field_names)
             cleaned, errors = validate_court(values)
             reserved_nicknames = validate_reserved_nicknames(
                 request.form.getlist("reserved_nickname"),
@@ -3610,9 +3662,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                     )
             else:
                 save_location = request.form.get("save_location") == "1"
-                values = {
-                    key: request.form.get(key, "").strip() for key in values
-                }
+                values = submitted_court_values(values)
                 cleaned, errors = validate_court(values)
                 reserved_nicknames = validate_reserved_nicknames(
                     request.form.getlist("reserved_nickname"),
@@ -3677,9 +3727,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         selected_remove_media: set[int] = set()
         if request.method == "POST":
             verify_csrf()
-            values = {
-                field: request.form.get(field, "").strip() for field in field_names
-            }
+            values = submitted_court_values(field_names)
             cleaned, errors = validate_court(values)
             reserved_nicknames = validate_reserved_nicknames(
                 request.form.getlist("reserved_nickname"),
@@ -3961,6 +4009,11 @@ def init_db() -> None:
             "ALTER TABLE users ADD COLUMN avatar_filename "
             "TEXT NOT NULL DEFAULT ''"
         )
+    if "time_format" not in user_columns:
+        db.execute(
+            "ALTER TABLE users ADD COLUMN time_format "
+            "TEXT NOT NULL DEFAULT '24h' CHECK(time_format IN ('12h', '24h'))"
+        )
     if "last_login_at" not in user_columns:
         db.execute("ALTER TABLE users ADD COLUMN last_login_at TEXT")
     if "last_login_ip" not in user_columns:
@@ -4073,6 +4126,31 @@ def current_language() -> str:
     if saved_language in LANGUAGES:
         return saved_language
     return "zh-tw" if detected_country_code() == "TW" else "en-us"
+
+
+def current_time_format() -> str:
+    cached_format = getattr(g, "time_format", None)
+    if cached_format in TIME_FORMATS:
+        return cached_format
+    member = current_member()
+    selected_format = (
+        member["time_format"]
+        if member is not None and member["time_format"] in TIME_FORMATS
+        else "24h"
+    )
+    g.time_format = selected_format
+    return selected_format
+
+
+def format_clock_time(value: datetime, include_seconds: bool = False) -> str:
+    minute_second = f":{value.minute:02d}"
+    if include_seconds:
+        minute_second += f":{value.second:02d}"
+    if current_time_format() == "12h":
+        hour = value.hour % 12 or 12
+        meridiem = "AM" if value.hour < 12 else "PM"
+        return f"{hour}{minute_second} {meridiem}"
+    return f"{value.hour:02d}{minute_second}"
 
 
 def validated_privacy_label(value: Any) -> str:
@@ -4950,7 +5028,7 @@ def current_member() -> sqlite3.Row | None:
     if not user_id:
         return None
     user = get_db().execute(
-        "SELECT id, username, created_at, avatar_filename, last_login_at, "
+        "SELECT id, username, created_at, avatar_filename, time_format, last_login_at, "
         "archived, banned, must_change_password, role "
         "FROM users WHERE id = ?",
         (user_id,),
@@ -5835,6 +5913,19 @@ def default_court_values() -> dict[str, str]:
         "female_level_min": "1",
         "female_level_max": "18",
     }
+
+
+def submitted_court_values(field_names: Any) -> dict[str, str]:
+    values = {
+        field: request.form.get(field, "").strip() for field in field_names
+    }
+    deadline_date = request.form.get("leave_deadline_date")
+    deadline_time = request.form.get("leave_deadline_time")
+    if deadline_date is not None or deadline_time is not None:
+        values["leave_deadline_at"] = (
+            f"{(deadline_date or '').strip()}T{(deadline_time or '').strip()}"
+        )
+    return values
 
 
 def court_form_values(court: sqlite3.Row) -> dict[str, str]:

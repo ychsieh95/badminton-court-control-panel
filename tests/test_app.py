@@ -294,13 +294,14 @@ def create_court(
     save_location=False,
     leave_deadline_enabled="0",
     leave_deadline_at="",
+    court_date="2026-08-20",
 ):
     token = csrf(client, "/courts/new")
     data = {
         "csrf_token": token,
         "event_name": event_name,
         "badminton_name": badminton_name,
-        "court_date": "2026-08-20",
+        "court_date": court_date,
         "start_time": "19:00",
         "end_time": "21:00",
         "hall_name": "Taipei Sports Center",
@@ -325,6 +326,11 @@ def create_court(
         "female_level_max": "10",
         "reserved_nickname": ["Coach Lin", "Mina"],
     }
+    if leave_deadline_at and "T" in leave_deadline_at:
+        deadline_date, deadline_time = leave_deadline_at.split("T", 1)
+        data.pop("leave_deadline_at")
+        data["leave_deadline_date"] = deadline_date
+        data["leave_deadline_time"] = deadline_time
     if media:
         data["media"] = media
     if save_location:
@@ -350,6 +356,7 @@ def test_owner_can_enable_leave_deadline_and_it_blocks_leaving(
         client,
         leave_deadline_enabled="1",
         leave_deadline_at=future_deadline,
+        court_date=(datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"),
     )
     guid = location.rsplit("/", 1)[-1]
 
@@ -366,6 +373,21 @@ def test_owner_can_enable_leave_deadline_and_it_blocks_leaving(
     assert b'name="leave_deadline_enabled"' not in detail.data
     assert future_deadline.replace("T", " ").encode() in detail.data
     assert f'action="/{guid}/leave"'.encode() in detail.data
+
+    edit_form = client.get(f"/admin/courts/{guid}/edit")
+    deadline_date, deadline_time = future_deadline.split("T", 1)
+    assert re.search(
+        rb'name="leave_deadline_date"\s+value="'
+        + re.escape(deadline_date.encode())
+        + rb'"',
+        edit_form.data,
+    )
+    assert re.search(
+        rb'name="leave_deadline_time"\s+value="'
+        + re.escape(deadline_time.encode())
+        + rb'"',
+        edit_form.data,
+    )
 
     joined = client.post(
         f"/{guid}/join",
@@ -423,6 +445,12 @@ def test_leave_deadline_is_disabled_by_default_and_requires_valid_datetime(
     form = client.get("/courts/new")
     assert b'name="leave_deadline_enabled"' in form.data
     assert b'data-leave-deadline-toggle' in form.data
+    assert b'data-leave-deadline-date' in form.data
+    assert b'data-leave-deadline-time' in form.data
+    assert b'name="leave_deadline_date"' in form.data
+    assert b'name="leave_deadline_time"' in form.data
+    assert b'data-time24' in form.data
+    assert rb'pattern="(?:[01]\d|2[0-3]):[0-5]\d"' in form.data
     assert not re.search(
         rb'name="leave_deadline_enabled"[^>]*checked', form.data
     )
@@ -443,7 +471,8 @@ def test_leave_deadline_is_disabled_by_default_and_requires_valid_datetime(
         "female_level_min": "1",
         "female_level_max": "18",
         "leave_deadline_enabled": "1",
-        "leave_deadline_at": "not-a-date",
+        "leave_deadline_date": "2026-08-20",
+        "leave_deadline_time": "07:00 PM",
     }
     invalid = client.post("/courts/new", data=data, follow_redirects=True)
     assert invalid.status_code == 200
@@ -2751,6 +2780,9 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     updates = client.get("/updates")
     assert updates.status_code == 200
     assert "羽球場控面板，持續變得更好。".encode() in updates.data
+    assert "符合每位會員習慣的時間顯示".encode() in updates.data
+    assert "退出期限編輯器拆分為日期及 24 小時制 HH:MM 欄位".encode() in updates.data
+    assert "個人資料頁新增可保存的 12 小時制".encode() in updates.data
     assert "更清楚的退出規則與場次表單".encode() in updates.data
     assert "活動主辦者可啟用精確的本地退出期限".encode() in updates.data
     assert "場次資訊檔匯入工具預設收合".encode() in updates.data
@@ -2770,13 +2802,16 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     assert "直接在場次頁管理球友".encode() in updates.data
     assert "系統會自動遞補最早加入的候補球友".encode() in updates.data
     assert "2026 年 7 月 28 日".encode() in updates.data
-    assert updates.data.count(b'class="update-entry"') == 9
+    assert updates.data.count(b'class="update-entry"') == 10
     assert updates.data.count(b'class="update-latest"') == 1
-    assert b'<time datetime="2026-08-21">' in updates.data
+    assert b'<time datetime="2026-08-23">' in updates.data
 
     client.set_cookie("court_lang", "en-us")
     english = client.get("/updates")
     assert b"The control panel keeps getting better." in english.data
+    assert b"Time displays that fit each member" in english.data
+    assert b"date and 24-hour HH:MM fields" in english.data
+    assert b"persistent 12-hour (AM/PM) or 24-hour display preference" in english.data
     assert b"Clearer leave rules and cleaner event forms" in english.data
     assert b"event owner enable an exact local leave deadline" in english.data
     assert b"file importer by default" in english.data
@@ -2805,7 +2840,7 @@ def test_update_history_is_loaded_and_validated_from_json(tmp_path):
     source_history = json.loads(history_path.read_text(encoding="utf-8"))
     assert tuple(source_history) == app_module.SITE_UPDATE_HISTORY
     assert app_module.SITE_UPDATE_HISTORY_PATH == history_path
-    assert len(source_history) == 9
+    assert len(source_history) == 10
 
     invalid_history_path = tmp_path / "invalid-update-history.json"
     invalid_history_path.write_text(
@@ -4056,3 +4091,62 @@ def test_last_login_time_and_ip_visibility(client, app):
     assert "上次登入".encode() in users_page.data
     assert "IP 位址".encode() in users_page.data
     assert b"203.0.113.42" in users_page.data
+
+
+def test_member_can_choose_12_or_24_hour_datetime_format(client, app):
+    login(client)
+    court_location = create_court(client)
+    with app.app_context():
+        db = get_db()
+        db.execute(
+            "UPDATE users SET last_login_at = '2026-08-23T19:05:06' "
+            "WHERE username_key = 'manager'"
+        )
+        db.commit()
+
+    profile = client.get("/account/profile")
+    assert "日期與時間格式".encode() in profile.data
+    assert re.search(rb'<option value="24h"[^>]*selected', profile.data)
+    assert b"2026-08-23 19:05" in profile.data
+
+    updated = client.post(
+        "/account/profile/preferences",
+        data={
+            "csrf_token": csrf(client, "/account/profile"),
+            "time_format": "12h",
+        },
+        follow_redirects=True,
+    )
+    assert "個人偏好設定已儲存。".encode() in updated.data
+    assert re.search(rb'<option value="12h"[^>]*selected', updated.data)
+    assert b"2026-08-23 7:05 PM" in updated.data
+    assert b"7:00 PM\xe2\x80\x939:00 PM" in client.get(court_location).data
+    with app.app_context():
+        assert get_db().execute(
+            "SELECT time_format FROM users WHERE username_key = 'manager'"
+        ).fetchone()["time_format"] == "12h"
+
+    rejected = client.post(
+        "/account/profile/preferences",
+        data={
+            "csrf_token": csrf(client, "/account/profile"),
+            "time_format": "locale",
+        },
+        follow_redirects=True,
+    )
+    assert "請選擇有效的日期與時間格式。".encode() in rejected.data
+    with app.app_context():
+        assert get_db().execute(
+            "SELECT time_format FROM users WHERE username_key = 'manager'"
+        ).fetchone()["time_format"] == "12h"
+
+    restored = client.post(
+        "/account/profile/preferences",
+        data={
+            "csrf_token": csrf(client, "/account/profile"),
+            "time_format": "24h",
+        },
+        follow_redirects=True,
+    )
+    assert b"2026-08-23 19:05" in restored.data
+    assert b"19:00\xe2\x80\x9321:00" in client.get(court_location).data

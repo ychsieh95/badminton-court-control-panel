@@ -55,7 +55,7 @@
                 <td data-label="{{ t('created') }}"><small class="table-date">{{ user.created_at[:10] }}</small></td>
                 <td data-label="{{ t('last_login') }}">
                   {% if user.last_login_at %}
-                    <span class="login-audit">{{ user.last_login_at[:16]|replace('T', ' ') }}</span>
+                    <span class="login-audit">{{ user.last_login_at|profile_datetime }}</span>
                   {% else %}
                     <span class="muted-inline">{{ t('never') }}</span>
                   {% endif %}

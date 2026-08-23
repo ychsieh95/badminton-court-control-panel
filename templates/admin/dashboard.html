@@ -152,7 +152,7 @@
               <tr>
                 <td data-label="{{ t('date') }}">
                   <strong>{{ court.court_date|court_date }}</strong>
-                  <small>{{ court.court_date|court_weekday }} · {{ court.start_time }}–{{ court.end_time }}</small>
+                  <small>{{ court.court_date|court_weekday }} · {{ court.start_time|court_time }}–{{ court.end_time|court_time }}</small>
                 </td>
                 <td data-label="{{ t('hall') }}">
                   <a class="table-link" href="{{ url_for('court_detail', guid=court.guid) }}">{{ court.event_name or court.hall_name }}</a>

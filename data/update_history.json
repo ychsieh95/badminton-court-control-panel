@@ -1,5 +1,32 @@
 [
   {
+    "date": "2026-08-23",
+    "date_label": {
+      "en-us": "August 23, 2026",
+      "zh-tw": "2026 年 8 月 23 日"
+    },
+    "title": {
+      "en-us": "Time displays that fit each member",
+      "zh-tw": "符合每位會員習慣的時間顯示"
+    },
+    "summary": {
+      "en-us": "Leave deadlines now use an unambiguous 24-hour editor, while signed-in members can choose how times are displayed throughout the site.",
+      "zh-tw": "退出期限現在使用明確的 24 小時制編輯器，登入會員也可選擇全站時間的顯示方式。"
+    },
+    "items": {
+      "en-us": [
+        "Splits the leave deadline editor into date and 24-hour HH:MM fields, preventing browser locale settings from changing the clock to AM/PM.",
+        "Adds a persistent 12-hour (AM/PM) or 24-hour display preference to the profile page; 24-hour remains the default for existing and new accounts.",
+        "Applies the signed-in member’s preference to court schedules, leave-deadline notices, login times, participation history, and administrator timestamps."
+      ],
+      "zh-tw": [
+        "將退出期限編輯器拆分為日期及 24 小時制 HH:MM 欄位，避免瀏覽器地區設定將時鐘改為 AM/PM。",
+        "在個人資料頁新增可保存的 12 小時制（AM/PM）或 24 小時制顯示偏好；現有及新帳號仍預設使用 24 小時制。",
+        "場次時間、退出期限通知、登入時間、參與歷程及管理員時間戳記皆會依登入會員的偏好顯示。"
+      ]
+    }
+  },
+  {
     "date": "2026-08-21",
     "date_label": {
       "en-us": "August 21, 2026",

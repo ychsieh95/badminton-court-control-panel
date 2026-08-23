@@ -104,7 +104,7 @@
             {% endif %}
           </div>
           <div class="court-card-body">
-            <p class="card-time">{{ court.court_date|court_date }} · {{ court.court_date|court_weekday }} · {{ court.start_time }}–{{ court.end_time }}</p>
+            <p class="card-time">{{ court.court_date|court_date }} · {{ court.court_date|court_weekday }} · {{ court.start_time|court_time }}–{{ court.end_time|court_time }}</p>
             <h3>{{ court.event_name or court.hall_name }}</h3>
             {% if court.event_name or court.badminton_name %}
               <p class="card-event-context">

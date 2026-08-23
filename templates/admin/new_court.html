@@ -112,19 +112,40 @@
               <small>{{ t('leave_deadline_help') }}</small>
             </span>
           </label>
-          <label class="field" data-leave-deadline-field {% if values.leave_deadline_enabled|string != '1' %}hidden{% endif %}>
-            <span>{{ t('leave_deadline') }}</span>
-            <input
-              type="datetime-local"
-              name="leave_deadline_at"
-              value="{{ values.leave_deadline_at }}"
-              step="60"
-              class="{% if errors.leave_deadline_at %}invalid{% endif %}"
-              data-leave-deadline-input
-              {% if values.leave_deadline_enabled|string == '1' %}required{% endif %}
-            >
+          <div class="leave-deadline-field" data-leave-deadline-field {% if values.leave_deadline_enabled|string != '1' %}hidden{% endif %}>
+            <span class="leave-deadline-label">{{ t('leave_deadline') }}</span>
+            <div class="leave-deadline-inputs">
+              <label class="field">
+                <span>{{ t('date') }}</span>
+                <input
+                  type="date"
+                  name="leave_deadline_date"
+                  value="{{ values.leave_deadline_at[:10] if values.leave_deadline_at|length >= 10 else '' }}"
+                  class="{% if errors.leave_deadline_at %}invalid{% endif %}"
+                  data-leave-deadline-date
+                  {% if values.leave_deadline_enabled|string == '1' %}required{% endif %}
+                >
+              </label>
+              <label class="field">
+                <span>{{ t('time') }} <small class="field-hint-inline">{{ t('time_hint') }}</small></span>
+                <input
+                  type="text"
+                  name="leave_deadline_time"
+                  value="{{ values.leave_deadline_at[11:16] if values.leave_deadline_at|length >= 16 else '' }}"
+                  inputmode="numeric"
+                  pattern="(?:[01]\d|2[0-3]):[0-5]\d"
+                  minlength="5"
+                  maxlength="5"
+                  placeholder="19:00"
+                  class="{% if errors.leave_deadline_at %}invalid{% endif %}"
+                  data-time24
+                  data-leave-deadline-time
+                  {% if values.leave_deadline_enabled|string == '1' %}required{% endif %}
+                >
+              </label>
+            </div>
             {% if errors.leave_deadline_at %}<small class="field-error">{{ errors.leave_deadline_at }}</small>{% endif %}
-          </label>
+          </div>
           {% if errors.leave_deadline_enabled %}<small class="field-error">{{ errors.leave_deadline_enabled }}</small>{% endif %}
         </div>
       </div>

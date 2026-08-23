@@ -203,7 +203,7 @@
       <article class="info-card">
         <div class="info-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
         <span>{{ t('time') }}</span>
-        <strong>{{ court.start_time }}–{{ court.end_time }}</strong>
+        <strong>{{ court.start_time|court_time }}–{{ court.end_time|court_time }}</strong>
       </article>
       <article class="info-card">
         <div class="info-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V7l8-4 8 4v13M8 20v-5h8v5M8 9h.01M12 9h.01M16 9h.01"/></svg></div>
@@ -664,7 +664,7 @@
           {% if court.leave_deadline_passed %}
             {{ t('leave_deadline_passed') }}
           {% else %}
-            {{ t('leave_deadline_notice')|replace('{deadline}', court.leave_deadline_at|replace('T', ' ')) }}
+            {{ t('leave_deadline_notice')|replace('{deadline}', court.leave_deadline_at|profile_datetime) }}
           {% endif %}
         </p>
       {% endif %}
@@ -691,7 +691,7 @@
         <h2>{{ t('leave_title') }}</h2>
         <p>{{ t('leave_body') }}</p>
         {% if court.leave_deadline_enabled %}
-          <p class="leave-deadline-notice">{{ t('leave_deadline_notice')|replace('{deadline}', court.leave_deadline_at|replace('T', ' ')) }}</p>
+          <p class="leave-deadline-notice">{{ t('leave_deadline_notice')|replace('{deadline}', court.leave_deadline_at|profile_datetime) }}</p>
         {% endif %}
         <form method="post" action="{{ url_for('leave_court', guid=court.guid) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

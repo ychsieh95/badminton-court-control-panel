@@ -416,12 +416,19 @@
 
   const leaveDeadlineToggle = document.querySelector('[data-leave-deadline-toggle]');
   const leaveDeadlineField = document.querySelector('[data-leave-deadline-field]');
-  const leaveDeadlineInput = document.querySelector('[data-leave-deadline-input]');
+  const leaveDeadlineDate = document.querySelector('[data-leave-deadline-date]');
+  const leaveDeadlineTime = document.querySelector('[data-leave-deadline-time]');
   const updateLeaveDeadline = () => {
-    if (!leaveDeadlineToggle || !leaveDeadlineField || !leaveDeadlineInput) return;
+    if (
+      !leaveDeadlineToggle
+      || !leaveDeadlineField
+      || !leaveDeadlineDate
+      || !leaveDeadlineTime
+    ) return;
     const enabled = leaveDeadlineToggle.checked;
     leaveDeadlineField.hidden = !enabled;
-    leaveDeadlineInput.required = enabled;
+    leaveDeadlineDate.required = enabled;
+    leaveDeadlineTime.required = enabled;
   };
   leaveDeadlineToggle?.addEventListener('change', updateLeaveDeadline);
   updateLeaveDeadline();

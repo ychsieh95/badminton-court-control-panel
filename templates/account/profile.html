@@ -26,7 +26,7 @@
       <div>
         <h2>{{ current_user.username }}</h2>
         <p>{{ t('member_since') }} · {{ current_user.created_at[:10] }}</p>
-        <p>{{ t('last_login') }} · {% if current_user.last_login_at %}{{ current_user.last_login_at[:16]|replace('T', ' ') }}{% else %}{{ t('never') }}{% endif %}</p>
+        <p>{{ t('last_login') }} · {% if current_user.last_login_at %}{{ current_user.last_login_at|profile_datetime }}{% else %}{{ t('never') }}{% endif %}</p>
       </div>
     </div>
 
@@ -50,6 +50,25 @@
         </form>
       {% endif %}
     </div>
+  </article>
+
+  <article class="panel profile-preferences-card">
+    <div>
+      <p class="eyebrow">{{ t('preferences') }}</p>
+      <h2>{{ t('datetime_format') }}</h2>
+      <p>{{ t('datetime_format_help') }}</p>
+    </div>
+    <form method="post" action="{{ url_for('account_update_profile_preferences') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="field">
+        <span>{{ t('datetime_format') }}</span>
+        <select name="time_format" required>
+          <option value="24h" {% if current_user.time_format == '24h' %}selected{% endif %}>{{ t('time_format_24h') }}</option>
+          <option value="12h" {% if current_user.time_format == '12h' %}selected{% endif %}>{{ t('time_format_12h') }}</option>
+        </select>
+      </label>
+      <button class="button button-primary" type="submit">{{ t('save_changes') }}</button>
+    </form>
   </article>
 
   <article class="panel saved-locations-card">
