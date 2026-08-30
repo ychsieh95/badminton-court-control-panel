@@ -261,17 +261,43 @@
             data-label="{{ t('reserved_nickname') }}"
             data-placeholder="{{ t('reserved_nickname_placeholder') }}"
             data-delete-label="{{ t('delete') }}"
+            data-drag-label="{{ t('drag_to_reorder') }}"
+            data-move-up-label="{{ t('move_up') }}"
+            data-move-down-label="{{ t('move_down') }}"
           >
             {% for nickname in reserved_nicknames %}
               <div class="field reserved-nickname-field">
                 <span class="reserved-nickname-field-heading">
                   <label for="reserved-nickname-{{ loop.index0 }}">{{ t('reserved_nickname') }} {{ loop.index }}</label>
-                  <button
-                    type="button"
-                    class="reserved-nickname-delete"
-                    data-delete-reserved-nickname
-                    aria-label="{{ t('delete') }} {{ t('reserved_nickname') }} {{ loop.index }}"
-                  >{{ t('delete') }}</button>
+                  <span class="reserved-nickname-actions">
+                    <span
+                      class="reserved-nickname-drag-handle"
+                      draggable="true"
+                      data-drag-reserved-nickname
+                      title="{{ t('drag_to_reorder') }} {{ t('reserved_nickname') }} {{ loop.index }}"
+                      aria-hidden="true"
+                    >&#8942;&#8942;</span>
+                    <button
+                      type="button"
+                      class="reserved-nickname-move"
+                      data-move-reserved-nickname="up"
+                      aria-label="{{ t('move_up') }} {{ t('reserved_nickname') }} {{ loop.index }}"
+                      {% if loop.first %}disabled{% endif %}
+                    >&#8593;</button>
+                    <button
+                      type="button"
+                      class="reserved-nickname-move"
+                      data-move-reserved-nickname="down"
+                      aria-label="{{ t('move_down') }} {{ t('reserved_nickname') }} {{ loop.index }}"
+                      {% if loop.last %}disabled{% endif %}
+                    >&#8595;</button>
+                    <button
+                      type="button"
+                      class="reserved-nickname-delete"
+                      data-delete-reserved-nickname
+                      aria-label="{{ t('delete') }} {{ t('reserved_nickname') }} {{ loop.index }}"
+                    >{{ t('delete') }}</button>
+                  </span>
                 </span>
                 <input id="reserved-nickname-{{ loop.index0 }}" name="reserved_nickname" value="{{ nickname }}" maxlength="40" placeholder="{{ t('reserved_nickname_placeholder') }}">
               </div>

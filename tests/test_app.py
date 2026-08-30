@@ -1750,7 +1750,7 @@ def test_reserved_nicknames_can_be_hidden_from_public_viewers(client, app):
         assert visibility == 0
 
 
-def test_edit_court_can_delete_a_reserved_nickname(client, app):
+def test_edit_court_can_reorder_and_delete_a_reserved_nickname(client, app):
     login(client)
     location = create_court(client)
     guid = location.rsplit("/", 1)[-1]
@@ -1758,39 +1758,73 @@ def test_edit_court_can_delete_a_reserved_nickname(client, app):
 
     edit_form = client.get(edit_url)
     assert edit_form.data.count(b"data-delete-reserved-nickname") == 2
+    assert edit_form.data.count(b"data-drag-reserved-nickname") == 2
+    assert edit_form.data.count(b'data-move-reserved-nickname="up"') == 2
+    assert edit_form.data.count(b'data-move-reserved-nickname="down"') == 2
     assert b"data-delete-label=" in edit_form.data
+    assert b"data-drag-label=" in edit_form.data
+    assert b"data-move-up-label=" in edit_form.data
+    assert b"data-move-down-label=" in edit_form.data
     assert b'id="reserved-nickname-0"' in edit_form.data
+    javascript = client.get("/static/js/app.js")
+    assert b"reservedNicknameList?.addEventListener('dragstart'" in javascript.data
+    assert b"data-move-reserved-nickname" in javascript.data
 
     token = csrf(client, edit_url)
-    saved = client.post(
+    form_data = {
+        "csrf_token": token,
+        "court_date": "2026-08-20",
+        "start_time": "19:00",
+        "end_time": "21:00",
+        "hall_name": "Taipei Sports Center",
+        "location": "Taipei City",
+        "google_place_id": "taipei-sports-center",
+        "latitude": "25.0480",
+        "longitude": "121.5160",
+        "remark": "Bring your own racket.",
+        "court_id": "A1",
+        "male_price": "250",
+        "female_price": "220",
+        "shuttlecock_info": "YONEX AS-30",
+        "reserved_names_visible": "1",
+        "member_min": "4",
+        "member_max": "8",
+        "ordered_count": "2",
+        "male_level_min": "6",
+        "male_level_max": "12",
+        "female_level_min": "4",
+        "female_level_max": "10",
+        "reserved_nickname": ["Mina", "Coach Lin"],
+    }
+    reordered = client.post(
         edit_url,
-        data={
-            "csrf_token": token,
-            "court_date": "2026-08-20",
-            "start_time": "19:00",
-            "end_time": "21:00",
-            "hall_name": "Taipei Sports Center",
-            "location": "Taipei City",
-            "google_place_id": "taipei-sports-center",
-            "latitude": "25.0480",
-            "longitude": "121.5160",
-            "remark": "Bring your own racket.",
-            "court_id": "A1",
-            "male_price": "250",
-            "female_price": "220",
-            "shuttlecock_info": "YONEX AS-30",
-            "reserved_names_visible": "1",
-            "member_min": "4",
-            "member_max": "8",
-            "ordered_count": "1",
-            "male_level_min": "6",
-            "male_level_max": "12",
-            "female_level_min": "4",
-            "female_level_max": "10",
-            "reserved_nickname": ["Mina"],
-        },
+        data=form_data,
         follow_redirects=False,
     )
+    assert reordered.status_code == 302
+
+    with app.app_context():
+        court = get_db().execute(
+            "SELECT id, ordered_count FROM courts WHERE guid = ?", (guid,)
+        ).fetchone()
+        reserved = get_db().execute(
+            "SELECT position, nickname FROM reserved_members "
+            "WHERE court_id = ? ORDER BY position",
+            (court["id"],),
+        ).fetchall()
+        assert court["ordered_count"] == 2
+        assert [(row["position"], row["nickname"]) for row in reserved] == [
+            (0, "Mina"),
+            (1, "Coach Lin"),
+        ]
+
+    detail = client.get(location)
+    assert detail.data.index(b"Mina") < detail.data.index(b"Coach Lin")
+
+    form_data["csrf_token"] = csrf(client, edit_url)
+    form_data["ordered_count"] = "1"
+    form_data["reserved_nickname"] = ["Mina"]
+    saved = client.post(edit_url, data=form_data, follow_redirects=False)
     assert saved.status_code == 302
 
     with app.app_context():

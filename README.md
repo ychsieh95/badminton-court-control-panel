@@ -25,7 +25,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 - Optionally set an exact local date and explicit 24-hour `HH:MM` time after which players cannot leave the event themselves. This restriction is disabled by default.
 - Choose a persistent 12-hour (AM/PM) or 24-hour display format from the profile page; court schedules, leave deadlines, login times, and audit timestamps follow the signed-in member’s preference.
 - Save frequently used hall locations while creating an event, reuse them without searching, and delete them from the profile page.
-- Add or remove individual reserved-player nickname rows while creating or editing an event, and choose whether visitors can see the names.
+- Add, remove, or reorder individual reserved-player nickname rows while creating or editing an event, and choose whether visitors can see the names.
 - Upload up to 12 JPEG, PNG, WebP, MP4, or WebM files. The first image becomes the court-card cover.
 - Export a managed court as `court_info.md` and import it on the new-event form to prefill another event.
 - Edit, duplicate, archive, restore, or delete owned events.

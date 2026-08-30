@@ -5234,6 +5234,69 @@ td small {
   gap: 10px;
 }
 
+.reserved-nickname-field {
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition: border-color .16s ease, opacity .16s ease, background .16s ease;
+}
+
+.reserved-nickname-field:has(.reserved-nickname-drag-handle:hover) {
+  border-color: var(--border);
+  background: var(--surface-soft);
+}
+
+.reserved-nickname-field.is-dragging {
+  border-color: var(--border-strong);
+  background: var(--primary-soft);
+  opacity: .5;
+}
+
+.reserved-nickname-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.reserved-nickname-drag-handle,
+.reserved-nickname-move {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--muted);
+  line-height: 1;
+  padding: 0;
+}
+
+.reserved-nickname-drag-handle {
+  cursor: grab;
+  user-select: none;
+}
+
+.reserved-nickname-drag-handle:active {
+  cursor: grabbing;
+}
+
+.reserved-nickname-move:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.reserved-nickname-move:disabled {
+  cursor: not-allowed;
+  opacity: .35;
+}
+
+.reserved-nickname-move:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  outline-offset: 2px;
+}
+
 .reserved-nickname-delete {
   padding: 0;
   border: 0;
