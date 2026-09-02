@@ -1,17 +1,23 @@
-# Environment and secrets
+# Application runtime data
+*.sqlite
+*.sqlite3
+instance/
+
+# Development environments and secrets
 .env
+.env.*
+!.env.example
 .venv/
 
-# Python
+# Private project files
+private/
+
+# Python-generated files
 *.py[cod]
 __pycache__/
 
 # Tests and coverage
 .coverage
+.coverage.*
 .pytest_cache/
-
-# Runtime data
-instance/
-
-# Private project files
-private/
+htmlcov/

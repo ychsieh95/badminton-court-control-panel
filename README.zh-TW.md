@@ -68,6 +68,7 @@ Badminton Court Control Panel 是一套支援雙語的 Flask 羽球活動管理�
 | `/updates` | 公開雙語更新紀錄 |
 | `/contact` | 公開雙語網站管理員聯絡頁面 |
 | `/privacy` | 公開雙語隱私權政策 |
+| `/healthz` | 容器健康檢查，通過資料庫探測後回傳 `{"status": "ok"}` |
 | `/courts` | 可篩選的公開場次列表 |
 | `/courts/new` | 會員與管理員共用的新增場次表單 |
 | `/<GUID>` | 公開場次詳情及報名 |
@@ -209,19 +210,29 @@ WEB_PUSH_SUBJECT=mailto:your-contact@example.com
 使用 Docker Compose 啟動應用程式：
 
 ```bash
-docker compose up -d --build
+docker compose -f docker/compose.yaml up -d --build
 ```
 
-Compose 會載入 `.env`、發布 `8080` 連接埠，並將具名磁碟區 `badminton-court-control-data` 掛載至 `/instance`。映像檔會將 `/app/instance` 連結至此目錄，因此重新建立容器時，SQLite 資料庫、頭像及場次媒體都會保留。停止服務但保留資料：
+Compose 會載入專案根目錄的 `.env`、發布 `8080` 連接埠，並將具名磁碟區 `badminton-court-control-data` 掛載至 `/instance`。映像檔會將 `/app/instance` 連結至此目錄，因此重新建立容器時，SQLite 資料庫、頭像及場次媒體都會保留。映像檔預設以 UID `1654` 執行；若持久化磁碟區需要其他數字擁有者，請在建立時設定 `APP_UID`。
+
+若具名磁碟區是由舊版以 root 執行的映像檔建立，請在啟動新映像檔前執行一次擁有者更新（若建立時使用其他 `APP_UID`，請取代下列 `1654`）：
 
 ```bash
-docker compose down
+docker run --rm --user 0 --entrypoint chown \
+  -v badminton-court-control-data:/instance \
+  badminton-court-control-panel:local -R 1654:0 /instance
+```
+
+停止服務但保留資料：
+
+```bash
+docker compose -f docker/compose.yaml down
 ```
 
 從專案根目錄建立映像檔：
 
 ```bash
-docker build -t badminton-court-control-panel .
+docker build --build-arg APP_UID=1654 -f docker/Dockerfile -t badminton-court-control-panel .
 ```
 
 在 `8080` 連接埠執行、載入正式環境設定，並持久化 SQLite 資料庫及上傳檔案：
@@ -236,6 +247,17 @@ docker run --rm \
 ```
 
 映像檔使用 `app.py` 作為 uWSGI 模組，並透過 Nginx 的 `8080` 連接埠提供服務。
+
+### 健康檢查
+
+映像檔定義了 `HEALTHCHECK`，每 30 秒請求 `/healthz` 一次，逾時時間 5 秒、啟動寬限期 20 秒、重試 3 次。此端點會執行 `SELECT 1` 資料庫探測並回傳 `{"status": "ok"}`，因此當應用程式或其 SQLite 資料庫停止回應時，容器會標記為不健康。可使用下列指令檢視目前狀態：
+
+```bash
+docker compose -f docker/compose.yaml ps
+docker inspect --format '{{.State.Health.Status}}' <container>
+```
+
+外部監控服務與反向代理檢查也可輪詢相同的 `/healthz` 路徑；該端點無須驗證，且不會回傳個人資料。
 
 ### Nginx 反向代理與用戶端 IP 位址
 
@@ -257,8 +279,8 @@ location / {
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
-docker compose up -d --force-recreate app
-docker compose exec app printenv TRUST_PROXY_HEADERS
+docker compose -f docker/compose.yaml up -d --force-recreate app
+docker compose -f docker/compose.yaml exec app printenv TRUST_PROXY_HEADERS
 ```
 
 最後一個指令必須顯示 `1`。只有應用程式完全透過會覆寫這些標頭的可信任代理存取時，才能啟用此設定。若 Nginx 前方另有 Cloudflare 或其他代理，請先使用該供應商的可信任位址範圍設定 Nginx real-IP 模組。
@@ -297,6 +319,7 @@ docker compose exec app printenv TRUST_PROXY_HEADERS
 - 持久化並備份設定的 SQLite 資料庫及 `instance` 上傳目錄。
 - 專案已內附產生媒體及活動資訊縮圖所需的 FFmpeg 執行檔與 Noto Sans TC 可變字型，無論是否使用 Docker 都可直接使用。
 - 將正式網域加入 Google Maps 瀏覽器金鑰允許的參照網址。
+- 將容器調度或監控服務指向 `/healthz`；Docker 映像檔已透過內建健康檢查輪詢此端點。
 
 ## 測試
 

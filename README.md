@@ -68,6 +68,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 | `/updates` | Public bilingual update history |
 | `/contact` | Public bilingual administrator contact page |
 | `/privacy` | Public bilingual privacy policy |
+| `/healthz` | Container health check returning `{"status": "ok"}` after a database probe |
 | `/courts` | Filterable public court listing |
 | `/courts/new` | Shared new-event form for signed-in members and administrators |
 | `/<GUID>` | Public court details and registration |
@@ -209,19 +210,29 @@ If any required VAPID setting is missing, the court-page switch remains disabled
 Start the application with Docker Compose:
 
 ```bash
-docker compose up -d --build
+docker compose -f docker/compose.yaml up -d --build
 ```
 
-Compose loads `.env`, publishes port `8080`, and mounts the named volume `badminton-court-control-data` at `/instance`. The image links `/app/instance` to this directory, so the SQLite database, avatars, and court media persist when containers are recreated. Stop the service without deleting its data:
+Compose loads the project-root `.env`, publishes port `8080`, and mounts the named volume `badminton-court-control-data` at `/instance`. The image links `/app/instance` to this directory, so the SQLite database, avatars, and court media persist when containers are recreated. The image runs as UID `1654` by default; set `APP_UID` when building if the persistent volume must use another numeric owner.
+
+If the named volume was created by an older root-running image, update its ownership once before starting the new image (replace `1654` if you build with another `APP_UID`):
 
 ```bash
-docker compose down
+docker run --rm --user 0 --entrypoint chown \
+  -v badminton-court-control-data:/instance \
+  badminton-court-control-panel:local -R 1654:0 /instance
+```
+
+Stop the service without deleting its data:
+
+```bash
+docker compose -f docker/compose.yaml down
 ```
 
 Build the image from the project root:
 
 ```bash
-docker build -t badminton-court-control-panel .
+docker build --build-arg APP_UID=1654 -f docker/Dockerfile -t badminton-court-control-panel .
 ```
 
 Run it on port `8080`, load the production environment, and persist the SQLite database and uploads:
@@ -236,6 +247,17 @@ docker run --rm \
 ```
 
 The image uses `app.py` as the uWSGI module and serves it through Nginx on port `8080`.
+
+### Health check
+
+The image defines a `HEALTHCHECK` that requests `/healthz` every 30 seconds, with a 5-second timeout, a 20-second start period, and 3 retries. The endpoint runs a `SELECT 1` database probe and returns `{"status": "ok"}`, so the container becomes unhealthy when the application or its SQLite database stops responding. Inspect the current state with:
+
+```bash
+docker compose -f docker/compose.yaml ps
+docker inspect --format '{{.State.Health.Status}}' <container>
+```
+
+External uptime monitors and reverse-proxy checks can poll the same `/healthz` path; it requires no authentication and returns no personal data.
 
 ### Nginx reverse proxy and client IP addresses
 
@@ -257,8 +279,8 @@ Validate and reload Nginx, then recreate the app container so Compose reloads `.
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
-docker compose up -d --force-recreate app
-docker compose exec app printenv TRUST_PROXY_HEADERS
+docker compose -f docker/compose.yaml up -d --force-recreate app
+docker compose -f docker/compose.yaml exec app printenv TRUST_PROXY_HEADERS
 ```
 
 The final command must print `1`. Enable this setting only when the application is reachable exclusively through a trusted proxy that overwrites these headers. If Cloudflare or another proxy is in front of Nginx, configure Nginx’s real-IP module with that provider’s trusted address ranges first.
@@ -297,6 +319,7 @@ The final command must print `1`. Enable this setting only when the application 
 - Persist and back up the configured SQLite database and `instance` upload directories.
 - The project bundles the FFmpeg executable and Noto Sans TC variable font required to generate media and information thumbnails, both inside and outside Docker.
 - Configure the deployed domain as an allowed Google Maps browser-key referrer.
+- Point container orchestration or uptime monitoring at `/healthz`; the Docker image already polls it through its built-in health check.
 
 ## Tests
 

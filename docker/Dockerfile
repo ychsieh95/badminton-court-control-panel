@@ -1,5 +1,7 @@
 FROM tiangolo/uwsgi-nginx-flask:python3.12
 
+ARG APP_UID=1654
+
 WORKDIR /app
 
 COPY ./requirements.txt /app/requirements.txt
@@ -19,7 +21,25 @@ COPY ./data /app/data
 COPY ./templates /app/templates
 COPY ./static /app/static
 
-RUN mkdir -p /instance/avatars /instance/court_media /instance/social_thumbnails \
-    && ln -s /instance /app/instance
+RUN mkdir -p \
+        /instance/avatars \
+        /instance/court_media \
+        /instance/social_thumbnails \
+        /var/cache/nginx \
+        /var/lib/nginx \
+    && rm -f /app/main.py /app/prestart.sh \
+    && ln -s /instance /app/instance \
+    && sed -i '/^chown-socket/d' /etc/uwsgi/uwsgi.ini \
+    && chown -R "$APP_UID:0" \
+        /app \
+        /etc/nginx \
+        /instance \
+        /run \
+        /var/cache/nginx \
+        /var/lib/nginx \
+        /var/log/nginx \
+        /var/log/supervisor
 
 VOLUME ["/instance"]
+
+USER $APP_UID

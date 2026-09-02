@@ -1,0 +1,26 @@
+# Default text normalization
+* text=auto eol=lf
+
+# Documentation
+*.md text diff=markdown
+
+# Source and configuration
+*.css text
+*.html text
+*.ini text
+*.js text
+*.json text
+*.py text diff=python
+*.toml text
+*.yaml text
+*.yml text
+.dockerignore text
+.env.example text
+.gitattributes text
+.gitignore text
+Dockerfile text
+
+# Binary assets
+*.png binary
+*.ttf binary
+*.webp binary

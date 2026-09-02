@@ -1,19 +1,28 @@
-# Environment and local configuration
-.env
-.venv
-
-# Version control
-.git
-.gitignore
-
-# Python cache and compiled files
-.pytest_cache
-__pycache__
-*.py[cod]
-
-# Application data
+# Application runtime data
 *.sqlite
-instance
+*.sqlite3
+instance/
+
+# Development environments and secrets
+.env
+.env.*
+.venv/
+
+# Private project files
+private/
+
+# Python-generated files
+*.py[cod]
+__pycache__/
 
 # Tests
-tests
+*.coverage
+.coverage
+.pytest_cache/
+htmlcov/
+tests/
+
+# Version control
+.git/
+.gitattributes
+.gitignore
