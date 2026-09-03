@@ -1,5 +1,30 @@
 [
   {
+    "date": "2026-09-03",
+    "date_label": {
+      "en-us": "September 3, 2026",
+      "zh-tw": "2026 年 9 月 3 日"
+    },
+    "title": {
+      "en-us": "Court thumbnails ready to download",
+      "zh-tw": "場次縮圖可直接下載"
+    },
+    "summary": {
+      "en-us": "Every visitor can now save a court's generated preview image directly from its detail page.",
+      "zh-tw": "所有訪客現在都能直接從場次詳情頁儲存系統產生的預覽圖片。"
+    },
+    "items": {
+      "en-us": [
+        "Adds a Download thumbnail button to every public court detail page without requiring an account.",
+        "Downloads the current 1200×630 JPEG preview with a descriptive date, time, and event-or-hall filename, reusing the first event photo, first video frame, or generated information card."
+      ],
+      "zh-tw": [
+        "每個公開場次詳情頁都新增「下載縮圖」按鈕，無須登入帳號即可使用。",
+        "以包含日期、時間及活動或球館名稱的清楚檔名，下載目前的 1200×630 JPEG 預覽圖；圖片會沿用第一張活動相片、第一段影片畫面，或系統產生的活動資訊卡。"
+      ]
+    }
+  },
+  {
     "date": "2026-08-23",
     "date_label": {
       "en-us": "August 23, 2026",

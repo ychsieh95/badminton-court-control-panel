@@ -15,6 +15,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 - Opt in to court-specific system push notifications when event information or the member list changes.
 - View the schedule, weekday, hall, location, prices, shuttlecock, levels, organizer, remarks, participant lists, and event media.
 - Share court links with a 1200×630 social preview generated from the first event photo, a frame from the first event video, or the event information when no media exists.
+- Download that current 1200×630 preview as a descriptively named JPEG directly from the public court detail page.
 - Use a floating, accessible join dialog on mobile screens.
 
 ### For organizers
@@ -72,6 +73,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 | `/courts` | Filterable public court listing |
 | `/courts/new` | Shared new-event form for signed-in members and administrators |
 | `/<GUID>` | Public court details and registration |
+| `/<GUID>/thumbnail.jpg` | Public download of the court's current 1200×630 JPEG thumbnail |
 | `/<GUID>/court_info.md` | Organizer-only court-configuration export |
 | `/signup` | Member registration |
 | `/login` | Member and administrator sign-in |
@@ -308,7 +310,7 @@ The final command must print `1`. Enable this setting only when the application 
 - SQLite data is stored in `instance/courts.sqlite` unless `COURT_DATABASE` is configured.
 - Avatars are stored under `instance/avatars`.
 - Court photos and videos are stored under `instance/court_media`.
-- Versioned social-sharing thumbnails are cached under `instance/social_thumbnails`.
+- Versioned social-sharing thumbnails are cached under `instance/social_thumbnails`; detail-page downloads reuse the same generated images.
 - Replacing or deleting records cleans up associated uploaded files where applicable.
 
 ## Production

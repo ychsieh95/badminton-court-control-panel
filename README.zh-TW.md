@@ -15,6 +15,7 @@ Badminton Court Control Panel 是一套支援雙語的 Flask 羽球活動管理�
 - 可針對個別場次開啟系統推播通知，在場次資訊或球友名單變更時收到通知。
 - 查看日期、星期、時間、球館、地點、費用、用球、程度、主辦者、備註、球友名單及活動媒體。
 - 分享場次網址時提供 1200×630 社群預覽；依序使用第一個活動相片、第一個活動影片的畫面，或在沒有媒體時使用活動資訊產生圖片。
+- 可直接從公開場次詳情頁，將目前的 1200×630 預覽圖下載為具有清楚檔名的 JPEG 檔案。
 - 在行動裝置上透過浮動按鈕開啟無障礙加入視窗。
 
 ### 主辦者功能
@@ -72,6 +73,7 @@ Badminton Court Control Panel 是一套支援雙語的 Flask 羽球活動管理�
 | `/courts` | 可篩選的公開場次列表 |
 | `/courts/new` | 會員與管理員共用的新增場次表單 |
 | `/<GUID>` | 公開場次詳情及報名 |
+| `/<GUID>/thumbnail.jpg` | 公開下載場次目前的 1200×630 JPEG 縮圖 |
 | `/<GUID>/court_info.md` | 僅限主辦者使用的場次設定匯出 |
 | `/signup` | 會員註冊 |
 | `/login` | 會員及管理員登入 |
@@ -308,7 +310,7 @@ docker compose -f docker/compose.yaml exec app printenv TRUST_PROXY_HEADERS
 - 未設定 `COURT_DATABASE` 時，SQLite 資料儲存在 `instance/courts.sqlite`。
 - 頭像儲存在 `instance/avatars`。
 - 場次相片及影片儲存在 `instance/court_media`。
-- 具版本的社群分享縮圖快取於 `instance/social_thumbnails`。
+- 具版本的社群分享縮圖快取於 `instance/social_thumbnails`；場次詳情頁下載功能會重複使用相同的產生圖片。
 - 更換或刪除資料時，系統會在適用情況下清理相關上傳檔案。
 
 ## 正式環境

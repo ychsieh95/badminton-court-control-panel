@@ -286,6 +286,7 @@ TRANSLATIONS = {
         "share": "Share",
         "copy_link": "Copy link",
         "copied": "Copied!",
+        "download_thumbnail": "Download thumbnail",
         "close": "Close",
         "push_notifications": "System push notifications",
         "push_notifications_body": "Get a device notification when event information or the member list changes.",
@@ -839,6 +840,7 @@ TRANSLATIONS = {
         "share": "分享",
         "copy_link": "複製連結",
         "copied": "已複製！",
+        "download_thumbnail": "下載縮圖",
         "close": "關閉",
         "push_notifications": "系統推播通知",
         "push_notifications_body": "場次資訊或球友名單變更時，在你的裝置上接收通知。",
@@ -2452,23 +2454,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 code=302,
             )
 
-        cache_key = court_social_thumbnail_cache_key(guid)
-        filename = f"{cache_key}-{version}-{lang}.jpg"
-        thumbnail_folder = Path(app.config["SOCIAL_THUMBNAIL_FOLDER"])
-        thumbnail_path = thumbnail_folder / filename
-        if not thumbnail_path.is_file():
-            thumbnail_data = render_court_social_thumbnail(
-                court, first_media, lang
-            )
-            temporary_path = thumbnail_folder / (
-                f".{filename}.{secrets.token_hex(8)}.tmp"
-            )
-            try:
-                temporary_path.write_bytes(thumbnail_data)
-                os.replace(temporary_path, thumbnail_path)
-            finally:
-                temporary_path.unlink(missing_ok=True)
-            remove_stale_court_social_thumbnails(cache_key, version)
+        thumbnail_folder, filename = cached_court_social_thumbnail(
+            court, first_media, version, lang
+        )
 
         response = send_from_directory(
             thumbnail_folder,
@@ -2478,6 +2466,27 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             max_age=31536000,
         )
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @app.get("/<guid>/thumbnail.jpg")
+    def download_court_thumbnail(guid: str):
+        court = fetch_court(guid)
+        if court is None:
+            abort(404)
+        first_media = fetch_first_court_media(court["id"])
+        version = court_social_thumbnail_version(court, first_media)
+        thumbnail_folder, filename = cached_court_social_thumbnail(
+            court, first_media, version, current_language()
+        )
+        response = send_from_directory(
+            thumbnail_folder,
+            filename,
+            mimetype="image/jpeg",
+            as_attachment=True,
+            download_name=court_thumbnail_download_filename(court),
+        )
+        response.headers["Cache-Control"] = "private, no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
@@ -5436,6 +5445,32 @@ def render_court_social_thumbnail(
     return output.getvalue()
 
 
+def cached_court_social_thumbnail(
+    court: sqlite3.Row,
+    first_media: sqlite3.Row | None,
+    version: str,
+    lang: str,
+) -> tuple[Path, str]:
+    cache_key = court_social_thumbnail_cache_key(court["guid"])
+    filename = f"{cache_key}-{version}-{lang}.jpg"
+    thumbnail_folder = Path(current_app_config("SOCIAL_THUMBNAIL_FOLDER"))
+    thumbnail_path = thumbnail_folder / filename
+    if not thumbnail_path.is_file():
+        thumbnail_data = render_court_social_thumbnail(
+            court, first_media, lang
+        )
+        temporary_path = thumbnail_folder / (
+            f".{filename}.{secrets.token_hex(8)}.tmp"
+        )
+        try:
+            temporary_path.write_bytes(thumbnail_data)
+            os.replace(temporary_path, thumbnail_path)
+        finally:
+            temporary_path.unlink(missing_ok=True)
+        remove_stale_court_social_thumbnails(cache_key, version)
+    return thumbnail_folder, filename
+
+
 def render_court_media_social_thumbnail(media: sqlite3.Row) -> Image.Image:
     media_path = (
         Path(current_app_config("COURT_MEDIA_FOLDER")) / media["filename"]
@@ -5958,6 +5993,11 @@ def court_info_export_filename(court: Any) -> str:
         f"{court_date}_{compact_time(court['start_time'])}_"
         f"{compact_time(court['end_time'])}_{name}.md"
     )
+
+
+def court_thumbnail_download_filename(court: Any) -> str:
+    export_filename = court_info_export_filename(court)
+    return f"{export_filename.removesuffix('.md')}.jpg"
 
 
 def render_court_info_markdown(court: sqlite3.Row) -> str:

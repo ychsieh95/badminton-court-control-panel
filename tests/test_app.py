@@ -1113,6 +1113,34 @@ def test_court_social_thumbnail_metadata_and_information_fallback(
     assert client.get(updated_thumbnail_path).status_code == 404
 
 
+def test_court_thumbnail_can_be_downloaded_from_detail_page(client, app):
+    login(client)
+    location = create_court(
+        client,
+        event_name="Friday Night 羽球",
+    )
+    guid = location.rsplit("/", 1)[-1]
+    public_client = app.test_client()
+    detail = public_client.get(location)
+
+    assert f'href="/{guid}/thumbnail.jpg"'.encode() in detail.data
+    assert "下載縮圖".encode() in detail.data
+
+    downloaded = public_client.get(f"/{guid}/thumbnail.jpg")
+    assert downloaded.status_code == 200
+    assert downloaded.mimetype == "image/jpeg"
+    assert "attachment" in downloaded.headers["Content-Disposition"]
+    assert (
+        "filename*=UTF-8''2026-08-20_1900_2100_"
+        "Friday%20Night%20%E7%BE%BD%E7%90%83.jpg"
+        in downloaded.headers["Content-Disposition"]
+    )
+    assert downloaded.headers["Cache-Control"] == "private, no-store"
+    with Image.open(io.BytesIO(downloaded.data)) as rendered:
+        assert rendered.size == (1200, 630)
+        assert rendered.format == "JPEG"
+
+
 def test_court_social_thumbnail_uses_first_event_image(client):
     login(client)
     expected_color = (27, 83, 144)
@@ -2814,6 +2842,8 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     updates = client.get("/updates")
     assert updates.status_code == 200
     assert "羽球場控面板，持續變得更好。".encode() in updates.data
+    assert "場次縮圖可直接下載".encode() in updates.data
+    assert "每個公開場次詳情頁都新增「下載縮圖」按鈕".encode() in updates.data
     assert "符合每位會員習慣的時間顯示".encode() in updates.data
     assert "退出期限編輯器拆分為日期及 24 小時制 HH:MM 欄位".encode() in updates.data
     assert "個人資料頁新增可保存的 12 小時制".encode() in updates.data
@@ -2836,13 +2866,15 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     assert "直接在場次頁管理球友".encode() in updates.data
     assert "系統會自動遞補最早加入的候補球友".encode() in updates.data
     assert "2026 年 7 月 28 日".encode() in updates.data
-    assert updates.data.count(b'class="update-entry"') == 10
+    assert updates.data.count(b'class="update-entry"') == 11
     assert updates.data.count(b'class="update-latest"') == 1
-    assert b'<time datetime="2026-08-23">' in updates.data
+    assert b'<time datetime="2026-09-03">' in updates.data
 
     client.set_cookie("court_lang", "en-us")
     english = client.get("/updates")
     assert b"The control panel keeps getting better." in english.data
+    assert b"Court thumbnails ready to download" in english.data
+    assert b"Download thumbnail button to every public court" in english.data
     assert b"Time displays that fit each member" in english.data
     assert b"date and 24-hour HH:MM fields" in english.data
     assert b"persistent 12-hour (AM/PM) or 24-hour display preference" in english.data
@@ -2874,7 +2906,7 @@ def test_update_history_is_loaded_and_validated_from_json(tmp_path):
     source_history = json.loads(history_path.read_text(encoding="utf-8"))
     assert tuple(source_history) == app_module.SITE_UPDATE_HISTORY
     assert app_module.SITE_UPDATE_HISTORY_PATH == history_path
-    assert len(source_history) == 10
+    assert len(source_history) == 11
 
     invalid_history_path = tmp_path / "invalid-update-history.json"
     invalid_history_path.write_text(
