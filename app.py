@@ -3426,6 +3426,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             selected_remove_media=selected_remove_media,
             editing=True,
             court=court,
+            registered_players=fetch_registered_players(court["id"]),
         )
 
     @app.post("/admin/courts/<guid>/duplicate")
@@ -3782,6 +3783,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             selected_remove_media=selected_remove_media,
             editing=True,
             court=court,
+            registered_players=fetch_registered_players(court["id"]),
             dashboard_endpoint="account_dashboard",
             console_key="my_courts",
         )
@@ -6267,6 +6269,14 @@ def update_court_record(
         raise
     remove_court_media_files([item["filename"] for item in removable_media])
     send_court_push_notifications(guid, "updated")
+
+
+def fetch_registered_players(court_id: int) -> list[sqlite3.Row]:
+    return get_db().execute(
+        "SELECT username, waitlisted, roll_called FROM participants "
+        "WHERE court_id = ? ORDER BY waitlisted, joined_at, id",
+        (court_id,),
+    ).fetchall()
 
 
 def reserved_nickname_values(court_id: int, ordered_count: int) -> list[str]:

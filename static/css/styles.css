@@ -5050,6 +5050,19 @@ td small {
   gap: 18px;
 }
 
+.registered-players-panel {
+  min-width: 0;
+  margin-top: 24px;
+}
+
+.registered-players-panel .panel-heading h2 {
+  font-size: 1.32rem;
+}
+
+.registered-players-panel > .muted {
+  margin: 20px 0 0;
+}
+
 .form-section {
   position: relative;
   display: grid;

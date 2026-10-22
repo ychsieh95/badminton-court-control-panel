@@ -305,6 +305,31 @@
           </div>
           {% if errors.reserved_nicknames %}<small class="field-error">{{ t(errors.reserved_nicknames) }}</small>{% endif %}
         </div>
+
+        {% if editing %}
+          <section class="registered-players-panel" aria-labelledby="registered-players-heading">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">{{ t('joined_on_site') }}</p>
+                <h2 id="registered-players-heading">{{ t('participants') }}</h2>
+              </div>
+              <span class="count-badge">{{ registered_players|length }}</span>
+            </div>
+            {% if registered_players %}
+              <div class="participant-list">
+                {% for player in registered_players %}
+                  <div class="participant">
+                    <span class="avatar{% if player.waitlisted %} waiting-avatar{% endif %}">{{ player.username[:1]|upper }}</span>
+                    <strong>{{ player.username }}</strong>
+                    <span class="participant-status">{{ t('waitlisted') if player.waitlisted else t('joined') }}{% if player.roll_called %} · {{ t('roll_call') }} ✓{% endif %}</span>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="muted">{{ t('no_participants') }}</p>
+            {% endif %}
+          </section>
+        {% endif %}
       </div>
     </article>
 

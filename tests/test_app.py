@@ -4120,7 +4120,10 @@ def test_member_can_delete_account_without_deleting_published_courts(client, app
     assert client.get("/account/profile").status_code == 302
 
 
-def test_last_login_time_and_ip_visibility(client, app):
+@pytest.mark.parametrize("trust_proxy_headers", [False, True])
+def test_last_login_time_and_ip_visibility(client, app, trust_proxy_headers):
+    app.config["TRUST_PROXY_HEADERS"] = trust_proxy_headers
+    expected_ip = "198.51.100.99" if trust_proxy_headers else "203.0.113.42"
     signup(client, "alice")
     token = csrf(client, "/my-courts")
     client.post("/logout", data={"csrf_token": token})
@@ -4142,13 +4145,13 @@ def test_last_login_time_and_ip_visibility(client, app):
             "WHERE username_key = 'alice'"
         ).fetchone()
         assert audit["last_login_at"]
-        assert audit["last_login_ip"] == "203.0.113.42"
+        assert audit["last_login_ip"] == expected_ip
 
     profile = client.get("/account/profile")
     assert "上次登入".encode() in profile.data
     assert audit["last_login_at"][:16].replace("T", " ").encode() in profile.data
     assert "IP 位址".encode() not in profile.data
-    assert b"203.0.113.42" not in profile.data
+    assert expected_ip.encode() not in profile.data
 
     token = csrf(client, "/my-courts")
     client.post("/logout", data={"csrf_token": token})
@@ -4156,7 +4159,7 @@ def test_last_login_time_and_ip_visibility(client, app):
     users_page = client.get("/admin/users")
     assert "上次登入".encode() in users_page.data
     assert "IP 位址".encode() in users_page.data
-    assert b"203.0.113.42" in users_page.data
+    assert expected_ip.encode() in users_page.data
 
 
 def test_member_can_choose_12_or_24_hour_datetime_format(client, app):
