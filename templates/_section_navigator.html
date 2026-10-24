@@ -1,0 +1,14 @@
+<details class="section-navigator {{ section_navigator_class|default('') }}" data-section-navigator hidden>
+  <summary class="section-navigator-trigger">
+    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M3 6h.01M3 12h.01M3 18h.01"/></svg>
+    <span class="section-navigator-caption">
+      <small>{{ t('current_section') }}</small>
+      <strong data-current-section></strong>
+    </span>
+    <svg class="section-navigator-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></svg>
+  </summary>
+  <nav class="section-navigator-menu" aria-label="{{ t('jump_to_section') }}">
+    <p>{{ t('jump_to_section') }}</p>
+    <div data-section-links></div>
+  </nav>
+</details>

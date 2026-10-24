@@ -17,6 +17,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 - Share court links with a 1200×630 social preview generated from the first event photo, a frame from the first event video, or the event information when no media exists.
 - Download that current 1200×630 preview as a descriptively named JPEG directly from the public court detail page.
 - Use a floating, accessible join dialog on mobile screens.
+- Collapse court sections and jump between them using a draggable floating section navigator.
 
 ### For organizers
 
@@ -27,10 +28,11 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 - Choose a persistent 12-hour (AM/PM) or 24-hour display format from the profile page; court schedules, leave deadlines, login times, and audit timestamps follow the signed-in member’s preference.
 - Save frequently used hall locations while creating an event, reuse them without searching, and delete them from the profile page.
 - Add, remove, or reorder individual reserved-player nickname rows while creating or editing an event, and choose whether visitors can see the names.
-- Upload up to 12 JPEG, PNG, WebP, MP4, or WebM files. The first image becomes the court-card cover.
+- Select minimum, maximum, and reserved-member counts from dropdowns; reserved-nickname rows follow the reserved count.
+- Upload up to 12 JPEG, PNG, WebP, MP4, or WebM files through a themed picker with a selected-file count and photo/video previews. The first image becomes the court-card cover.
 - Export a managed court as `court_info.md` and import it on the new-event form to prefill another event.
 - Edit, duplicate, archive, restore, or delete owned events.
-- Start **Roll call & clearing** to make an event read-only and track attendance and payment-clearing status.
+- Start **Roll call & clearing** to make an event read-only and track attendance and payment-clearing status. Each column supports check/uncheck all across reserved and online members, with a mixed-selection indicator; use **Save member statuses** to save changes.
 
 ### For administrators
 
@@ -175,9 +177,17 @@ http://localhost:5000/*
 
 Without a key, the court form remains usable and provides a live Google Maps search link.
 
+## Section navigation and form controls
+
+Court detail pages and new/edit forms have expandable sections, including the court-information importer. Sections start expanded and remember their state in cookies for one year. Form sections with validation errors reopen automatically. Date and time inputs keep their format hints below the controls so the inputs stay aligned.
+
+The floating section navigator shows the current section as you scroll. Choose a section to expand it and jump to its heading. Its default position is below the page header at the top-left on desktop and top-right on tablets/phones (viewport width up to 1024px).
+
+Drag the navigator with a mouse or touch toward any screen edge to partially hide it; a 44px handle remains available. Drag it back or click it to reveal the navigator. Its menu fits the available space, supports keyboard navigation and Escape, and respects reduced-motion preferences.
+
 ## Court information import and export
 
-From a court’s organizer action menu, choose **Export** to download a file named `yyyy-MM-dd_HHmm_HHmm_<name>.md`, where the two times are the event’s start and end times. The final name uses the event name when present and otherwise uses the hall name. Expand the collapsed **Court information file** section at the top of `/courts/new` and choose that file to prefill a new event. Importing only fills the form; the organizer must review and save it before a court is created. The section automatically opens when an import error needs attention.
+From a court’s organizer action menu, choose **Export** to download a file named `yyyy-MM-dd_HHmm_HHmm_<name>.md`, where the two times are the event’s start and end times. The final name uses the event name when present and otherwise uses the hall name. Open the **Court information file** section at the top of `/courts/new` if it is collapsed and choose that file to prefill a new event. Importing only fills the form; the organizer must review and save it before a court is created. The section automatically opens when an import error needs attention.
 
 The versioned Markdown file contains reusable court fields and reserved-player nicknames in a readable JSON block. It intentionally excludes registrations, participant PINs, join/leave history, media files, ownership, and the original public GUID. Imports are limited to 64 KB and pass through the normal court validation before saving.
 
@@ -325,10 +335,17 @@ The final command must print `1`. Enable this setting only when the application 
 
 ## Tests
 
-Run the complete test suite inside the virtual environment:
+Run the Python tests inside the virtual environment:
 
 ```bash
 .venv/bin/pytest -q
+```
+
+Run the browser-control logic tests with Node.js (no extra packages required):
+
+```bash
+node tests/test_court_controls.cjs
+node tests/test_court_navigation.cjs
 ```
 
 ## Attribution and licenses

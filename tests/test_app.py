@@ -568,8 +568,7 @@ def test_court_info_import_rejects_invalid_and_oversized_files(client, app):
     login(client)
 
     new_court_form = client.get("/courts/new")
-    assert b'<details class="panel court-info-import" >' in new_court_form.data
-    assert b'<details class="panel court-info-import" open>' not in new_court_form.data
+    assert b'data-court-section="form-import" open>' in new_court_form.data
 
     invalid = client.post(
         "/courts/new",
@@ -585,7 +584,7 @@ def test_court_info_import_rejects_invalid_and_oversized_files(client, app):
     )
     assert invalid.status_code == 200
     assert "請選擇由本網站匯出的有效".encode() in invalid.data
-    assert b'<details class="panel court-info-import" open>' in invalid.data
+    assert b'data-court-section="form-import" open>' in invalid.data
 
     oversized = client.post(
         "/courts/new",
@@ -634,7 +633,7 @@ def test_court_push_notification_control_and_service_worker(client):
     login(client)
     location = create_court(client)
     detail = client.get(location)
-    assert b'class="panel push-notification-panel"' in detail.data
+    assert b'class="push-notification-panel"' in detail.data
     assert b'data-push-notification-toggle' in detail.data
     assert b'data-push-enabled="false"' in detail.data
     assert "此網站尚未設定系統推播通知。".encode() in detail.data
@@ -934,8 +933,11 @@ def test_court_media_gallery_card_cover_and_file_cleanup(client, app):
 
     detail = client.get(location)
     assert b'class="event-gallery"' in detail.data
-    assert b'<details class="panel event-gallery-panel">' in detail.data
-    assert b'<details class="panel event-gallery-panel" open>' not in detail.data
+    assert b'data-court-section="gallery" open>' in detail.data
+    client.set_cookie("court_section_gallery", "collapsed")
+    collapsed = client.get(location)
+    assert b'data-court-section="gallery">' in collapsed.data
+    assert b'data-court-section="gallery" open>' not in collapsed.data
     assert detail.data.count(b"<video controls") == 1
     assert detail.data.count(b"<figure") == 3
     assert f"/court-media/{first_image}".encode() in client.get("/").data
@@ -2219,6 +2221,54 @@ def test_admin_can_rename_reset_pin_and_delete_court_participants(
     ]
 
 
+def test_court_sections_default_to_expanded_and_restore_cookie_preferences(client):
+    login(client)
+    location = create_court(client)
+    detail = client.get(location)
+    assert b'section-navigator-court' in detail.data
+    assert b'data-section-navigator' in detail.data
+    assert b'data-section-title=' in detail.data
+    sections = re.findall(rb'<details[^>]*data-court-section="([^"]+)"[^>]*>', detail.data)
+    assert {b"notifications", b"capacity", b"price", b"level", b"participants", b"history", b"registration"} <= set(sections)
+    for section in sections:
+        assert b'data-court-section="' + section + b'" open>' in detail.data
+        assert b'id="court-section-' + section + b'"' in detail.data
+
+    client.set_cookie("court_section_participants", "collapsed")
+    client.set_cookie("court_section_history", "collapsed")
+    client.set_cookie("court_section_price", "unexpected")
+    restored = client.get(location)
+    assert b'data-court-section="participants">' in restored.data
+    assert b'data-court-section="history">' in restored.data
+    assert b'data-court-section="capacity" open>' in restored.data
+    assert b'data-court-section="price" open>' in restored.data
+
+    client.set_cookie("court_section_participants", "expanded")
+    reopened = client.get(location)
+    assert b'data-court-section="participants" open>' in reopened.data
+    assert b'data-court-section="history">' in reopened.data
+
+
+def test_bulk_status_controls_are_available_only_to_court_managers(client, app):
+    login(client)
+    location = create_court(
+        client, court_date=(datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d")
+    )
+    started = client.post(
+        f"{location}/roll-clearing/start",
+        data={"csrf_token": csrf(client, location)},
+        follow_redirects=True,
+    )
+    assert b'data-status-all="roll"' in started.data
+    assert b'data-status-all="cleared"' in started.data
+    assert b'data-court-section="roll-clearing" open>' in started.data
+    client.set_cookie("court_section_roll-clearing", "collapsed")
+    assert b'data-court-section="roll-clearing">' in client.get(location).data
+    public = app.test_client().get(location)
+    assert b'data-status-all=' not in public.data
+    assert b'data-court-section="roll-clearing"' not in public.data
+
+
 def test_owner_can_finalize_court_and_record_roll_and_clearing(client, app):
     signup(client, "alice")
     location = create_member_court(client, "Finalized Court")
@@ -2239,6 +2289,9 @@ def test_owner_can_finalize_court_and_record_roll_and_clearing(client, app):
     assert 'name="reserved_roll"'.encode() in started.data
     assert 'name="participant_roll"'.encode() in started.data
     assert b"Bob" in started.data
+    assert b'data-status-all="roll"' in started.data
+    assert b'data-status-all="cleared"' in started.data
+    assert b'data-court-section="roll-clearing" open>' in started.data
 
     guid = location.rsplit("/", 1)[-1]
     locked_edit = client.get(
@@ -2866,13 +2919,17 @@ def test_update_history_page_is_bilingual_and_linked_from_footer(client):
     assert "直接在場次頁管理球友".encode() in updates.data
     assert "系統會自動遞補最早加入的候補球友".encode() in updates.data
     assert "2026 年 7 月 28 日".encode() in updates.data
-    assert updates.data.count(b'class="update-entry"') == 11
+    assert updates.data.count(b'class="update-entry"') == 12
     assert updates.data.count(b'class="update-latest"') == 1
-    assert b'<time datetime="2026-09-03">' in updates.data
+    assert b'<time datetime="2026-10-24">' in updates.data
+    assert "更順手的場次導覽與管理".encode() in updates.data
+    assert "保留 44px 區域".encode() in updates.data
 
     client.set_cookie("court_lang", "en-us")
     english = client.get("/updates")
     assert b"The control panel keeps getting better." in english.data
+    assert b"Easier court navigation and event management" in english.data
+    assert b"top-right on screens up to 1024px" in english.data
     assert b"Court thumbnails ready to download" in english.data
     assert b"Download thumbnail button to every public court" in english.data
     assert b"Time displays that fit each member" in english.data
@@ -2906,7 +2963,7 @@ def test_update_history_is_loaded_and_validated_from_json(tmp_path):
     source_history = json.loads(history_path.read_text(encoding="utf-8"))
     assert tuple(source_history) == app_module.SITE_UPDATE_HISTORY
     assert app_module.SITE_UPDATE_HISTORY_PATH == history_path
-    assert len(source_history) == 11
+    assert len(source_history) == 12
 
     invalid_history_path = tmp_path / "invalid-update-history.json"
     invalid_history_path.write_text(

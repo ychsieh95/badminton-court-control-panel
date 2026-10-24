@@ -1,5 +1,38 @@
 [
   {
+    "date": "2026-10-24",
+    "date_label": {
+      "en-us": "October 24, 2026",
+      "zh-tw": "2026 年 10 月 24 日"
+    },
+    "title": {
+      "en-us": "Easier court navigation and event management",
+      "zh-tw": "更順手的場次導覽與管理"
+    },
+    "summary": {
+      "en-us": "Collapsible sections, a draggable section navigator, and clearer form controls make court pages easier to browse and manage.",
+      "zh-tw": "透過可收合區塊、可拖曳的浮動導覽及更清楚的表單控制，讓場次瀏覽與管理更方便。"
+    },
+    "items": {
+      "en-us": [
+        "Adds expand/collapse controls to court details and new/edit forms, including the court-information importer. Sections default to expanded, remember their state in cookies for one year, and reopen when form errors need attention.",
+        "Adds a floating navigator that tracks the current section and opens and scrolls to a selected section. It starts at the top-left on desktop and top-right on screens up to 1024px wide, below the page header.",
+        "Lets mouse and touch users drag the navigator to any screen edge to partially hide it, leaving a 44px handle to drag back or click to reveal. Menus adjust to the available space and respect reduced-motion preferences.",
+        "Adds independent check/uncheck-all controls for roll call and clearing across reserved and online members, with mixed-selection indicators. Changes are committed with the existing Save member statuses button.",
+        "Replaces minimum, maximum, and reserved-member count inputs with value selectors and aligns date/time editors by moving format hints below their inputs.",
+        "Restyles media selection with a themed upload card, localized file button, selected-file count, and existing photo/video previews."
+      ],
+      "zh-tw": [
+        "場次詳情與新增／編輯表單的各區塊（包含場次資訊匯入）皆可展開或收合；預設展開，以 Cookie 記住狀態一年，表單有錯誤時則自動展開相關區塊。",
+        "新增浮動區塊導覽，捲動時顯示目前區塊，選取後自動展開並跳轉；桌面預設位於頁首下方左上角，寬度不超過 1024px 的裝置則位於右上角。",
+        "滑鼠與觸控皆可將導覽拖至螢幕任一邊緣以部分隱藏，保留 44px 區域供拖回或點擊展開；選單會依可用空間調整位置，並遵循減少動畫偏好。",
+        "點名與結清各自新增全部勾選／取消控制，涵蓋預訂與線上報名球友，並顯示部分勾選狀態；變更仍需按「儲存成員狀態」才會儲存。",
+        "將最少、最多與已預訂人數改為數值下拉選單，並將時間格式提示移至輸入框下方，修正日期與時間欄位的對齊。",
+        "將媒體選擇改為主題化上傳卡片，提供本地化檔案按鈕、已選檔案數量，並保留相片與影片預覽。"
+      ]
+    }
+  },
+  {
     "date": "2026-09-03",
     "date_label": {
       "en-us": "September 3, 2026",

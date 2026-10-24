@@ -25,6 +25,220 @@
     window.location.reload();
   });
 
+  document.querySelectorAll('[data-court-section]').forEach((section) => {
+    section.addEventListener('toggle', () => {
+      const state = section.open ? 'expanded' : 'collapsed';
+      const secure = window.location.protocol === 'https:' ? ';secure' : '';
+      document.cookie = `court_section_${section.dataset.courtSection}=${state};path=/;max-age=31536000;samesite=lax${secure}`;
+    });
+  });
+
+  const sectionNavigator = document.querySelector('[data-section-navigator]');
+  if (sectionNavigator) {
+    const sections = Array.from(document.querySelectorAll(
+      '.court-form > details[data-court-section], .detail-main > details[data-court-section]'
+    ));
+    const currentLabel = sectionNavigator.querySelector('[data-current-section]');
+    const linksContainer = sectionNavigator.querySelector('[data-section-links]');
+    const trigger = sectionNavigator.querySelector('summary');
+    const entries = sections.map((section, index) => {
+      const title = section.dataset.sectionTitle || section.querySelector('h2').textContent.trim();
+      const number = section.querySelector('.form-section-number')?.textContent.trim()
+        || String(index + 1).padStart(2, '0');
+      const link = document.createElement('a');
+      link.href = `#${section.id}`;
+      const badge = document.createElement('span');
+      badge.textContent = number;
+      link.append(badge, document.createTextNode(title));
+      linksContainer.append(link);
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        section.open = true;
+        sectionNavigator.open = false;
+        section.querySelector('summary').focus({ preventScroll: true });
+        section.scrollIntoView({
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+          block: 'start',
+        });
+        setCurrentSection(section);
+      });
+      return { section, title, number, link };
+    });
+    let previousSection = null;
+    const setCurrentSection = (activeSection) => {
+      if (previousSection === activeSection) return;
+      previousSection = activeSection;
+      entries.forEach(({ section, title, number, link }) => {
+        if (section === activeSection) {
+          link.setAttribute('aria-current', 'location');
+          currentLabel.textContent = `${number} · ${title}`;
+        } else {
+          link.removeAttribute('aria-current');
+        }
+      });
+    };
+    const updateCurrentSection = () => {
+      if (!sections.length) return;
+      const marker = (document.querySelector('.site-header')?.getBoundingClientRect().bottom || 0) + 32;
+      let active = sections[0];
+      sections.forEach((section) => {
+        if (section.getBoundingClientRect().top <= marker) active = section;
+      });
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) {
+        active = sections[sections.length - 1];
+      }
+      setCurrentSection(active);
+    };
+    let updatePending = false;
+    const scheduleSectionUpdate = () => {
+      if (updatePending) return;
+      updatePending = true;
+      window.requestAnimationFrame(() => {
+        updatePending = false;
+        updateCurrentSection();
+      });
+    };
+    window.addEventListener('scroll', scheduleSectionUpdate, { passive: true });
+    window.addEventListener('resize', scheduleSectionUpdate);
+    sections.forEach((section) => section.addEventListener('toggle', scheduleSectionUpdate));
+    if (window.ResizeObserver) {
+      new window.ResizeObserver(scheduleSectionUpdate).observe(sections[0].parentElement);
+    }
+    document.addEventListener('click', (event) => {
+      if (!sectionNavigator.contains(event.target)) sectionNavigator.open = false;
+    });
+    sectionNavigator.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        sectionNavigator.open = false;
+        trigger.focus();
+      }
+    });
+
+    // Keep a finger-sized part of the navigator reachable at every edge.
+    const visibleHandle = 44;
+    const edgeGap = 12;
+    let navigatorPosition = null;
+    let drag = null;
+    let suppressDragClick = false;
+    const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
+    const placeNavigator = (x, y) => {
+      const { width, height } = trigger.getBoundingClientRect();
+      navigatorPosition = {
+        x: clamp(x, visibleHandle - width, window.innerWidth - visibleHandle),
+        y: clamp(y, visibleHandle - height, window.innerHeight - visibleHandle),
+      };
+      Object.assign(sectionNavigator.style, {
+        left: `${navigatorPosition.x}px`, top: `${navigatorPosition.y}px`,
+        right: 'auto', bottom: 'auto',
+      });
+    };
+    const revealNavigator = () => {
+      const rect = trigger.getBoundingClientRect();
+      const { x, y } = navigatorPosition || { x: rect.left, y: rect.top };
+      placeNavigator(
+        clamp(x, edgeGap, Math.max(edgeGap, window.innerWidth - rect.width - edgeGap)),
+        clamp(y, edgeGap, Math.max(edgeGap, window.innerHeight - rect.height - edgeGap))
+      );
+      delete sectionNavigator.dataset.tucked;
+    };
+    const positionNavigatorMenu = () => {
+      if (!sectionNavigator.open) return;
+      revealNavigator();
+      const rect = trigger.getBoundingClientRect();
+      const above = rect.top - edgeGap - 10;
+      const below = window.innerHeight - rect.bottom - edgeGap - 10;
+      sectionNavigator.dataset.menuBelow = String(below > above);
+      sectionNavigator.style.setProperty('--section-menu-height', `${Math.max(44, Math.max(above, below))}px`);
+    };
+    const tuckNavigator = () => {
+      const rect = trigger.getBoundingClientRect();
+      const { x, y } = navigatorPosition;
+      const edges = [
+        ['left', x], ['right', window.innerWidth - x - rect.width],
+        ['top', y], ['bottom', window.innerHeight - y - rect.height],
+      ].sort((a, b) => a[1] - b[1]);
+      const edge = edges[0][1] <= edgeGap ? edges[0][0] : null;
+      delete sectionNavigator.dataset.tucked;
+      if (edge) {
+        sectionNavigator.dataset.tucked = edge;
+        placeNavigator(
+          edge === 'left' ? visibleHandle - rect.width : edge === 'right' ? window.innerWidth - visibleHandle : x,
+          edge === 'top' ? visibleHandle - rect.height : edge === 'bottom' ? window.innerHeight - visibleHandle : y
+        );
+      }
+    };
+    trigger.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 || event.isPrimary === false) return;
+      const rect = trigger.getBoundingClientRect();
+      drag = { id: event.pointerId, x: event.clientX, y: event.clientY, left: rect.left, top: rect.top, moved: false };
+      trigger.setPointerCapture(event.pointerId);
+    });
+    trigger.addEventListener('pointermove', (event) => {
+      if (!drag || drag.id !== event.pointerId) return;
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+      drag.moved = true;
+      sectionNavigator.open = false;
+      sectionNavigator.dataset.dragging = 'true';
+      delete sectionNavigator.dataset.tucked;
+      placeNavigator(drag.left + dx, drag.top + dy);
+    });
+    const finishNavigatorDrag = (event) => {
+      if (!drag || drag.id !== event.pointerId) return;
+      const moved = drag.moved;
+      drag = null;
+      delete sectionNavigator.dataset.dragging;
+      if (trigger.hasPointerCapture(event.pointerId)) trigger.releasePointerCapture(event.pointerId);
+      if (moved) {
+        tuckNavigator();
+        suppressDragClick = event.type === 'pointerup';
+        window.setTimeout(() => { suppressDragClick = false; }, 0);
+      }
+    };
+    trigger.addEventListener('pointerup', finishNavigatorDrag);
+    trigger.addEventListener('pointercancel', finishNavigatorDrag);
+    trigger.addEventListener('lostpointercapture', finishNavigatorDrag);
+    trigger.addEventListener('click', (event) => {
+      if (suppressDragClick) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    });
+    sectionNavigator.addEventListener('toggle', positionNavigatorMenu);
+    window.addEventListener('resize', () => {
+      if (!navigatorPosition) return;
+      const { width, height } = trigger.getBoundingClientRect();
+      const edge = sectionNavigator.dataset.tucked;
+      placeNavigator(
+        edge === 'left' ? visibleHandle - width : edge === 'right' ? window.innerWidth - visibleHandle : navigatorPosition.x,
+        edge === 'top' ? visibleHandle - height : edge === 'bottom' ? window.innerHeight - visibleHandle : navigatorPosition.y
+      );
+      positionNavigatorMenu();
+    });
+    updateCurrentSection();
+    sectionNavigator.hidden = false;
+  }
+
+  document.querySelectorAll('[data-status-all]').forEach((toggle) => {
+    const column = toggle.dataset.statusAll;
+    const checkboxes = Array.from(toggle.form.querySelectorAll(
+      `input[name="reserved_${column}"], input[name="participant_${column}"]`
+    ));
+    const updateToggle = () => {
+      const checkedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+      toggle.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+      toggle.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+      toggle.disabled = checkboxes.length === 0;
+    };
+    toggle.addEventListener('change', () => {
+      checkboxes.forEach((checkbox) => { checkbox.checked = toggle.checked; });
+      updateToggle();
+    });
+    checkboxes.forEach((checkbox) => checkbox.addEventListener('change', updateToggle));
+    updateToggle();
+  });
+
   const firstVisitPrompt = document.querySelector('[data-first-visit-prompt]');
   const firstVisitStorageKey = 'court-introduction-prompt-seen-v1';
   if (firstVisitPrompt) {
@@ -466,8 +680,15 @@
 
   const courtMediaInput = document.querySelector('[data-court-media-input]');
   const courtMediaPreview = document.querySelector('[data-court-media-preview]');
+  const courtMediaStatus = document.querySelector('[data-media-upload-status]');
   let courtMediaPreviewUrls = [];
   courtMediaInput?.addEventListener('change', () => {
+    if (courtMediaStatus) {
+      const count = courtMediaInput.files?.length || 0;
+      courtMediaStatus.textContent = count
+        ? courtMediaStatus.dataset.selectedLabel.replace('{count}', String(count))
+        : courtMediaStatus.dataset.emptyLabel;
+    }
     courtMediaPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
     courtMediaPreviewUrls = [];
     if (!courtMediaPreview) return;

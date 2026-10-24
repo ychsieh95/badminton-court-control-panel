@@ -3,6 +3,28 @@
 {% set form_console_key = console_key|default('admin_console') %}
 {% block title %}{{ t('edit_title') if editing else t('new_court') }} · {{ t('brand') }}{% endblock %}
 {% block content %}
+{% macro form_section_state(key, fields=[]) -%}
+  {% set state = namespace(has_errors=false) %}
+  {% for field in fields %}
+    {% if errors.get(field) %}{% set state.has_errors = true %}{% endif %}
+  {% endfor %}
+  data-court-section="form-{{ key }}"{% if state.has_errors or request.cookies.get('court_section_form-' ~ key) != 'collapsed' %} open{% endif %}
+{%- endmacro %}
+{% macro form_section(number, key, title, fields, description='') %}
+  <details id="form-section-{{ key }}" class="panel form-section" {{ form_section_state(key, fields) }}>
+    <summary class="court-section-summary form-section-summary">
+      <span class="form-section-number">{{ number }}</span>
+      <div class="form-section-heading">
+        <h2>{{ t(title) }}</h2>
+        {% if description %}<p>{{ t(description) }}</p>{% endif %}
+      </div>
+      <svg class="section-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+    </summary>
+    <div class="form-section-content">
+      {{ caller() }}
+    </div>
+  </details>
+{% endmacro %}
 <section class="page-header page-header-small">
   <div class="shell">
     <a class="back-link" href="{{ url_for(back_route) }}">
@@ -20,7 +42,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     {% if not editing %}
-      <details class="panel court-info-import" {% if errors.court_info_file %}open{% endif %}>
+      <details id="form-section-import" class="panel court-info-import" {{ form_section_state('import', ['court_info_file']) }}>
         <summary class="court-info-import-summary">
           <span class="form-section-number">MD</span>
           <div class="form-section-heading">
@@ -49,12 +71,7 @@
       </details>
     {% endif %}
 
-    <article class="panel form-section">
-      <div class="form-section-number">01</div>
-      <div class="form-section-content">
-        <div class="form-section-heading">
-          <h2>{{ t('event_information') }}</h2>
-        </div>
+    {% call form_section('01', 'event', 'event_information', ['badminton_name', 'court_date', 'end_time', 'event_name', 'leave_deadline_at', 'leave_deadline_enabled', 'start_time']) %}
         <div class="form-grid form-grid-2 event-name-fields">
           <label class="field">
             <span>{{ t('event_name') }} <small class="field-hint-inline">{{ t('optional') }}</small></span>
@@ -86,13 +103,15 @@
             {% if errors.court_date %}<small class="field-error">{{ errors.court_date }}</small>{% endif %}
           </label>
           <label class="field">
-            <span>{{ t('start_time') }} <small class="field-hint-inline">{{ t('time_hint') }}</small></span>
+            <span>{{ t('start_time') }}</span>
             <input type="text" name="start_time" value="{{ values.start_time }}" inputmode="numeric" pattern="(?:[01]\d|2[0-3]):[0-5]\d" minlength="5" maxlength="5" placeholder="19:00" required data-time24 class="{% if errors.start_time %}invalid{% endif %}">
+            <small class="field-help">{{ t('time_hint') }}</small>
             {% if errors.start_time %}<small class="field-error">{{ errors.start_time }}</small>{% endif %}
           </label>
           <label class="field">
-            <span>{{ t('end_time') }} <small class="field-hint-inline">{{ t('time_hint') }}</small></span>
+            <span>{{ t('end_time') }}</span>
             <input type="text" name="end_time" value="{{ values.end_time }}" inputmode="numeric" pattern="(?:[01]\d|2[0-3]):[0-5]\d" minlength="5" maxlength="5" placeholder="21:00" required data-time24 class="{% if errors.end_time %}invalid{% endif %}">
+            <small class="field-help">{{ t('time_hint') }}</small>
             {% if errors.end_time %}<small class="field-error">{{ errors.end_time }}</small>{% endif %}
           </label>
         </div>
@@ -127,7 +146,7 @@
                 >
               </label>
               <label class="field">
-                <span>{{ t('time') }} <small class="field-hint-inline">{{ t('time_hint') }}</small></span>
+                <span>{{ t('time') }}</span>
                 <input
                   type="text"
                   name="leave_deadline_time"
@@ -142,21 +161,16 @@
                   data-leave-deadline-time
                   {% if values.leave_deadline_enabled|string == '1' %}required{% endif %}
                 >
+                <small class="field-help">{{ t('time_hint') }}</small>
               </label>
             </div>
             {% if errors.leave_deadline_at %}<small class="field-error">{{ errors.leave_deadline_at }}</small>{% endif %}
           </div>
           {% if errors.leave_deadline_enabled %}<small class="field-error">{{ errors.leave_deadline_enabled }}</small>{% endif %}
         </div>
-      </div>
-    </article>
+    {% endcall %}
 
-    <article class="panel form-section">
-      <div class="form-section-number">02</div>
-      <div class="form-section-content">
-        <div class="form-section-heading">
-          <h2>{{ t('hall') }}</h2>
-        </div>
+    {% call form_section('02', 'hall', 'hall', ['court_id', 'hall_name', 'location']) %}
         <div class="form-grid form-grid-2">
           {% if allow_save_location|default(false) %}
           <label class="field field-wide">
@@ -215,30 +229,35 @@
             {% if errors.court_id %}<small class="field-error">{{ errors.court_id }}</small>{% endif %}
           </label>
         </div>
-      </div>
-    </article>
+    {% endcall %}
 
-    <article class="panel form-section">
-      <div class="form-section-number">03</div>
-      <div class="form-section-content">
-        <div class="form-section-heading">
-          <h2>{{ t('members') }}</h2>
-          <p>{{ t('ordered_help') }}</p>
-        </div>
+    {% call form_section('03', 'members', 'members', ['member_max', 'member_min', 'ordered_count', 'reserved_names_visible', 'reserved_nicknames'], 'ordered_help') %}
         <div class="form-grid form-grid-3">
           <label class="field">
             <span>{{ t('member_min') }}</span>
-            <input type="number" name="member_min" value="{{ values.member_min }}" min="1" max="99" required class="{% if errors.member_min %}invalid{% endif %}">
+            <select name="member_min" required class="{% if errors.member_min %}invalid{% endif %}">
+              {% for count in range(1, 100) %}
+                <option value="{{ count }}" {% if values.member_min|string == count|string %}selected{% endif %}>{{ count }}</option>
+              {% endfor %}
+            </select>
             {% if errors.member_min %}<small class="field-error">{{ errors.member_min }}</small>{% endif %}
           </label>
           <label class="field">
             <span>{{ t('member_max') }}</span>
-            <input type="number" name="member_max" value="{{ values.member_max }}" min="1" max="99" required class="{% if errors.member_max %}invalid{% endif %}">
+            <select name="member_max" required class="{% if errors.member_max %}invalid{% endif %}">
+              {% for count in range(1, 100) %}
+                <option value="{{ count }}" {% if values.member_max|string == count|string %}selected{% endif %}>{{ count }}</option>
+              {% endfor %}
+            </select>
             {% if errors.member_max %}<small class="field-error">{{ errors.member_max }}</small>{% endif %}
           </label>
           <label class="field">
             <span>{{ t('ordered_count') }}</span>
-            <input id="ordered-count" type="number" name="ordered_count" value="{{ values.ordered_count }}" min="0" max="99" required class="{% if errors.ordered_count %}invalid{% endif %}">
+            <select id="ordered-count" name="ordered_count" required class="{% if errors.ordered_count %}invalid{% endif %}">
+              {% for count in range(0, 100) %}
+                <option value="{{ count }}" {% if values.ordered_count|string == count|string %}selected{% endif %}>{{ count }}</option>
+              {% endfor %}
+            </select>
             {% if errors.ordered_count %}<small class="field-error">{{ errors.ordered_count }}</small>{% endif %}
           </label>
         </div>
@@ -330,15 +349,9 @@
             {% endif %}
           </section>
         {% endif %}
-      </div>
-    </article>
+    {% endcall %}
 
-    <article class="panel form-section">
-      <div class="form-section-number">04</div>
-      <div class="form-section-content">
-        <div class="form-section-heading">
-          <h2>{{ t('price_and_shuttlecock') }}</h2>
-        </div>
+    {% call form_section('04', 'price', 'price_and_shuttlecock', ['female_price', 'male_price', 'shuttlecock_info']) %}
         <div class="form-grid form-grid-2">
           <label class="field">
             <span>{{ t('male_price') }} <small class="field-hint-inline">{{ t('price_hint') }}</small></span>
@@ -356,16 +369,9 @@
             {% if errors.shuttlecock_info %}<small class="field-error">{{ errors.shuttlecock_info }}</small>{% endif %}
           </label>
         </div>
-      </div>
-    </article>
+    {% endcall %}
 
-    <article class="panel form-section">
-      <div class="form-section-number">05</div>
-      <div class="form-section-content">
-        <div class="form-section-heading">
-          <h2>{{ t('level') }}</h2>
-          <p>{{ t('level_guide_text') }}</p>
-        </div>
+    {% call form_section('05', 'level', 'level', ['female_level_max', 'female_level_min', 'male_level_max', 'male_level_min'], 'level_guide_text') %}
         <div class="level-form-group">
           <div class="level-form-label"><span class="gender-symbol male-symbol">♂</span><strong>{{ t('male') }}</strong></div>
           <div class="form-grid form-grid-2">
@@ -404,30 +410,17 @@
             </label>
           </div>
         </div>
-      </div>
-    </article>
+    {% endcall %}
 
-    <article class="panel form-section">
-      <div class="form-section-number">06</div>
-      <div class="form-section-content">
-        <div class="form-section-heading">
-          <h2>{{ t('remark') }}</h2>
-        </div>
+    {% call form_section('06', 'remark', 'remark', ['remark']) %}
         <label class="field">
           <span>{{ t('remark') }}</span>
           <textarea name="remark" maxlength="2000" rows="5" placeholder="{{ t('remark_placeholder') }}" class="{% if errors.remark %}invalid{% endif %}">{{ values.remark }}</textarea>
           {% if errors.remark %}<small class="field-error">{{ errors.remark }}</small>{% endif %}
         </label>
-      </div>
-    </article>
+    {% endcall %}
 
-    <article class="panel form-section">
-      <div class="form-section-number">07</div>
-      <div class="form-section-content">
-        <div class="form-section-heading">
-          <h2>{{ t('event_media') }}</h2>
-          <p>{{ t('event_media_body') }}</p>
-        </div>
+    {% call form_section('07', 'media', 'event_media', ['media'], 'event_media_body') %}
         {% if court_media %}
           <p class="media-section-label">{{ t('current_media') }}</p>
           <div class="media-editor-grid">
@@ -456,13 +449,23 @@
             accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
             class="{% if errors.media %}invalid{% endif %}"
             data-court-media-input
+            aria-describedby="media-upload-help media-upload-status"
           >
-          <small class="field-help">{{ t('media_upload_help') }}</small>
+          <span class="media-upload-picker">
+            <span class="media-upload-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4"/></svg>
+            </span>
+            <span class="media-upload-copy">
+              <strong>{{ t('media_upload') }}</strong>
+              <small id="media-upload-status" data-media-upload-status data-empty-label="{{ t('media_choose_multiple') }}" data-selected-label="{{ t('media_files_selected') }}" role="status">{{ t('media_choose_multiple') }}</small>
+            </span>
+            <span class="media-upload-button">{{ t('media_browse_files') }}</span>
+          </span>
+          <small class="field-help" id="media-upload-help">{{ t('media_upload_help') }}</small>
           {% if errors.media %}<small class="field-error">{{ t(errors.media) }}</small>{% endif %}
         </label>
         <div class="media-upload-preview" data-court-media-preview aria-live="polite"></div>
-      </div>
-    </article>
+    {% endcall %}
 
     <div class="form-actions">
       <a class="button button-ghost" href="{{ url_for(back_route) }}">{{ t('cancel') }}</a>
@@ -470,6 +473,7 @@
     </div>
   </form>
 </section>
+{% include '_section_navigator.html' %}
 {% endblock %}
 {% block scripts %}
   {% if google_maps_api_key %}
