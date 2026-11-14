@@ -14,7 +14,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 - Enter a FIFO waiting list automatically when confirmed places are full.
 - Opt in to court-specific system push notifications when event information or the member list changes.
 - View the schedule, weekday, hall, location, prices, shuttlecock, levels, organizer, remarks, participant lists, and event media.
-- Share court links with a 1200×630 social preview generated from the first event photo, a frame from the first event video, or the event information when no media exists.
+- Share court links with a 1200×630 social preview. The preview uses the first event photo or a frame from the first event video. If no media exists, it uses the event information.
 - Download that current 1200×630 preview as a descriptively named JPEG directly from the public court detail page.
 - Use a floating, accessible join dialog on mobile screens.
 - Collapse court sections and jump between them using a draggable floating section navigator.
@@ -23,9 +23,9 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 
 - Create an account and manage personal events from `/my-courts`.
 - Publish optional event and badminton-group names with permanent UUID links in the form `https://your-domain.example/<GUID>`.
-- Configure the date, 24-hour start/end time, Google Place hall, court ID, capacity range, reserved places, male/female level ranges, prices, shuttlecock, and remarks.
+- Configure the date, 24-hour start/end time, Google Place hall, and court ID. Set the capacity range and reserved places. Set male/female level ranges, prices, shuttlecock, and remarks.
 - Optionally set an exact local date and explicit 24-hour `HH:MM` time after which players cannot leave the event themselves. This restriction is disabled by default.
-- Choose a persistent 12-hour (AM/PM) or 24-hour display format from the profile page; court schedules, leave deadlines, login times, and audit timestamps follow the signed-in member’s preference.
+- Choose a 12-hour (AM/PM) or 24-hour display format on the profile page. The app saves this preference. Court schedules, leave deadlines, login times, and audit timestamps use the signed-in member’s preference.
 - Save frequently used hall locations while creating an event, reuse them without searching, and delete them from the profile page.
 - Add, remove, or reorder individual reserved-player nickname rows while creating or editing an event, and choose whether visitors can see the names.
 - Select minimum, maximum, and reserved-member counts from dropdowns; reserved-nickname rows follow the reserved count.
@@ -102,7 +102,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Update `.env`, then start the development server:
+Update `.env`. Start the development server:
 
 ```bash
 flask --app app run --debug
@@ -156,13 +156,13 @@ Values already present in the process environment take precedence over `.env`.
 
 ## Cloudflare Turnstile
 
-Create a [Turnstile widget](https://developers.cloudflare.com/turnstile/get-started/), allow the deployed hostname, and set both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` to protect `/signup`, the shared `/login` page, and the `/contact` message form. The widget uses the `signup`, `login`, or `contact_message` action, and the server validates both the token and matching action before processing the request.
+Create a [Turnstile widget](https://developers.cloudflare.com/turnstile/get-started/). Allow the deployed hostname. Set both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. These settings protect `/signup`, the shared `/login` page, and the `/contact` message form. The widget uses the `signup`, `login`, or `contact_message` action, and the server validates both the token and matching action before processing the request.
 
 Missing, rejected, expired, reused, oversized, malformed, action-mismatched, and unverifiable tokens are denied. If either key is empty or Flask debug mode is active, Turnstile is disabled. The secret key is used only for server-to-server verification and is never rendered into HTML. Cloudflare provides [dedicated test sitekeys and secret keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) for automated testing and localhost; never deploy those test credentials to production.
 
 ## Contact message notifications
 
-Public messages are always committed to SQLite before optional external delivery. Configure `CONTACT_DISCORD_WEBHOOK_URL` and/or both Telegram settings, then an administrator or super-administrator can enable notifications from `/admin/messages`. Discord URLs must be official HTTPS incoming-webhook endpoints; Telegram bot tokens and chat IDs are validated before the switch becomes available. Webhook URLs and bot tokens remain server-side and are never rendered in the inbox. A timeout or provider error is logged without its secret endpoint and does not discard the stored message.
+Public messages are always committed to SQLite before optional external delivery. Configure `CONTACT_DISCORD_WEBHOOK_URL` and/or both Telegram settings. An administrator or super-administrator can then enable notifications from `/admin/messages`. Discord URLs must be official HTTPS incoming-webhook endpoints; Telegram bot tokens and chat IDs are validated before the switch becomes available. Webhook URLs and bot tokens remain server-side and are never rendered in the inbox. A timeout or provider error is logged without its secret endpoint and does not discard the stored message.
 
 ## Google hall search
 
@@ -187,15 +187,15 @@ Drag the navigator with a mouse or touch toward any screen edge to partially hid
 
 ## Court information import and export
 
-From a court’s organizer action menu, choose **Export** to download a file named `yyyy-MM-dd_HHmm_HHmm_<name>.md`, where the two times are the event’s start and end times. The final name uses the event name when present and otherwise uses the hall name. Open the **Court information file** section at the top of `/courts/new` if it is collapsed and choose that file to prefill a new event. Importing only fills the form; the organizer must review and save it before a court is created. The section automatically opens when an import error needs attention.
+From a court’s organizer action menu, choose **Export** to download a file named `yyyy-MM-dd_HHmm_HHmm_<name>.md`, where the two times are the event’s start and end times. The final name uses the event name when present and otherwise uses the hall name. If collapsed, open the **Court information file** section at the top of `/courts/new`. Choose that file to prefill a new event. Importing only fills the form; the organizer must review and save it before a court is created. The section automatically opens when an import error needs attention.
 
 The versioned Markdown file contains reusable court fields and reserved-player nicknames in a readable JSON block. It intentionally excludes registrations, participant PINs, join/leave history, media files, ownership, and the original public GUID. Imports are limited to 64 KB and pass through the normal court validation before saving.
 
-Administrators can also choose **Export all courts (CSV)** on `/admin`. The UTF-8-with-BOM file contains one row for every existing event, including archived and expired courts, with event configuration, organizer/status information, counts, reserved nicknames, media count, and public URL. Participant PINs and join/leave history are not exported.
+Administrators can also choose **Export all courts (CSV)** on `/admin`. The file uses UTF-8 with a BOM. It contains one row per existing event, including archived and expired courts. Each row includes event configuration, organizer/status information, counts, reserved nicknames, media count, and the public URL. Participant PINs and join/leave history are not exported.
 
 ## System push notifications
 
-Each court page includes an opt-in switch for browser/system notifications. Notifications are sent when an organizer edits, archives, restores, locks/unlocks, or deletes that court, and when a player successfully joins, enters the waiting list, or leaves. Failed join/leave attempts and individual roll-call checkbox changes do not send pushes.
+Each court page includes an opt-in switch for browser/system notifications. The app sends notifications when an organizer edits, archives, restores, locks/unlocks, or deletes that court. It also sends notifications when a player successfully joins, enters the waiting list, or leaves. Failed join/leave attempts and individual roll-call checkbox changes do not send pushes.
 
 Generate one persistent VAPID key pair:
 
@@ -227,7 +227,7 @@ docker compose -f docker/compose.yaml up -d --build
 
 Compose loads the project-root `.env`, publishes port `8080`, and mounts the named volume `badminton-court-control-data` at `/instance`. The image links `/app/instance` to this directory, so the SQLite database, avatars, and court media persist when containers are recreated. The image runs as UID `1654` by default; set `APP_UID` when building if the persistent volume must use another numeric owner.
 
-If the named volume was created by an older root-running image, update its ownership once before starting the new image (replace `1654` if you build with another `APP_UID`):
+An older image that ran as root might have created the named volume. In that case, update its ownership once before starting the new image. Replace `1654` if you build with another `APP_UID`:
 
 ```bash
 docker run --rm --user 0 --entrypoint chown \
@@ -262,7 +262,7 @@ The image uses `app.py` as the uWSGI module and serves it through Nginx on port 
 
 ### Health check
 
-The image defines a `HEALTHCHECK` that requests `/healthz` every 30 seconds, with a 5-second timeout, a 20-second start period, and 3 retries. The endpoint runs a `SELECT 1` database probe and returns `{"status": "ok"}`, so the container becomes unhealthy when the application or its SQLite database stops responding. Inspect the current state with:
+The image defines a `HEALTHCHECK` that requests `/healthz` every 30 seconds, with a 5-second timeout, a 20-second start period, and 3 retries. The endpoint runs a `SELECT 1` database probe and returns `{"status": "ok"}`. The container becomes unhealthy when the application or its SQLite database stops responding. Inspect the current state with:
 
 ```bash
 docker compose -f docker/compose.yaml ps
@@ -273,7 +273,7 @@ External uptime monitors and reverse-proxy checks can poll the same `/healthz` p
 
 ### Nginx reverse proxy and client IP addresses
 
-When another Nginx instance proxies to the published Docker port, the container sees the Docker bridge gateway (often `172.18.0.1`) as the direct peer. To record the visitor address, set `TRUST_PROXY_HEADERS=1` in `.env` and make the public-facing trusted proxy replace—not append untrusted input to—the forwarded headers:
+When another Nginx instance proxies to the published Docker port, the container sees the Docker bridge gateway (often `172.18.0.1`) as the direct peer. To record the visitor address, set `TRUST_PROXY_HEADERS=1` in `.env`. Configure the public-facing trusted proxy to replace forwarded headers. It must not append untrusted input:
 
 ```nginx
 location / {
@@ -295,7 +295,7 @@ docker compose -f docker/compose.yaml up -d --force-recreate app
 docker compose -f docker/compose.yaml exec app printenv TRUST_PROXY_HEADERS
 ```
 
-The final command must print `1`. Enable this setting only when the application is reachable exclusively through a trusted proxy that overwrites these headers. If Cloudflare or another proxy is in front of Nginx, configure Nginx’s real-IP module with that provider’s trusted address ranges first.
+The final command must print `1`. Enable this setting only when the application is reachable exclusively through a trusted proxy that overwrites these headers. If a proxy is in front of Nginx, first configure Nginx’s real-IP module with the provider’s trusted address ranges. This includes Cloudflare.
 
 ## Security and privacy
 
@@ -315,7 +315,7 @@ The final command must print `1`. Enable this setting only when the application 
 ## Event lifecycle and storage
 
 - Events expire automatically after their configured date and end time. Expired events become read-only and are hidden from default listings.
-- An enabled leave deadline is enforced independently before event expiry; players may still join, but cannot remove themselves at or after the configured local minute.
+- The app enforces an enabled leave deadline independently before event expiry. Players can still join. They cannot remove themselves at or after the configured local minute.
 - Archived events remain available through direct links and organizer or administrator dashboards.
 - SQLite data is stored in `instance/courts.sqlite` unless `COURT_DATABASE` is configured.
 - Avatars are stored under `instance/avatars`.

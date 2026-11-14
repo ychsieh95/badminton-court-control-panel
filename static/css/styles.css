@@ -5716,6 +5716,25 @@ td small {
   box-shadow: var(--shadow-sm);
 }
 
+.court-info-upload-field {
+  min-width: 0;
+}
+
+.court-info-upload-picker {
+  gap: 12px;
+  padding: 14px;
+}
+
+.court-info-upload-picker .media-upload-copy {
+  min-width: 0;
+}
+
+.court-info-upload-picker .media-upload-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .media-upload-preview {
   margin-top: 14px;
 }

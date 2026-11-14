@@ -53,14 +53,27 @@
         </summary>
         <div class="court-info-import-body">
           <div class="court-info-import-controls">
-            <label class="field">
+            <label class="field media-upload-field court-info-upload-field">
               <span>{{ t('court_info_choose') }}</span>
               <input
                 type="file"
                 name="court_info_file"
                 accept=".md,text/markdown,text/plain"
                 class="{% if errors.court_info_file %}invalid{% endif %}"
+                data-court-info-input
+                aria-describedby="court-info-file-status"
+                {% if errors.court_info_file %}aria-invalid="true"{% endif %}
               >
+              <span class="media-upload-picker court-info-upload-picker">
+                <span class="media-upload-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M14 3H6v18h12V7l-4-4Zm0 0v5h4M9 12h6m-6 4h6"/></svg>
+                </span>
+                <span class="media-upload-copy">
+                  <strong>court_info.md</strong>
+                  <small id="court-info-file-status" data-court-info-status data-empty-label="{{ t('court_info_no_file') }}" role="status">{{ t('court_info_no_file') }}</small>
+                </span>
+                <span class="media-upload-button">{{ t('media_browse_files') }}</span>
+              </span>
               {% if errors.court_info_file %}<small class="field-error">{{ t(errors.court_info_file) }}</small>{% endif %}
             </label>
             <button class="button button-secondary" type="submit" name="form_action" value="import_court_info">

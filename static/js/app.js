@@ -678,6 +678,15 @@
     previousFromDate = nextFromDate;
   });
 
+  const courtInfoInput = document.querySelector('[data-court-info-input]');
+  const courtInfoStatus = document.querySelector('[data-court-info-status]');
+  courtInfoInput?.addEventListener('change', () => {
+    if (!courtInfoStatus) return;
+    const filename = courtInfoInput.files?.[0]?.name || '';
+    courtInfoStatus.textContent = filename || courtInfoStatus.dataset.emptyLabel;
+    courtInfoStatus.title = filename;
+  });
+
   const courtMediaInput = document.querySelector('[data-court-media-input]');
   const courtMediaPreview = document.querySelector('[data-court-media-preview]');
   const courtMediaStatus = document.querySelector('[data-media-upload-status]');
