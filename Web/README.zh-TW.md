@@ -86,6 +86,7 @@ Badminton Court Control Panel 是一套支援雙語的 Flask 羽球活動管理�
 | `/admin/courts/export.csv` | 僅限管理員匯出所有場次活動 |
 | `/admin/users` | 會員管理 |
 | `/licenses` | 素材授權及開發協助說明 |
+| `/api/v1/...` | 提供 App 與外部整合使用的 JSON API（請見 [API.md](API.md)） |
 
 ## 更新紀錄內容
 
@@ -93,7 +94,7 @@ Badminton Court Control Panel 是一套支援雙語的 Flask 羽球活動管理�
 
 ## 本機安裝
 
-建議使用 Python 3.10 或更新版本。
+建議使用 Python 3.10 或更新版本。網站程式位於儲存庫的 `Web/` 目錄，本文件中的所有指令都請在該目錄執行。
 
 ```bash
 python3 -m venv .venv
@@ -130,6 +131,8 @@ flask --app app run --debug
 | `WEB_PUSH_PRIVATE_KEY` | 空白 | 私密 VAPID 金鑰內容或 PEM 檔案路徑。 |
 | `WEB_PUSH_SUBJECT` | 空白 | VAPID 聲明使用的營運者聯絡 URI，例如 `mailto:admin@example.com`。 |
 | `WEB_PUSH_TIMEOUT` | `5` | 每個推播接收者的傳送逾時秒數。 |
+| `FCM_SERVICE_ACCOUNT_FILE` | 空白 | Firebase 服務帳戶金鑰 JSON 的路徑。設定後 Android App 可透過 Firebase 雲端通訊（FCM）接收通知。 |
+| `FCM_TIMEOUT` | `5` | 每個 FCM 接收者的傳送逾時秒數。 |
 | `SOCIAL_THUMBNAIL_FFMPEG` | 內附執行檔 | 第一個活動媒體是影片時，用來覆寫擷取預覽畫面的 FFmpeg 執行檔。 |
 | `SOCIAL_THUMBNAIL_FONT` | 內附 Noto Sans TC | 可選用的 TrueType/OpenType 字型路徑，用來覆寫產生活動資訊縮圖時使用的內附字型。 |
 | `SESSION_COOKIE_SECURE` | `0` | 網站完全透過 HTTPS 提供時設為 `1`。 |
@@ -143,14 +146,16 @@ flask --app app run --debug
 | `ADMIN_CONTACT_DISCORD` | 空白 | 選用的 Discord 邀請碼；`/contact` 會自動組成官方 `discord.gg` 連結。 |
 | `ADMIN_CONTACT_LINE` | 空白 | 選用的 LINE 官方帳號 ID（可含或不含 `@`）；`/contact` 會自動組成官方 `line.me` 連結。 |
 | `ADMIN_CONTACT_TELEGRAM` | 空白 | 選用的 Telegram 公開使用者名稱（可含或不含 `@`）；`/contact` 會自動組成官方 `t.me` 連結。 |
-| `CONTACT_DISCORD_WEBHOOK_URL` | 空白 | 啟用新留言通知時使用的私密 Discord Incoming Webhook 網址。 |
-| `CONTACT_TELEGRAM_BOT_TOKEN` | 空白 | 啟用新留言通知時使用的私密 Telegram Bot API Token。 |
-| `CONTACT_TELEGRAM_CHAT_ID` | 空白 | 接收通知的 Telegram 數字 Chat ID 或公開 `@channel` 使用者名稱。 |
+| `CONTACT_DISCORD_WEBHOOK_URL` | 空白 | 管理員啟用後，用於新留言通知的私密 Discord Incoming Webhook 網址。 |
+| `CONTACT_TELEGRAM_BOT_TOKEN` | 空白 | 私密 Telegram Bot API Token；與 `CONTACT_TELEGRAM_CHAT_ID` 一併設定後，每則新聯絡留言都會回報至 Telegram。 |
+| `CONTACT_TELEGRAM_CHAT_ID` | 空白 | 接收聯絡回報的 Telegram 數字 Chat ID 或公開 `@channel` 使用者名稱。 |
 | `CONTACT_NOTIFICATION_TIMEOUT` | `5` | Discord／Telegram 各服務的傳送逾時秒數。 |
+| `ANDROID_APP_URL` | 空白 | 選用的 HTTPS 下載連結（例如 Google Play 頁面），顯示於 `/android` 頁面；未設定時，頁面會請訪客與我們聯絡。 |
 | `LOGIN_MAX_ATTEMPTS` | `5` | 暫時鎖定前允許的登入失敗次數。 |
 | `LOGIN_LOCKOUT_SECONDS` | `900` | 暫時鎖定秒數。 |
 | `LEAVE_MAX_ATTEMPTS` | `5` | 每個場次、暱稱及用戶端 IP 在暫時鎖定前允許的錯誤暱稱／PIN 碼退出嘗試次數。 |
 | `LEAVE_LOCKOUT_SECONDS` | `900` | 退出場次嘗試的暫時鎖定秒數。 |
+| `API_TOKEN_TTL_DAYS` | `90` | JSON API 核發之存取權杖的有效天數。 |
 
 處理程序環境中已存在的變數會優先於 `.env`。
 
@@ -162,7 +167,7 @@ flask --app app run --debug
 
 ## 聯絡留言通知
 
-公開留言一定會先寫入 SQLite，才嘗試傳送選用外部通知。設定 `CONTACT_DISCORD_WEBHOOK_URL`，及／或同時設定兩個 Telegram 變數後，管理員或最高管理員可在 `/admin/messages` 啟用通知。Discord 網址必須是官方 HTTPS Incoming Webhook。開關可用前也會驗證 Telegram Bot Token 與 Chat ID。Webhook 網址與 Bot Token 只保留在伺服器端，不會顯示於收件匣。傳送逾時或供應商錯誤只會記錄不含私密端點的錯誤類型，不會捨棄已儲存的留言。
+公開留言一定會先寫入 SQLite，才嘗試傳送選用外部通知。兩個 Telegram 變數皆有效時，網站或 Android App 送出的每則新留言都會回報至該 Telegram 聊天室。回報內容包含主旨、留言、名稱、回覆聯絡方式、已登入帳號、來源（網站與概略裝置類型，或 Android App 的版本、Android 版本與裝置型號）、語言、時間及收件匣連結。Discord 為選用：設定 `CONTACT_DISCORD_WEBHOOK_URL` 後，由管理員或最高管理員在 `/admin/messages` 開啟。Discord 網址必須是官方 HTTPS Incoming Webhook，Telegram Bot Token 與 Chat ID 也會在使用前驗證。Webhook 網址與 Bot Token 只保留在伺服器端，不會顯示於收件匣。傳送逾時或供應商錯誤只會記錄不含私密端點的錯誤類型，不會捨棄已儲存的留言。
 
 ## Google 球館搜尋
 
@@ -216,6 +221,20 @@ WEB_PUSH_SUBJECT=mailto:your-contact@example.com
 私密金鑰與整個 `instance` 目錄都必須跨部署持久保存。更換 VAPID 金鑰會使既有瀏覽器訂閱失效。正式環境推播需要 HTTPS 及瀏覽器通知權限。支援的瀏覽器會將 localhost 視為安全的開發環境。
 
 若缺少任何必要的 VAPID 設定，場次頁面的通知開關會保持停用。推播服務回覆 `404` 或 `410` 時，系統會自動移除失效端點。
+
+### Android App 通知（FCM）
+
+Android App 透過 Firebase 雲端通訊（FCM）接收相同的場次通知。請在 Firebase 主控台的「專案設定 → 服務帳戶」產生私密金鑰，存放在持久保存的目錄（例如 `instance/firebase-service-account.json`），並設定：
+
+```text
+FCM_SERVICE_ACCOUNT_FILE=instance/firebase-service-account.json
+```
+
+Docker 部署時請將檔案放進 `/instance` 磁碟區，並設定 `FCM_SERVICE_ACCOUNT_FILE=/instance/firebase-service-account.json`。未設定時，App 不會顯示通知開關。FCM 回報已失效的權杖會自動移除。
+
+## JSON API
+
+`/api/v1` 以 JSON 形式提供球員、主揪、帳號與管理員功能，供 Android App 及其他用戶端使用。用戶端透過 `POST /api/v1/auth/login` 登入，並以 `Authorization: Bearer <token>` 傳送取得的權杖。API 要求不會使用瀏覽器的工作階段 Cookie，因此不需要 CSRF 權杖。API 與網頁共用相同的驗證、嘗試次數限制及權限規則。端點說明請見 [API.md](API.md)。
 
 ## Docker
 

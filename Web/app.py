@@ -13,6 +13,7 @@ import re
 import secrets
 import sqlite3
 import subprocess
+import sys
 import uuid
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlencode, urlparse
@@ -41,6 +42,7 @@ from flask import (
 from imageio_ffmpeg import get_ffmpeg_exe
 from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
 from pywebpush import WebPushException, webpush
+from fcm import FcmClient, FcmError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
@@ -58,6 +60,7 @@ COURT_MEDIA_FILENAME_PATTERN = re.compile(
 )
 SOCIAL_THUMBNAIL_VERSION_PATTERN = re.compile(r"^[a-f0-9]{16}$")
 WEB_PUSH_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]+={0,2}$")
+FCM_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_:-]{20,4096}$")
 TRUSTED_PUSH_HOST_SUFFIXES = (
     "fcm.googleapis.com",
     "push.services.mozilla.com",
@@ -109,6 +112,36 @@ TRANSLATIONS = {
         "brand": "Badminton Court Control Panel",
         "home": "Courts",
         "introduction": "Introduction",
+        "android_page_nav": "Android app",
+        "android_page_eyebrow": "Android app",
+        "android_page_title": "Your courts, in your pocket.",
+        "android_page_body": "The Android app does everything the website does, in a native app: find a court, join with your PIN, and run your own events. It can also notify you when something changes.",
+        "android_page_download": "Get the Android app",
+        "android_page_unavailable": "The Android app is in testing. Contact us if you want to try it.",
+        "android_page_contact": "Contact us",
+        "android_page_requirements": "Requires Android 8.0 or later",
+        "android_page_features_eyebrow": "What's in the app",
+        "android_page_features_title": "Built for the court, not the desk.",
+        "android_page_features_body": "The app uses the same server and the same accounts as the website. Courts you create or join appear in both.",
+        "android_page_find_title": "Find a court fast",
+        "android_page_find_body": "Browse and search courts, then filter by date, level, gender, or status. Court links shared with you open straight in the app.",
+        "android_page_join_title": "Join in seconds",
+        "android_page_join_body": "Join or leave with a name and a 6-digit PIN. You don't need an account. If a court is full, the app adds you to the waiting list.",
+        "android_page_follow_title": "Follow the courts you play",
+        "android_page_follow_body": "Turn on change notifications for any court. After you join or leave, the app asks whether to turn them on or off for that court.",
+        "android_page_organizer_title": "Run your events",
+        "android_page_organizer_body": "Create, edit, and copy courts with photos, videos, and saved venues. Run roll call and clearing from your phone.",
+        "android_page_owner_title": "Hear about your courts",
+        "android_page_owner_body": "When players join or leave your court, or an administrator changes it, the app notifies you. You can turn this off for each court in its settings.",
+        "android_page_style_title": "Make it yours",
+        "android_page_style_body": "Use it in English or Traditional Chinese, in a light or dark theme, with the website's color palettes or your device colors, and with 12- or 24-hour time.",
+        "android_page_steps_title": "Get started in three steps",
+        "android_page_step_one_title": "Install the app",
+        "android_page_step_one_body": "Install the app on your Android phone. It connects to this website's server.",
+        "android_page_step_two_title": "Sign in if you organize",
+        "android_page_step_two_body": "Players can join courts without an account. Organizers sign in with their website account to manage courts and get notifications about them.",
+        "android_page_step_three_title": "Allow notifications",
+        "android_page_step_three_body": "Allow notifications when the app asks, so you hear about the courts you follow and the ones you run.",
         "updates": "Update history",
         "contact": "Contact",
         "contact_admin": "Contact administrator",
@@ -176,14 +209,14 @@ TRANSLATIONS = {
         "contact_filter_unread": "Unread",
         "contact_filter_read": "Read",
         "contact_notification_settings": "Message notifications",
-        "contact_notification_settings_body": "Send a notification when a visitor leaves a new message. Messages are always stored in the inbox, even if delivery fails.",
-        "contact_notification_enable": "Enable new-message notifications",
+        "contact_notification_settings_body": "Every new message is reported to the Telegram chat whenever a Telegram bot and chat are configured. The switch below also sends it to Discord. Messages are always stored in the inbox, even if delivery fails.",
+        "contact_notification_enable": "Also notify Discord",
         "contact_notification_discord_ready": "Discord webhook configured",
         "contact_notification_discord_missing": "Discord webhook not configured",
         "contact_notification_telegram_ready": "Telegram bot and chat configured",
         "contact_notification_telegram_missing": "Telegram bot or chat not configured",
         "contact_notification_saved": "Message notification settings saved.",
-        "contact_notification_unavailable": "Configure a valid Discord webhook or Telegram bot and chat before enabling notifications.",
+        "contact_notification_unavailable": "Configure a valid Discord webhook before enabling Discord notifications.",
         "previous_page": "Previous",
         "next_page": "Next",
         "privacy": "Privacy",
@@ -301,6 +334,7 @@ TRANSLATIONS = {
         "push_notifications_unavailable": "System push notifications are not configured for this site.",
         "push_notifications_error": "Unable to update notifications. Please try again.",
         "push_event_updated_title": "{name} updated",
+        "push_owner_title": "Your court {name} changed",
         "push_event_updated_body": "The organizer changed this court event.",
         "push_event_archived_body": "The organizer archived this court event.",
         "push_event_restored_body": "The organizer reopened this court event.",
@@ -671,6 +705,36 @@ TRANSLATIONS = {
         "brand": "羽球場控面板",
         "home": "球場",
         "introduction": "網站介紹",
+        "android_page_nav": "Android App",
+        "android_page_eyebrow": "Android App",
+        "android_page_title": "場次資訊，隨身掌握。",
+        "android_page_body": "Android App 以原生介面提供網站的所有功能：搜尋場次、用 PIN 碼報名、管理自己的活動，場次有異動時還能通知你。",
+        "android_page_download": "下載 Android App",
+        "android_page_unavailable": "Android App 正在測試中，想試用的話歡迎與我們聯絡。",
+        "android_page_contact": "聯絡我們",
+        "android_page_requirements": "需要 Android 8.0 以上版本",
+        "android_page_features_eyebrow": "App 功能",
+        "android_page_features_title": "為球場設計，不只在電腦前用。",
+        "android_page_features_body": "App 與網站使用同一個伺服器和同一組帳號，你建立或報名的場次在兩邊都看得到。",
+        "android_page_find_title": "快速找到場次",
+        "android_page_find_body": "瀏覽與搜尋場次，並依日期、程度、性別或狀態篩選。別人分享給你的場次連結會直接在 App 中開啟。",
+        "android_page_join_title": "幾秒完成報名",
+        "android_page_join_body": "輸入名稱與 6 位數 PIN 碼即可報名或退出，不需要帳號。場次額滿時，App 會幫你加入候補名單。",
+        "android_page_follow_title": "追蹤你打的場次",
+        "android_page_follow_body": "任何場次都能開啟異動通知。報名或退出後，App 會詢問你是否要開啟或關閉該場次的通知。",
+        "android_page_organizer_title": "管理你的活動",
+        "android_page_organizer_body": "建立、編輯與複製場次，可附上照片、影片與常用場館；點名與清場也能在手機上完成。",
+        "android_page_owner_title": "掌握你開的場次",
+        "android_page_owner_body": "球友報名或退出你的場次，或管理員修改場次時，App 都會通知你。每個場次都可以在場次設定中關閉此通知。",
+        "android_page_style_title": "打造你的風格",
+        "android_page_style_body": "支援英文與繁體中文、淺色與深色主題、網站配色或裝置配色，以及 12 或 24 小時制。",
+        "android_page_steps_title": "三個步驟開始使用",
+        "android_page_step_one_title": "安裝 App",
+        "android_page_step_one_body": "在 Android 手機上安裝 App，它會連線到本網站的伺服器。",
+        "android_page_step_two_title": "主揪請登入",
+        "android_page_step_two_body": "球友不需要帳號即可報名。主揪使用網站帳號登入後，就能管理場次並收到場次通知。",
+        "android_page_step_three_title": "允許通知",
+        "android_page_step_three_body": "App 詢問時請允許通知，才能收到你追蹤和你開的場次的異動。",
         "updates": "更新紀錄",
         "contact": "聯絡我們",
         "contact_admin": "聯絡網站管理員",
@@ -738,14 +802,14 @@ TRANSLATIONS = {
         "contact_filter_unread": "未讀",
         "contact_filter_read": "已讀",
         "contact_notification_settings": "留言通知",
-        "contact_notification_settings_body": "訪客送出新留言時傳送通知。即使外部通知傳送失敗，留言仍會保存在收件匣。",
-        "contact_notification_enable": "啟用新留言通知",
+        "contact_notification_settings_body": "只要設定了 Telegram Bot 與聊天室，每則新留言都會回報到 Telegram 聊天室；下方開關可另外傳送到 Discord。即使外部通知傳送失敗，留言仍會保存在收件匣。",
+        "contact_notification_enable": "同時通知 Discord",
         "contact_notification_discord_ready": "Discord Webhook 已設定",
         "contact_notification_discord_missing": "Discord Webhook 尚未設定",
         "contact_notification_telegram_ready": "Telegram Bot 與聊天室已設定",
         "contact_notification_telegram_missing": "Telegram Bot 或聊天室尚未設定",
         "contact_notification_saved": "留言通知設定已儲存。",
-        "contact_notification_unavailable": "啟用通知前，請先設定有效的 Discord Webhook，或 Telegram Bot 與聊天室。",
+        "contact_notification_unavailable": "啟用 Discord 通知前，請先設定有效的 Discord Webhook。",
         "previous_page": "上一頁",
         "next_page": "下一頁",
         "privacy": "隱私權",
@@ -863,6 +927,7 @@ TRANSLATIONS = {
         "push_notifications_unavailable": "此網站尚未設定系統推播通知。",
         "push_notifications_error": "無法更新通知設定，請再試一次。",
         "push_event_updated_title": "{name} 已更新",
+        "push_owner_title": "你的場次「{name}」有異動",
         "push_event_updated_body": "主辦者已變更此羽球場次。",
         "push_event_archived_body": "主辦者已封存此羽球場次。",
         "push_event_restored_body": "主辦者已重新開放此羽球場次。",
@@ -1332,7 +1397,7 @@ PRIVACY_POLICY_SECTIONS = {
                 "Accounts: username, password hash, role and account status, creation time, optional avatar, saved hall locations, last successful sign-in time, and last successful sign-in IP address. Plain-text account passwords are not stored.",
                 "Court events: organizer identity, event and group names, date and time, venue and coordinates, court ID, capacity, reserved-player nicknames, levels, prices, shuttlecock information, remarks, status, roll-call/clearing state, and uploaded photos or videos.",
                 "Public registration: nickname, participant PIN hash, confirmed or waiting status, join time, roll-call/clearing state, and successful join/leave history. History contains nickname, action, time, validated IP address, and broad device category. Plain-text participant PINs are not stored.",
-                "Push notifications: the selected court, browser push-service endpoint, encryption keys, language, and creation/update times after a visitor explicitly opts in.",
+                "Push notifications: the selected court, browser push-service endpoint, encryption keys, language, and creation/update times after a visitor explicitly opts in. In the Android app, the device's Firebase Cloud Messaging registration token is stored instead of a browser endpoint.",
                 "Contact messages: the name supplied by the visitor, optional reply contact, subject, message, interface language, submission time, and administrator read status.",
             ),
         },
@@ -1379,8 +1444,8 @@ PRIVACY_POLICY_SECTIONS = {
             "items": (
                 "Google Fonts is requested by website pages. Google Maps links are available for venue searches, and Google Maps JavaScript/Places loads on the event form when the operator configures an API key.",
                 "Cloudflare Turnstile loads on signup, sign-in, and contact-message forms and receives verification information when both Turnstile keys are configured.",
-                "Opt-in Web Push sends encrypted notification payloads through the push service selected by the visitor’s browser, such as Apple, Google, Microsoft, or Mozilla.",
-                "When an administrator enables contact-message notifications, the submitted name, reply contact, subject, message, time, and inbox link are sent to the configured Discord webhook and/or Telegram bot chat. A failed delivery does not remove the message from this website’s database.",
+                "Opt-in Web Push sends encrypted notification payloads through the push service selected by the visitor’s browser, such as Apple, Google, Microsoft, or Mozilla. The Android app receives notifications through Google Firebase Cloud Messaging.",
+                "Each contact message is reported to the operator’s Telegram bot chat when one is configured, and also to a Discord webhook when an administrator enables it. The report contains the submitted name, reply contact, subject, message, time, language, inbox link, the signed-in username if any, and where it was sent from (website with a broad device type, or the Android app with its version, Android version, and device model). A failed delivery does not remove the message from this website’s database.",
                 "When a court link is shared, the chosen social or messaging platform may request its public metadata and generated preview image.",
                 "Following any external link sends the request directly to that external website.",
             ),
@@ -1392,7 +1457,7 @@ PRIVACY_POLICY_SECTIONS = {
                 "Account data remains until the account is deleted or an administrator deletes an eligible archived account. Member self-deletion removes the account, avatar, and saved locations, but already-published courts and their displayed creator label remain online without an owner.",
                 "Leaving a court removes the active participant record. Successful join/leave history remains until the court itself is deleted.",
                 "Archiving or expiration does not delete a court. Deleting a court removes its participants, reserved members, media records and files, participation history, push mappings, and generated social-preview cache.",
-                "Turning off push notifications removes the matching court subscription mapping. Endpoints rejected as expired by a push service are removed automatically.",
+                "Turning off push notifications removes the matching court subscription mapping. Endpoints and app tokens rejected as expired by a push service are removed automatically.",
                 "Successful authentication clears the matching failed-attempt record; administrators can reset member sign-in retries. Other security records remain as needed to enforce current lockouts.",
                 "Contact messages remain in the deployment database until the operator removes them according to its support and retention practices or handles an applicable deletion request.",
                 "Hosting logs and backups are controlled by the deployment operator and may follow different retention and deletion schedules.",
@@ -1447,7 +1512,7 @@ PRIVACY_POLICY_SECTIONS = {
                 "帳號：使用者名稱、密碼雜湊、角色與帳號狀態、建立時間、選用頭像、已儲存球館地點，以及最近成功登入時間與 IP 位址。系統不儲存帳號明文密碼。",
                 "場次活動：主辦者身分、活動與羽球團名稱、日期與時間、場館與座標、場地編號、名額、預訂球友暱稱、程度、費用、用球、備註、狀態、點名／結清狀態，以及上傳的相片或影片。",
                 "公開報名：暱稱、參加者 PIN 雜湊、正取或候補狀態、加入時間、點名／結清狀態，以及成功加入／退出歷程。歷程包含暱稱、動作、時間、已驗證 IP 位址與概略裝置類型。系統不儲存參加者明文 PIN。",
-                "推播通知：訪客明確同意後，儲存所選場次、瀏覽器推播服務端點、加密金鑰、語言及建立／更新時間。",
+                "推播通知：訪客明確同意後，儲存所選場次、瀏覽器推播服務端點、加密金鑰、語言及建立／更新時間。Android App 則以裝置的 Firebase 雲端通訊（FCM）註冊權杖取代瀏覽器端點。",
                 "聯絡留言：訪客填寫的名稱、選填回覆聯絡方式、主旨、留言內容、介面語言、送出時間及管理員已讀狀態。",
             ),
         },
@@ -1494,8 +1559,8 @@ PRIVACY_POLICY_SECTIONS = {
             "items": (
                 "網站頁面會向 Google Fonts 取得字型。場館搜尋提供 Google Maps 連結；營運者設定 API 金鑰後，活動表單會載入 Google Maps JavaScript／Places。",
                 "同時設定兩個 Turnstile 金鑰後，註冊、登入及聯絡留言表單會載入 Cloudflare Turnstile，並傳送驗證資訊。",
-                "選用 Web Push 會透過訪客瀏覽器指定的推播服務（例如 Apple、Google、Microsoft 或 Mozilla）傳送加密通知內容。",
-                "管理員啟用聯絡留言通知後，系統會將填寫的名稱、回覆聯絡方式、主旨、留言、時間及收件匣連結傳送至設定的 Discord Webhook 及／或 Telegram Bot 聊天室；外部傳送失敗不會移除網站資料庫中的留言。",
+                "選用 Web Push 會透過訪客瀏覽器指定的推播服務（例如 Apple、Google、Microsoft 或 Mozilla）傳送加密通知內容。Android App 則透過 Google Firebase 雲端通訊（FCM）接收通知。",
+                "設定 Telegram Bot 聊天室後，每則聯絡留言都會回報至該聊天室；管理員啟用後，也會另外傳送至設定的 Discord Webhook。回報內容包含填寫的名稱、回覆聯絡方式、主旨、留言、時間、語言、收件匣連結、已登入的使用者名稱（若有），以及送出來源（網站與概略裝置類型，或 Android App 的版本、Android 版本與裝置型號）；外部傳送失敗不會移除網站資料庫中的留言。",
                 "分享場次連結時，所選社群或通訊平台可能讀取公開中繼資料及產生的預覽圖片。",
                 "開啟任何外部連結時，請求會直接傳送至該外部網站。",
             ),
@@ -1507,7 +1572,7 @@ PRIVACY_POLICY_SECTIONS = {
                 "帳號資料會保留至帳號被刪除，或管理員刪除符合條件的已封存帳號。會員自行刪除帳號會移除帳號、頭像及已儲存地點；已發布的場次及其顯示的建立者標示會保留，但不再有擁有者。",
                 "退出場次會移除目前的參加者紀錄；成功加入／退出歷程會保留至該場次被刪除。",
                 "封存或過期不等於刪除。刪除場次會移除參加者、預訂球友、媒體紀錄與檔案、參與歷程、推播對應關係及產生的社群預覽快取。",
-                "關閉推播會移除相符的場次訂閱對應；推播服務判定已失效的端點也會自動移除。",
+                "關閉推播會移除相符的場次訂閱對應；推播服務判定已失效的端點與 App 權杖也會自動移除。",
                 "成功驗證會清除相符的失敗嘗試紀錄；管理員也可重設會員登入重試。其他安全紀錄會在執行目前鎖定所需期間保留。",
                 "聯絡留言會保留在此部署網站的資料庫中，直到營運者依支援與保留方式移除，或處理適用的刪除請求。",
                 "主機紀錄與備份由部署網站營運者控制，可能採用不同的保留及刪除時程。",
@@ -1593,6 +1658,7 @@ CREATE TABLE IF NOT EXISTS courts (
     leave_deadline_enabled INTEGER NOT NULL DEFAULT 0 CHECK(leave_deadline_enabled IN (0, 1)),
     leave_deadline_at TEXT NOT NULL DEFAULT '',
     roll_clearing_locked INTEGER NOT NULL DEFAULT 0 CHECK(roll_clearing_locked IN (0, 1)),
+    owner_notifications INTEGER NOT NULL DEFAULT 1 CHECK(owner_notifications IN (0, 1)),
     archived INTEGER NOT NULL DEFAULT 0 CHECK(archived IN (0, 1)),
     created_at TEXT NOT NULL,
     FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
@@ -1684,6 +1750,20 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 CREATE INDEX IF NOT EXISTS push_subscriptions_court_idx
 ON push_subscriptions(court_id);
 
+CREATE TABLE IF NOT EXISTS fcm_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    court_id INTEGER NOT NULL,
+    token TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'en-us',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (court_id) REFERENCES courts(id) ON DELETE CASCADE,
+    UNIQUE(court_id, token)
+);
+
+CREATE INDEX IF NOT EXISTS fcm_subscriptions_token_idx
+ON fcm_subscriptions(token);
+
 CREATE TABLE IF NOT EXISTS login_attempts (
     attempt_key TEXT PRIMARY KEY,
     scope TEXT NOT NULL DEFAULT '',
@@ -1713,7 +1793,48 @@ CREATE TABLE IF NOT EXISTS contact_messages (
 
 CREATE INDEX IF NOT EXISTS contact_messages_status_time_idx
 ON contact_messages(read_at, submitted_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS api_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    last_used_at TEXT,
+    expires_at TEXT NOT NULL,
+    fcm_token TEXT,
+    fcm_language TEXT NOT NULL DEFAULT 'en-us'
+);
+
+CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens(user_id);
 """
+
+
+class CourtActionError(Exception):
+    """A user-facing failure shared by the HTML views and the JSON API.
+
+    ``code`` is a TRANSLATIONS key (or a stable API error code); ``message``
+    overrides the translated text when it needs runtime values.
+    """
+
+    def __init__(
+        self,
+        code: str,
+        status: int = 400,
+        message: str | None = None,
+        fields: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(code)
+        self.code = code
+        self.status = status
+        self.custom_message = message
+        self.fields = fields or {}
+
+    @property
+    def message(self) -> str:
+        if self.custom_message:
+            return self.custom_message
+        return TRANSLATIONS[current_language()].get(self.code, self.code)
 
 
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
@@ -1735,6 +1856,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         WEB_PUSH_PRIVATE_KEY=os.environ.get("WEB_PUSH_PRIVATE_KEY", ""),
         WEB_PUSH_SUBJECT=os.environ.get("WEB_PUSH_SUBJECT", ""),
         WEB_PUSH_TIMEOUT=float(os.environ.get("WEB_PUSH_TIMEOUT", "5")),
+        FCM_SERVICE_ACCOUNT_FILE=os.environ.get("FCM_SERVICE_ACCOUNT_FILE", ""),
+        FCM_TIMEOUT=float(os.environ.get("FCM_TIMEOUT", "5")),
         AVATAR_FOLDER=str(Path(app.instance_path) / "avatars"),
         COURT_MEDIA_FOLDER=str(Path(app.instance_path) / "court_media"),
         SOCIAL_THUMBNAIL_FOLDER=str(
@@ -1765,11 +1888,17 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         CONTACT_NOTIFICATION_TIMEOUT=float(
             os.environ.get("CONTACT_NOTIFICATION_TIMEOUT", "5")
         ),
+        ANDROID_APP_URL=os.environ.get("ANDROID_APP_URL", ""),
         TRUST_PROXY_HEADERS=os.environ.get("TRUST_PROXY_HEADERS", "0") == "1",
         LOGIN_MAX_ATTEMPTS=int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5")),
         LOGIN_LOCKOUT_SECONDS=int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "900")),
         LEAVE_MAX_ATTEMPTS=int(os.environ.get("LEAVE_MAX_ATTEMPTS", "5")),
         LEAVE_LOCKOUT_SECONDS=int(os.environ.get("LEAVE_LOCKOUT_SECONDS", "900")),
+        API_TOKEN_TTL_DAYS=int(os.environ.get("API_TOKEN_TTL_DAYS", "90")),
+        # Defaults to the newest update-history date so every deployment
+        # reports something meaningful without extra configuration.
+        APP_VERSION=os.environ.get("APP_VERSION", "").strip()
+        or SITE_UPDATE_HISTORY[0]["date"],
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "0") == "1",
@@ -1797,6 +1926,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
     with app.app_context():
         init_db()
+
+    from api import create_api_blueprint
+
+    app.register_blueprint(create_api_blueprint(sys.modules[__name__]))
 
     @app.context_processor
     def inject_globals() -> dict[str, Any]:
@@ -1938,54 +2071,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         form_errors: dict[str, str] = {}
         if request.method == "POST":
             verify_csrf()
-            for field_name in ("sender_name", "subject", "message"):
-                if not form_values[field_name]:
-                    form_errors[field_name] = "contact_form_required"
-            length_rules = (
-                ("sender_name", MAX_CONTACT_NAME_LENGTH, "contact_name_too_long"),
-                ("reply_contact", MAX_CONTACT_REPLY_LENGTH, "contact_reply_too_long"),
-                ("subject", MAX_CONTACT_SUBJECT_LENGTH, "contact_subject_too_long"),
-                ("message", MAX_CONTACT_MESSAGE_LENGTH, "contact_message_too_long"),
-            )
-            for field_name, maximum, error_key in length_rules:
-                if len(form_values[field_name]) > maximum:
-                    form_errors[field_name] = error_key
-            for field_name, field_value in form_values.items():
-                if contains_disallowed_control_characters(
-                    field_value, multiline=field_name == "message"
-                ):
-                    form_errors[field_name] = "contact_form_invalid"
+            form_errors = validate_contact_message(form_values)
             if not form_errors and not verify_turnstile_response(
                 "contact_message"
             ):
                 form_errors["turnstile"] = "turnstile_required"
             if not form_errors:
-                submitted_at = datetime.now().isoformat(timespec="seconds")
-                db = get_db()
-                cursor = db.execute(
-                    """
-                    INSERT INTO contact_messages
-                        (sender_name, reply_contact, subject, message,
-                         language, submitted_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        form_values["sender_name"],
-                        form_values["reply_contact"],
-                        form_values["subject"],
-                        form_values["message"],
-                        lang,
-                        submitted_at,
-                    ),
-                )
-                db.commit()
-                send_contact_message_notifications(
-                    {
-                        "id": int(cursor.lastrowid),
-                        **form_values,
-                        "submitted_at": submitted_at,
-                    }
-                )
+                store_contact_message(form_values, lang)
                 flash_t("contact_message_sent", "success")
                 return redirect(url_for("contact") + "#contact-form")
             flash_t("contact_form_invalid", "error")
@@ -2006,6 +2098,16 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     def introduction():
         return render_template("introduction.html")
 
+    @app.get("/android")
+    def android_app():
+        download_url = str(app.config.get("ANDROID_APP_URL") or "").strip()
+        parsed = urlparse(download_url)
+        if parsed.scheme != "https" or not parsed.netloc:
+            download_url = ""
+        return render_template(
+            "android.html", android_download_url=download_url
+        )
+
     @app.get("/updates")
     def updates():
         lang = current_language()
@@ -2025,115 +2127,14 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
     @app.get("/courts")
     def public_courts():
-        search = request.args.get("q", "").strip()[:100]
-        legacy_date = request.args.get("date", "").strip()
-        date_from = request.args.get("date_from", "").strip() or legacy_date
-        date_to = request.args.get("date_to", "").strip() or legacy_date
-        level_value = request.args.get("level", "").strip()
-        gender = request.args.get("gender", "both").strip()
-        status = request.args.get("status", "").strip()
-        show_expired = request.args.get("show_expired", "") == "1"
-        clauses = ["c.archived = 0"]
-        parameters: list[Any] = []
-        if not show_expired:
-            clauses.append(f"NOT {COURT_EXPIRED_SQL}")
-
-        if search:
-            search_pattern = f"%{search}%"
-            clauses.append(
-                "(c.event_name LIKE ? OR c.badminton_name LIKE ? "
-                "OR c.hall_name LIKE ? OR c.location LIKE ? OR c.court_id LIKE ? "
-                "OR COALESCE(NULLIF(c.creator_name, ''), u.username, ?) LIKE ?)"
-            )
-            parameters.extend(
-                [
-                    search_pattern,
-                    search_pattern,
-                    search_pattern,
-                    search_pattern,
-                    search_pattern,
-                    app.config["ADMIN_USERNAME"],
-                    search_pattern,
-                ]
-            )
-
-        parsed_date_from = parse_filter_date(date_from)
-        if date_from and parsed_date_from is None:
-            date_from = ""
-        parsed_date_to = parse_filter_date(date_to)
-        if date_to and parsed_date_to is None:
-            date_to = ""
-        if parsed_date_from:
-            clauses.append("c.court_date >= ?")
-            parameters.append(parsed_date_from.isoformat())
-        if parsed_date_to:
-            clauses.append("c.court_date <= ?")
-            parameters.append(parsed_date_to.isoformat())
-
-        try:
-            level = int(level_value) if level_value else None
-        except ValueError:
-            level = None
-        if gender not in {"male", "female", "both"}:
-            gender = "both"
-        if level is not None and 1 <= level <= 18:
-            if gender == "male":
-                clauses.append("? BETWEEN c.male_level_min AND c.male_level_max")
-                parameters.append(level)
-            elif gender == "female":
-                clauses.append(
-                    "? BETWEEN c.female_level_min AND c.female_level_max"
-                )
-                parameters.append(level)
-            else:
-                clauses.append(
-                    "(? BETWEEN c.male_level_min AND c.male_level_max "
-                    "AND ? BETWEEN c.female_level_min AND c.female_level_max)"
-                )
-                parameters.extend([level, level])
-        else:
-            level = None
-            level_value = ""
-
-        capacity_count = (
-            "c.ordered_count + (SELECT COUNT(*) FROM participants fp "
-            "WHERE fp.court_id = c.id AND fp.waitlisted = 0)"
-        )
-        if status == "open":
-            clauses.append(
-                f"NOT {COURT_EXPIRED_SQL} AND c.roll_clearing_locked = 0 "
-                f"AND {capacity_count} < c.member_max"
-            )
-        elif status == "full":
-            clauses.append(
-                f"NOT {COURT_EXPIRED_SQL} AND c.roll_clearing_locked = 0 "
-                f"AND {capacity_count} >= c.member_max"
-            )
-        elif status == "read_only":
-            clauses.append(f"NOT {COURT_EXPIRED_SQL} AND c.roll_clearing_locked = 1")
-        else:
-            status = ""
-
+        clauses, parameters, filters = build_court_filters(request.args)
         courts = get_db().execute(
             court_query()
-            + " WHERE "
-            + " AND ".join(clauses)
+            + court_where_sql(clauses)
             + " ORDER BY is_expired, c.court_date, c.start_time",
             parameters,
         ).fetchall()
-        return render_template(
-            "courts.html",
-            courts=courts,
-            filters={
-                "q": search,
-                "date_from": format_filter_date(parsed_date_from),
-                "date_to": format_filter_date(parsed_date_to),
-                "level": level_value,
-                "gender": gender,
-                "status": status,
-                "show_expired": show_expired,
-            },
-        )
+        return render_template("courts.html", courts=courts, filters=filters)
 
     @app.route("/signup", methods=["GET", "POST"])
     def account_signup():
@@ -2152,41 +2153,21 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 flash_t("turnstile_required", "error")
                 return render_template("account/auth.html", signup=True)
             username = request.form.get("username", "").strip()
-            password = request.form.get("password", "")
-            confirmation = request.form.get("confirm_password", "")
-            if not ACCOUNT_USERNAME_PATTERN.fullmatch(username):
-                flash_t("account_username_help", "error")
-            elif len(password) < 8:
-                flash_t("password_too_short", "error")
-            elif password != confirmation:
-                flash_t("password_mismatch", "error")
+            try:
+                user_id = register_member(
+                    username,
+                    request.form.get("password", ""),
+                    request.form.get("confirm_password", ""),
+                )
+            except CourtActionError as error:
+                flash_action_error(error)
             else:
-                db = get_db()
-                try:
-                    cursor = db.execute(
-                        "INSERT INTO users "
-                        "(username, username_key, password_hash, created_at, "
-                        "last_login_at, last_login_ip) "
-                        "VALUES (?, ?, ?, ?, ?, ?)",
-                        (
-                            username,
-                            username.casefold(),
-                            generate_password_hash(password),
-                            datetime.now().isoformat(timespec="seconds"),
-                            datetime.now().isoformat(timespec="seconds"),
-                            client_ip_address(),
-                        ),
-                    )
-                    db.commit()
-                except sqlite3.IntegrityError:
-                    flash_t("username_taken", "error")
-                else:
-                    session.clear()
-                    session["user_id"] = cursor.lastrowid
-                    session["user_username"] = username
-                    session["csrf_token"] = secrets.token_urlsafe(32)
-                    flash_t("account_created", "success")
-                    return redirect(url_for("account_dashboard"))
+                session.clear()
+                session["user_id"] = user_id
+                session["user_username"] = username
+                session["csrf_token"] = secrets.token_urlsafe(32)
+                flash_t("account_created", "success")
+                return redirect(url_for("account_dashboard"))
         return render_template("account/auth.html", signup=True)
 
     @app.route("/login", methods=["GET", "POST"])
@@ -2201,43 +2182,14 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             if not verify_turnstile_response("login"):
                 flash_t("turnstile_required", "error")
                 return render_template("account/auth.html", signup=False)
-            username = request.form.get("username", "").strip()
-            password = request.form.get("password", "")
-            user = get_db().execute(
-                "SELECT id, username, password_hash, role, archived, banned, "
-                "must_change_password FROM users WHERE username_key = ?",
-                (username.casefold(),),
-            ).fetchone()
-            login_scope = (
-                "admin"
-                if user is not None and user["role"] in ADMIN_ROLES
-                else "member"
-            )
-            locked_minutes = login_lock_minutes(login_scope, username)
-            if locked_minutes:
-                flash_login_locked(locked_minutes)
-                return render_template("account/auth.html", signup=False)
-            if user is None or not check_password_hash(user["password_hash"], password):
-                flash_login_failure(login_scope, username)
-            elif user["banned"]:
-                clear_login_failures(login_scope, username)
-                flash_t("account_banned", "error")
-            elif user["archived"]:
-                clear_login_failures(login_scope, username)
-                flash_t("account_archived", "error")
-            else:
-                clear_login_failures(login_scope, username)
-                db = get_db()
-                db.execute(
-                    "UPDATE users SET last_login_at = ?, last_login_ip = ? "
-                    "WHERE id = ?",
-                    (
-                        datetime.now().isoformat(timespec="seconds"),
-                        client_ip_address(),
-                        user["id"],
-                    ),
+            try:
+                user = authenticate_member(
+                    request.form.get("username", ""),
+                    request.form.get("password", ""),
                 )
-                db.commit()
+            except CourtActionError as error:
+                flash_action_error(error)
+            else:
                 session.clear()
                 session["user_id"] = user["id"]
                 session["user_username"] = user["username"]
@@ -2270,28 +2222,16 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         member = current_member()
         if request.method == "POST":
             verify_csrf()
-            current_password = request.form.get("current_password", "")
-            new_password = request.form.get("new_password", "")
-            confirmation = request.form.get("confirm_password", "")
-            account = get_db().execute(
-                "SELECT password_hash FROM users WHERE id = ?", (member["id"],)
-            ).fetchone()
-            if account is None or not check_password_hash(
-                account["password_hash"], current_password
-            ):
-                flash_t("invalid_credentials", "error")
-            elif len(new_password) < 8:
-                flash_t("password_too_short", "error")
-            elif new_password != confirmation:
-                flash_t("password_mismatch", "error")
-            else:
-                db = get_db()
-                db.execute(
-                    "UPDATE users SET password_hash = ?, must_change_password = 0 "
-                    "WHERE id = ?",
-                    (generate_password_hash(new_password), member["id"]),
+            try:
+                change_member_password(
+                    member["id"],
+                    request.form.get("current_password", ""),
+                    request.form.get("new_password", ""),
+                    request.form.get("confirm_password", ""),
                 )
-                db.commit()
+            except CourtActionError as error:
+                flash_action_error(error)
+            else:
                 flash_t("password_changed", "success")
                 return redirect(
                     url_for(
@@ -2308,53 +2248,23 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         member = current_member()
         if request.method == "POST":
             verify_csrf()
-            uploaded = request.files.get("avatar")
-            if uploaded is None or not uploaded.filename:
-                flash_t("invalid_avatar", "error")
-                return redirect(url_for("account_profile"))
-
-            image_data = uploaded.stream.read(MAX_AVATAR_BYTES + 1)
-            if len(image_data) > MAX_AVATAR_BYTES:
-                flash_t("avatar_too_large", "error")
-                return redirect(url_for("account_profile"))
-            extension = detect_image_extension(image_data)
-            if extension is None:
-                flash_t("invalid_avatar", "error")
-                return redirect(url_for("account_profile"))
-
-            filename = f"{secrets.token_hex(16)}.{extension}"
-            avatar_path = Path(app.config["AVATAR_FOLDER"]) / filename
-            avatar_path.write_bytes(image_data)
-            db = get_db()
-            old_filename = member["avatar_filename"]
-            db.execute(
-                "UPDATE users SET avatar_filename = ? WHERE id = ?",
-                (filename, member["id"]),
-            )
-            db.commit()
-            remove_avatar_file(old_filename)
-            flash_t("avatar_updated", "success")
+            try:
+                save_member_avatar(member, request.files.get("avatar"))
+            except CourtActionError as error:
+                flash_action_error(error)
+            else:
+                flash_t("avatar_updated", "success")
             return redirect(url_for("account_profile"))
-        saved_locations = get_db().execute(
-            "SELECT * FROM saved_locations WHERE user_id = ? "
-            "ORDER BY hall_name COLLATE NOCASE, location COLLATE NOCASE",
-            (member["id"],),
-        ).fetchall()
         return render_template(
-            "account/profile.html", saved_locations=saved_locations
+            "account/profile.html",
+            saved_locations=fetch_saved_locations(member["id"]),
         )
 
     @app.post("/account/profile/avatar/remove")
     @member_required
     def account_remove_avatar():
         verify_csrf()
-        member = current_member()
-        db = get_db()
-        db.execute(
-            "UPDATE users SET avatar_filename = '' WHERE id = ?", (member["id"],)
-        )
-        db.commit()
-        remove_avatar_file(member["avatar_filename"])
+        remove_member_avatar(current_member())
         flash_t("avatar_removed", "success")
         return redirect(url_for("account_profile"))
 
@@ -2396,24 +2306,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @member_required
     def account_delete():
         verify_csrf()
-        member = current_member()
-        if member["role"] in ADMIN_ROLES:
-            flash_t("admin_account_delete_disabled", "error")
+        try:
+            delete_member_account(
+                current_member(), request.form.get("current_password", "")
+            )
+        except CourtActionError as error:
+            flash_action_error(error)
             return redirect(url_for("account_profile"))
-        password = request.form.get("current_password", "")
-        account = get_db().execute(
-            "SELECT password_hash FROM users WHERE id = ?", (member["id"],)
-        ).fetchone()
-        if account is None or not check_password_hash(
-            account["password_hash"], password
-        ):
-            flash_t("invalid_credentials", "error")
-            return redirect(url_for("account_profile"))
-
-        db = get_db()
-        db.execute("DELETE FROM users WHERE id = ?", (member["id"],))
-        db.commit()
-        remove_avatar_file(member["avatar_filename"])
         session.clear()
         flash_t("account_deleted", "success")
         return redirect(url_for("index"))
@@ -2660,35 +2559,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.post("/<guid>/roll-clearing/start")
     def start_roll_clearing(guid: str):
         verify_csrf()
-        court = fetch_managed_court(guid)
-        db = get_db()
-        changed = False
-        try:
-            db.execute("BEGIN IMMEDIATE")
-            current = db.execute(
-                "SELECT id, ordered_count, roll_clearing_locked "
-                "FROM courts WHERE id = ?",
-                (court["id"],),
-            ).fetchone()
-            if current is None:
-                db.rollback()
-                abort(404)
-            if not current["roll_clearing_locked"]:
-                nicknames = reserved_nickname_values(
-                    current["id"], current["ordered_count"]
-                )
-                sync_reserved_members(db, current["id"], nicknames)
-                db.execute(
-                    "UPDATE courts SET roll_clearing_locked = 1 WHERE id = ?",
-                    (current["id"],),
-                )
-                changed = True
-            db.commit()
-        except sqlite3.Error:
-            db.rollback()
-            raise
-        if changed:
-            send_court_push_notifications(guid, "roll_started")
+        start_roll_clearing_mode(fetch_managed_court(guid))
         flash_t("roll_and_clearing_started", "success")
         return redirect(url_for("court_detail", guid=guid))
 
@@ -2699,75 +2570,28 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if not court["roll_clearing_locked"]:
             abort(409)
 
-        participant_roll = set(request.form.getlist("participant_roll"))
-        participant_cleared = set(request.form.getlist("participant_cleared"))
-        reserved_roll = set(request.form.getlist("reserved_roll"))
-        reserved_cleared = set(request.form.getlist("reserved_cleared"))
-        db = get_db()
-        try:
-            db.execute("BEGIN IMMEDIATE")
-            participants = db.execute(
-                "SELECT id FROM participants "
-                "WHERE court_id = ? AND waitlisted = 0",
-                (court["id"],),
-            ).fetchall()
-            db.executemany(
-                "UPDATE participants SET roll_called = ?, cleared = ? "
-                "WHERE id = ? AND court_id = ?",
-                [
-                    (
-                        int(str(member["id"]) in participant_roll),
-                        int(str(member["id"]) in participant_cleared),
-                        member["id"],
-                        court["id"],
-                    )
-                    for member in participants
-                ],
-            )
-            reserved_members = db.execute(
-                "SELECT id FROM reserved_members WHERE court_id = ?",
-                (court["id"],),
-            ).fetchall()
-            db.executemany(
-                "UPDATE reserved_members SET roll_called = ?, cleared = ? "
-                "WHERE id = ? AND court_id = ?",
-                [
-                    (
-                        int(str(member["id"]) in reserved_roll),
-                        int(str(member["id"]) in reserved_cleared),
-                        member["id"],
-                        court["id"],
-                    )
-                    for member in reserved_members
-                ],
-            )
-            db.commit()
-        except sqlite3.Error:
-            db.rollback()
-            raise
+        def checkbox_statuses(roll_field: str, cleared_field: str):
+            roll = set(request.form.getlist(roll_field))
+            cleared = set(request.form.getlist(cleared_field))
+            return {
+                int(value): (value in roll, value in cleared)
+                for value in roll | cleared
+                if value.isdigit()
+            }
+
+        save_roll_clearing_statuses(
+            court,
+            checkbox_statuses("participant_roll", "participant_cleared"),
+            checkbox_statuses("reserved_roll", "reserved_cleared"),
+            reset_unlisted=True,
+        )
         flash_t("member_statuses_saved", "success")
         return redirect(url_for("court_detail", guid=guid))
 
     @app.post("/<guid>/roll-clearing/edit")
     def restore_court_editing(guid: str):
         verify_csrf()
-        court = fetch_managed_court(guid)
-        db = get_db()
-        try:
-            db.execute("BEGIN IMMEDIATE")
-            result = db.execute(
-                "UPDATE courts SET roll_clearing_locked = 0 WHERE id = ?",
-                (court["id"],),
-            )
-            if result.rowcount == 0:
-                db.rollback()
-                abort(404)
-            db.commit()
-        except sqlite3.Error:
-            db.rollback()
-            raise
-        if court["roll_clearing_locked"]:
-            send_court_push_notifications(guid, "editing_restored")
+        restore_court_editing_mode(fetch_managed_court(guid))
         flash_t("editing_mode_restored", "success")
         edit_endpoint = (
             "admin_edit_court"
@@ -2782,86 +2606,19 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         court = fetch_court(guid)
         if court is None:
             abort(404)
-        if court["archived"]:
-            flash_t("court_closed", "error")
-            return redirect(url_for("court_detail", guid=guid))
-        if court["is_expired"]:
-            flash_t("court_expired", "error")
-            return redirect(url_for("court_detail", guid=guid))
-        if court["roll_clearing_locked"]:
-            flash_t("court_read_only", "error")
-            return redirect(url_for("court_detail", guid=guid))
-
-        username = clean_username(request.form.get("username", ""))
-        pin = request.form.get("pin", "").strip()
-        if not 2 <= len(username) <= 40:
-            flash_t("invalid_username", "error")
-            return redirect(url_for("court_detail", guid=guid))
-        if not PIN_PATTERN.fullmatch(pin):
-            flash_t("invalid_pin", "error")
-            return redirect(url_for("court_detail", guid=guid))
-
-        db = get_db()
         try:
-            # Serialize the capacity check with the insert so simultaneous
-            # sign-ups are assigned confirmed/waiting positions in order.
-            db.execute("BEGIN IMMEDIATE")
-            current = db.execute(
-                """
-                SELECT c.archived, c.roll_clearing_locked, c.member_max,
-                       CASE WHEN """
-                + COURT_EXPIRED_SQL
-                + """ THEN 1 ELSE 0 END AS is_expired,
-                       c.ordered_count +
-                       (SELECT COUNT(*) FROM participants p
-                        WHERE p.court_id = c.id AND p.waitlisted = 0)
-                           AS total_count
-                FROM courts c
-                WHERE c.id = ?
-                """,
-                (court["id"],),
-            ).fetchone()
-            if current is None or current["archived"]:
-                db.rollback()
-                flash_t("court_closed", "error")
-                return redirect(url_for("court_detail", guid=guid))
-            if current["is_expired"]:
-                db.rollback()
-                flash_t("court_expired", "error")
-                return redirect(url_for("court_detail", guid=guid))
-            if current["roll_clearing_locked"]:
-                db.rollback()
-                flash_t("court_read_only", "error")
-                return redirect(url_for("court_detail", guid=guid))
-            waitlisted = int(current["total_count"] >= current["member_max"])
-            occurred_at = datetime.now().isoformat(timespec="seconds")
-            db.execute(
-                "INSERT INTO participants "
-                "(court_id, username, username_key, pin_hash, waitlisted, joined_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    court["id"],
-                    username,
-                    username.casefold(),
-                    generate_password_hash(pin),
-                    waitlisted,
-                    occurred_at,
-                ),
+            waitlisted = join_court_entry(
+                court,
+                request.form.get("username", ""),
+                request.form.get("pin", ""),
             )
-            record_participation_event(
-                db, court["id"], username, "join", occurred_at
+        except CourtActionError as error:
+            flash_action_error(error)
+        else:
+            flash_t(
+                "joined_waitlist_success" if waitlisted else "joined_success",
+                "success",
             )
-            db.commit()
-        except sqlite3.IntegrityError:
-            db.rollback()
-            flash_t("duplicate_username", "error")
-            return redirect(url_for("court_detail", guid=guid))
-
-        send_court_push_notifications(guid, "members_changed")
-        flash_t(
-            "joined_waitlist_success" if waitlisted else "joined_success",
-            "success",
-        )
         return redirect(url_for("court_detail", guid=guid))
 
     @app.post("/<guid>/leave")
@@ -2870,87 +2627,16 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         court = fetch_court(guid)
         if court is None:
             abort(404)
-        if court["is_expired"]:
-            flash_t("court_expired", "error")
-            return redirect(url_for("court_detail", guid=guid))
-        if court["roll_clearing_locked"]:
-            flash_t("court_read_only", "error")
-            return redirect(url_for("court_detail", guid=guid))
-        if court["leave_deadline_passed"]:
-            flash_t("leave_deadline_passed", "error")
-            return redirect(url_for("court_detail", guid=guid))
-
-        username = clean_username(request.form.get("username", ""))
-        pin = request.form.get("pin", "").strip()
-        leave_attempt_scope = court_leave_attempt_scope(court["id"])
-        locked_minutes = login_lock_minutes(leave_attempt_scope, username)
-        if locked_minutes:
-            flash_leave_locked(locked_minutes)
-            return redirect(url_for("court_detail", guid=guid))
-        if not 2 <= len(username) <= 40 or not PIN_PATTERN.fullmatch(pin):
-            flash_leave_failure(court["id"], username)
-            return redirect(url_for("court_detail", guid=guid))
-
-        db = get_db()
         try:
-            db.execute("BEGIN IMMEDIATE")
-            current = db.execute(
-                "SELECT roll_clearing_locked, CASE WHEN "
-                + COURT_EXPIRED_SQL
-                + " THEN 1 ELSE 0 END AS is_expired, CASE WHEN "
-                + LEAVE_DEADLINE_PASSED_SQL
-                + " THEN 1 ELSE 0 END AS leave_deadline_passed "
-                "FROM courts c WHERE id = ?",
-                (court["id"],),
-            ).fetchone()
-            if current is None:
-                db.rollback()
-                abort(404)
-            if current["is_expired"]:
-                db.rollback()
-                flash_t("court_expired", "error")
-                return redirect(url_for("court_detail", guid=guid))
-            if current["roll_clearing_locked"]:
-                db.rollback()
-                flash_t("court_read_only", "error")
-                return redirect(url_for("court_detail", guid=guid))
-            if current["leave_deadline_passed"]:
-                db.rollback()
-                flash_t("leave_deadline_passed", "error")
-                return redirect(url_for("court_detail", guid=guid))
-            participant = db.execute(
-                "SELECT id, pin_hash FROM participants "
-                "WHERE court_id = ? AND username_key = ?",
-                (court["id"], username.casefold()),
-            ).fetchone()
-            if participant is None or not check_password_hash(
-                participant["pin_hash"], pin
-            ):
-                db.rollback()
-                flash_leave_failure(court["id"], username)
-                return redirect(url_for("court_detail", guid=guid))
-
-            db.execute(
-                "DELETE FROM login_attempts WHERE attempt_key = ?",
-                (login_attempt_key(leave_attempt_scope, username),),
+            leave_court_entry(
+                court,
+                request.form.get("username", ""),
+                request.form.get("pin", ""),
             )
-            db.execute(
-                "DELETE FROM participants WHERE id = ?", (participant["id"],)
-            )
-            rebalance_participants(db, court["id"])
-            record_participation_event(
-                db,
-                court["id"],
-                username,
-                "leave",
-                datetime.now().isoformat(timespec="seconds"),
-            )
-            db.commit()
-        except sqlite3.Error:
-            db.rollback()
-            raise
-        send_court_push_notifications(guid, "members_changed")
-        flash_t("left_success", "success")
+        except CourtActionError as error:
+            flash_action_error(error)
+        else:
+            flash_t("left_success", "success")
         return redirect(url_for("court_detail", guid=guid))
 
     @app.route("/admin/login", methods=["GET", "POST"])
@@ -2971,124 +2657,19 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.get("/admin")
     @admin_required
     def admin_dashboard():
-        search = request.args.get("q", "").strip()[:100]
-        date_from = request.args.get("date_from", "").strip()
-        date_to = request.args.get("date_to", "").strip()
-        level_value = request.args.get("level", "").strip()
-        gender = request.args.get("gender", "both").strip()
-        status = request.args.get("status", "").strip()
-        show_expired = request.args.get("show_expired", "") == "1"
-        clauses: list[str] = []
-        parameters: list[Any] = []
-        if not show_expired:
-            clauses.append(f"(c.archived = 1 OR NOT {COURT_EXPIRED_SQL})")
-
-        if search:
-            search_pattern = f"%{search}%"
-            clauses.append(
-                "(c.event_name LIKE ? OR c.badminton_name LIKE ? "
-                "OR c.hall_name LIKE ? OR c.location LIKE ? OR c.court_id LIKE ? "
-                "OR COALESCE(NULLIF(c.creator_name, ''), u.username, ?) LIKE ?)"
-            )
-            parameters.extend(
-                [
-                    search_pattern,
-                    search_pattern,
-                    search_pattern,
-                    search_pattern,
-                    search_pattern,
-                    app.config["ADMIN_USERNAME"],
-                    search_pattern,
-                ]
-            )
-
-        parsed_date_from = parse_filter_date(date_from)
-        if date_from and parsed_date_from is None:
-            date_from = ""
-        parsed_date_to = parse_filter_date(date_to)
-        if date_to and parsed_date_to is None:
-            date_to = ""
-        if parsed_date_from:
-            clauses.append("c.court_date >= ?")
-            parameters.append(parsed_date_from.isoformat())
-        if parsed_date_to:
-            clauses.append("c.court_date <= ?")
-            parameters.append(parsed_date_to.isoformat())
-
-        try:
-            level = int(level_value) if level_value else None
-        except ValueError:
-            level = None
-        if gender not in {"male", "female", "both"}:
-            gender = "both"
-        if level is not None and 1 <= level <= 18:
-            if gender == "male":
-                clauses.append("? BETWEEN c.male_level_min AND c.male_level_max")
-                parameters.append(level)
-            elif gender == "female":
-                clauses.append(
-                    "? BETWEEN c.female_level_min AND c.female_level_max"
-                )
-                parameters.append(level)
-            else:
-                clauses.append(
-                    "(? BETWEEN c.male_level_min AND c.male_level_max "
-                    "AND ? BETWEEN c.female_level_min AND c.female_level_max)"
-                )
-                parameters.extend([level, level])
-        else:
-            level = None
-            level_value = ""
-
-        capacity_count = (
-            "c.ordered_count + (SELECT COUNT(*) FROM participants afp "
-            "WHERE afp.court_id = c.id AND afp.waitlisted = 0)"
-        )
-        if status == "open":
-            clauses.append(
-                f"c.archived = 0 AND NOT {COURT_EXPIRED_SQL} "
-                f"AND c.roll_clearing_locked = 0 "
-                f"AND {capacity_count} < c.member_max"
-            )
-        elif status == "full":
-            clauses.append(
-                f"c.archived = 0 AND NOT {COURT_EXPIRED_SQL} "
-                f"AND c.roll_clearing_locked = 0 "
-                f"AND {capacity_count} >= c.member_max"
-            )
-        elif status == "read_only":
-            clauses.append(
-                f"c.archived = 0 AND NOT {COURT_EXPIRED_SQL} "
-                "AND c.roll_clearing_locked = 1"
-            )
-        elif status == "archived":
-            clauses.append("c.archived = 1")
-        else:
-            status = ""
-
-        where_clause = (
-            " WHERE " + " AND ".join(f"({clause})" for clause in clauses)
-            if clauses
-            else ""
+        clauses, parameters, filters = build_court_filters(
+            request.args, admin=True
         )
         courts = get_db().execute(
             court_query()
-            + where_clause
+            + court_where_sql(clauses)
             + " ORDER BY c.archived, c.court_date DESC, c.start_time DESC",
             parameters,
         ).fetchall()
         return render_template(
             "admin/dashboard.html",
             courts=courts,
-            admin_filters={
-                "q": search,
-                "date_from": format_filter_date(parsed_date_from),
-                "date_to": format_filter_date(parsed_date_to),
-                "level": level_value,
-                "gender": gender,
-                "status": status,
-                "show_expired": show_expired,
-            },
+            admin_filters=filters,
             home_court_limit=get_int_setting(
                 "homepage_court_limit", 12, 1, 100
             ),
@@ -3118,38 +2699,16 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             page = max(1, int(request.args.get("page", "1")))
         except ValueError:
             page = 1
-        where_clause = ""
-        if message_status == "unread":
-            where_clause = " WHERE read_at IS NULL"
-        elif message_status == "read":
-            where_clause = " WHERE read_at IS NOT NULL"
-        db = get_db()
-        total_count = db.execute(
-            f"SELECT COUNT(*) AS count FROM contact_messages{where_clause}"
-        ).fetchone()["count"]
-        unread_count = db.execute(
-            "SELECT COUNT(*) AS count FROM contact_messages "
-            "WHERE read_at IS NULL"
-        ).fetchone()["count"]
-        per_page = 50
-        page_count = max(1, (total_count + per_page - 1) // per_page)
-        page = min(page, page_count)
-        messages = db.execute(
-            "SELECT id, sender_name, reply_contact, subject, message, "
-            "language, submitted_at, read_at FROM contact_messages"
-            f"{where_clause} "
-            "ORDER BY submitted_at DESC, id DESC LIMIT ? OFFSET ?",
-            (per_page, (page - 1) * per_page),
-        ).fetchall()
+        message_page = fetch_contact_message_page(message_status, page)
         notification_channels = contact_notification_channels()
         return render_template(
             "admin/messages.html",
-            contact_messages=messages,
+            contact_messages=message_page["messages"],
             message_status=message_status,
-            total_count=total_count,
-            unread_count=unread_count,
-            page=page,
-            page_count=page_count,
+            total_count=message_page["total_count"],
+            unread_count=message_page["unread_count"],
+            page=message_page["page"],
+            page_count=message_page["page_count"],
             contact_notifications_enabled=get_bool_setting(
                 "contact_notifications_enabled"
             ),
@@ -3165,19 +2724,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @account_admin_required
     def admin_update_message_status(message_id: int):
         verify_csrf()
-        mark_read = request.form.get("read") == "1"
-        read_at = (
-            datetime.now().isoformat(timespec="seconds")
-            if mark_read
-            else None
-        )
-        db = get_db()
-        cursor = db.execute(
-            "UPDATE contact_messages SET read_at = ? WHERE id = ?",
-            (read_at, message_id),
-        )
-        db.commit()
-        if cursor.rowcount == 0:
+        if not set_contact_message_read(
+            message_id, request.form.get("read") == "1"
+        ):
             abort(404)
         flash_t("contact_message_status_updated", "success")
         message_status = request.form.get("status", "all")
@@ -3200,9 +2749,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         verify_csrf()
         enabled = request.form.get("enabled") == "1"
         channels = contact_notification_channels()
-        if enabled and not (
-            channels["discord_ready"] or channels["telegram_ready"]
-        ):
+        if enabled and not channels["discord_ready"]:
             flash_t("contact_notification_unavailable", "error")
             return redirect(url_for("admin_messages"))
         set_setting(
@@ -3231,48 +2778,21 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.get("/admin/users")
     @account_admin_required
     def admin_users():
-        users = get_db().execute(
-            """
-            SELECT u.id, u.username, u.role, u.archived, u.banned, u.must_change_password,
-                   u.created_at, u.last_login_at, u.last_login_ip,
-                   COUNT(c.id) AS court_count,
-                   COALESCE(
-                       (
-                           SELECT SUM(la.failed_count)
-                           FROM login_attempts la
-                           WHERE la.scope = 'member'
-                             AND la.username_key = u.username_key
-                       ),
-                       0
-                   ) AS failed_login_attempts
-            FROM users u
-            LEFT JOIN courts c ON c.owner_id = u.id
-            GROUP BY u.id
-            ORDER BY u.banned DESC, u.archived, u.username_key
-            """
-        ).fetchall()
-        return render_template("admin/users.html", users=users)
+        return render_template("admin/users.html", users=fetch_admin_user_rows())
 
     @app.post("/admin/users/<int:user_id>/role")
     @super_admin_required
     def admin_update_user_role(user_id: int):
         verify_csrf()
-        actor = current_member()
-        if user_id == actor["id"]:
-            flash_t("cannot_change_own_role", "error")
+        try:
+            set_member_role(
+                current_member(), user_id, request.form.get("role", "")
+            )
+        except CourtActionError as error:
+            if error.status == 404:
+                abort(404)
+            flash_action_error(error)
             return redirect(url_for("admin_users"))
-        role = request.form.get("role", "").strip()
-        if role not in ACCOUNT_ROLES:
-            flash_t("invalid_role", "error")
-            return redirect(url_for("admin_users"))
-        db = get_db()
-        result = db.execute(
-            "UPDATE users SET role = ? WHERE id = ?",
-            (role, user_id),
-        )
-        if result.rowcount == 0:
-            abort(404)
-        db.commit()
         flash_t("role_updated", "success")
         return redirect(url_for("admin_users"))
 
@@ -3298,22 +2818,11 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @account_admin_required
     def admin_delete_user(user_id: int):
         verify_csrf()
-        db = get_db()
-        user = db.execute(
-            "SELECT role, archived, avatar_filename FROM users WHERE id = ?",
-            (user_id,),
-        ).fetchone()
-        if user is None:
-            abort(404)
-        if user["role"] in ADMIN_ROLES:
-            abort(403)
-        if not user["archived"]:
-            flash_t("account_must_be_archived", "error")
+        try:
+            delete_archived_member(user_id)
+        except CourtActionError as error:
+            flash_action_error(error)
             return redirect(url_for("admin_users"))
-
-        db.execute("DELETE FROM users WHERE id = ?", (user_id,))
-        db.commit()
-        remove_avatar_file(user["avatar_filename"])
         flash_t("user_account_deleted", "success")
         return redirect(url_for("admin_users"))
 
@@ -3372,6 +2881,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if result.rowcount == 0:
             abort(404)
         db.commit()
+        revoke_api_tokens(user_id)
         flash_t("temporary_password_set", "success")
         return redirect(url_for("admin_users"))
 
@@ -3489,50 +2999,16 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         court = fetch_court(guid)
         if court is None:
             abort(404)
-        if court["roll_clearing_locked"]:
-            flash_t("court_read_only", "error")
-            return redirect(url_for("court_detail", guid=guid))
-
-        username = clean_username(request.form.get("username", ""))
-        if not 2 <= len(username) <= 40:
-            flash_t("invalid_username", "error")
-            return redirect(url_for("court_detail", guid=guid))
-
-        db = get_db()
-        changed = False
         try:
-            db.execute("BEGIN IMMEDIATE")
-            participant = db.execute(
-                "SELECT username FROM participants "
-                "WHERE id = ? AND court_id = ?",
-                (participant_id, court["id"]),
-            ).fetchone()
-            if participant is None:
-                db.rollback()
-                abort(404)
-            changed = participant["username"] != username
-            db.execute(
-                "UPDATE participants SET username = ?, username_key = ? "
-                "WHERE id = ? AND court_id = ?",
-                (
-                    username,
-                    username.casefold(),
-                    participant_id,
-                    court["id"],
-                ),
+            rename_court_participant(
+                court, participant_id, request.form.get("username", "")
             )
-            db.commit()
-        except sqlite3.IntegrityError:
-            db.rollback()
-            flash_t("duplicate_username", "error")
-            return redirect(url_for("court_detail", guid=guid))
-        except sqlite3.Error:
-            db.rollback()
-            raise
-
-        if changed:
-            send_court_push_notifications(guid, "members_changed")
-        flash_t("participant_renamed", "success")
+        except CourtActionError as error:
+            if error.status == 404:
+                abort(404)
+            flash_action_error(error)
+        else:
+            flash_t("participant_renamed", "success")
         return redirect(url_for("court_detail", guid=guid))
 
     @app.post(
@@ -3544,26 +3020,16 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         court = fetch_court(guid)
         if court is None:
             abort(404)
-        if court["roll_clearing_locked"]:
-            flash_t("court_read_only", "error")
-            return redirect(url_for("court_detail", guid=guid))
-
-        pin = request.form.get("pin", "").strip()
-        if not PIN_PATTERN.fullmatch(pin):
-            flash_t("invalid_pin", "error")
-            return redirect(url_for("court_detail", guid=guid))
-
-        db = get_db()
-        result = db.execute(
-            "UPDATE participants SET pin_hash = ? "
-            "WHERE id = ? AND court_id = ?",
-            (generate_password_hash(pin), participant_id, court["id"]),
-        )
-        if result.rowcount == 0:
-            db.rollback()
-            abort(404)
-        db.commit()
-        flash_t("participant_pin_reset", "success")
+        try:
+            reset_court_participant_pin(
+                court, participant_id, request.form.get("pin", "")
+            )
+        except CourtActionError as error:
+            if error.status == 404:
+                abort(404)
+            flash_action_error(error)
+        else:
+            flash_t("participant_pin_reset", "success")
         return redirect(url_for("court_detail", guid=guid))
 
     @app.post(
@@ -3575,28 +3041,14 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         court = fetch_court(guid)
         if court is None:
             abort(404)
-        if court["roll_clearing_locked"]:
-            flash_t("court_read_only", "error")
-            return redirect(url_for("court_detail", guid=guid))
-
-        db = get_db()
         try:
-            db.execute("BEGIN IMMEDIATE")
-            result = db.execute(
-                "DELETE FROM participants WHERE id = ? AND court_id = ?",
-                (participant_id, court["id"]),
-            )
-            if result.rowcount == 0:
-                db.rollback()
+            remove_court_participant(court, participant_id)
+        except CourtActionError as error:
+            if error.status == 404:
                 abort(404)
-            rebalance_participants(db, court["id"])
-            db.commit()
-        except sqlite3.Error:
-            db.rollback()
-            raise
-
-        send_court_push_notifications(guid, "members_changed")
-        flash_t("participant_removed", "success")
+            flash_action_error(error)
+        else:
+            flash_t("participant_removed", "success")
         return redirect(url_for("court_detail", guid=guid))
 
     @app.get("/my-courts")
@@ -3842,6 +3294,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
     @app.errorhandler(404)
     def not_found(_error):
+        if request.path == "/api" or request.path.startswith("/api/"):
+            return api_error_response("not_found", 404)
         return render_template("404.html"), 404
 
     return app
@@ -3988,6 +3442,28 @@ def init_db() -> None:
             "ALTER TABLE courts ADD COLUMN leave_deadline_at "
             "TEXT NOT NULL DEFAULT ''"
         )
+    if "owner_notifications" not in columns:
+        db.execute(
+            "ALTER TABLE courts ADD COLUMN owner_notifications "
+            "INTEGER NOT NULL DEFAULT 1"
+        )
+    api_token_columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(api_tokens)").fetchall()
+    }
+    # The Android app links its FCM registration token to its sign-in token
+    # so organizers hear about changes to their own courts.
+    if "fcm_token" not in api_token_columns:
+        db.execute("ALTER TABLE api_tokens ADD COLUMN fcm_token TEXT")
+    if "fcm_language" not in api_token_columns:
+        db.execute(
+            "ALTER TABLE api_tokens ADD COLUMN fcm_language "
+            "TEXT NOT NULL DEFAULT 'en-us'"
+        )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS api_tokens_fcm_token_idx "
+        "ON api_tokens(fcm_token)"
+    )
     participant_columns = {
         row["name"]
         for row in db.execute("PRAGMA table_info(participants)").fetchall()
@@ -4155,6 +3631,16 @@ def public_external_url(endpoint: str, **values: Any) -> str:
 
 
 def current_language() -> str:
+    if api_request_active():
+        requested = request.args.get("lang", "").strip().lower()
+        if requested in LANGUAGES:
+            return requested
+        if request.accept_languages:
+            matched = request.accept_languages.best_match(
+                ("zh-TW", "zh-Hant", "zh", "en-US", "en")
+            )
+            if matched:
+                return "zh-tw" if matched.lower().startswith("zh") else "en-us"
     saved_language = request.cookies.get("court_lang", "").lower()
     if saved_language in LANGUAGES:
         return saved_language
@@ -4465,19 +3951,80 @@ def contact_notification_channels() -> dict[str, Any]:
     }
 
 
+CONTACT_CLIENT_FIELDS = ("platform", "app_version", "os_version", "device_model")
+WEB_DEVICE_LABELS = {
+    "android": "Android browser",
+    "ios": "iOS browser",
+    "mobile": "Mobile browser",
+    "web": "Desktop browser",
+}
+
+
+def clean_contact_client(value: Any) -> dict[str, str]:
+    """Keep the short, printable client fields an app sends with a message."""
+    if not isinstance(value, dict):
+        return {}
+    client: dict[str, str] = {}
+    for field_name in CONTACT_CLIENT_FIELDS:
+        field_value = value.get(field_name)
+        if isinstance(field_value, (str, int, float)) and not isinstance(
+            field_value, bool
+        ):
+            text = "".join(
+                ch for ch in str(field_value).strip() if ch.isprintable()
+            )[:60]
+            if text:
+                client[field_name] = text
+    return client
+
+
+def contact_message_context(client: dict[str, str] | None = None) -> dict[str, str]:
+    """Where a contact message came from, for the delivered report."""
+    member = current_member()
+    account = (
+        f"{member['username']} (#{member['id']})" if member else "Guest / 訪客"
+    )
+    client = client or {}
+    if not api_request_active():
+        source = "Website / 網站"
+        device = WEB_DEVICE_LABELS[client_device_information()]
+    elif client.get("platform", "").casefold() == "android":
+        source = " ".join(
+            part for part in ("Android app / App", client.get("app_version")) if part
+        )
+        os_version = client.get("os_version")
+        device = " · ".join(
+            part
+            for part in (
+                client.get("device_model"),
+                f"Android {os_version}" if os_version else "",
+            )
+            if part
+        ) or "—"
+    else:
+        source = "API"
+        device = WEB_DEVICE_LABELS[client_device_information()]
+    return {"source": source, "device": device, "account": account}
+
+
 def format_contact_message_notification(message: dict[str, Any]) -> str:
     reply_contact = message["reply_contact"] or "—"
     body = message["message"]
     if len(body) > 1200:
         body = body[:1197].rstrip() + "…"
     notification = (
-        "New contact message / 新聯絡留言\n"
-        f"ID: #{message['id']}\n"
+        f"📮 Contact report / 聯絡回報 #{message['id']}\n"
+        f"Subject / 主旨: {message['subject']}\n\n"
+        f"{body}\n\n"
+        "— Sender / 寄件者 —\n"
         f"Name / 名稱: {message['sender_name']}\n"
         f"Reply / 回覆: {reply_contact}\n"
-        f"Subject / 主旨: {message['subject']}\n"
+        f"Account / 帳號: {message.get('account') or '—'}\n\n"
+        "— Environment / 環境 —\n"
+        f"Source / 來源: {message.get('source') or '—'}\n"
+        f"Device / 裝置: {message.get('device') or '—'}\n"
+        f"Language / 語言: {message.get('language') or '—'}\n"
         f"Submitted / 送出: {message['submitted_at']}\n\n"
-        f"{body}\n\n"
         f"Inbox / 收件匣: {public_external_url('admin_messages')}"
     )
     return notification[:1900]
@@ -4531,11 +4078,16 @@ def post_contact_notification(
 
 
 def send_contact_message_notifications(message: dict[str, Any]) -> None:
-    if not get_bool_setting("contact_notifications_enabled"):
-        return
+    """Report a new message: always to Telegram when it is configured, and to
+    Discord when an administrator turned Discord notifications on."""
     channels = contact_notification_channels()
+    discord_enabled = channels["discord_ready"] and get_bool_setting(
+        "contact_notifications_enabled"
+    )
+    if not (discord_enabled or channels["telegram_ready"]):
+        return
     notification = format_contact_message_notification(message)
-    if channels["discord_ready"]:
+    if discord_enabled:
         post_contact_notification(
             "Discord",
             channels["discord_webhook"],
@@ -4703,7 +4255,7 @@ def clear_login_failures(scope: str, username: str) -> None:
     db.commit()
 
 
-def flash_failed_attempt(
+def record_failed_attempt(
     scope: str,
     username: str,
     *,
@@ -4712,7 +4264,8 @@ def flash_failed_attempt(
     remaining_translation: str,
     locked_translation: str,
     store_username_key: bool,
-) -> None:
+) -> str:
+    """Count one failed attempt and return the user-facing message."""
     db = get_db()
     now = datetime.now()
     attempt_key = login_attempt_key(scope, username)
@@ -4759,11 +4312,9 @@ def flash_failed_attempt(
     remaining = max(0, max_attempts - failed_count)
     if remaining:
         db.commit()
-        message = TRANSLATIONS[current_language()][remaining_translation].format(
+        return TRANSLATIONS[current_language()][remaining_translation].format(
             count=remaining,
         )
-        flash(message, "error")
-        return
 
     lockout_seconds = attempt_window
     locked_until = now + timedelta(seconds=lockout_seconds)
@@ -4772,14 +4323,14 @@ def flash_failed_attempt(
         (locked_until.isoformat(timespec="seconds"), attempt_key),
     )
     db.commit()
-    flash_attempt_locked(
+    return attempt_locked_message(
         locked_translation,
         max(1, (lockout_seconds + 59) // 60),
     )
 
 
-def flash_login_failure(scope: str, username: str) -> None:
-    flash_failed_attempt(
+def record_login_failure(scope: str, username: str) -> str:
+    return record_failed_attempt(
         scope,
         username,
         max_attempts_config="LOGIN_MAX_ATTEMPTS",
@@ -4794,8 +4345,8 @@ def court_leave_attempt_scope(court_id: int) -> str:
     return f"court_leave:{court_id}"
 
 
-def flash_leave_failure(court_id: int, username: str) -> None:
-    flash_failed_attempt(
+def record_leave_failure(court_id: int, username: str) -> str:
+    return record_failed_attempt(
         court_leave_attempt_scope(court_id),
         username,
         max_attempts_config="LEAVE_MAX_ATTEMPTS",
@@ -4806,19 +4357,36 @@ def flash_leave_failure(court_id: int, username: str) -> None:
     )
 
 
-def flash_login_locked(minutes: int) -> None:
-    flash_attempt_locked("login_locked", minutes)
-
-
-def flash_leave_locked(minutes: int) -> None:
-    flash_attempt_locked("leave_locked", minutes)
-
-
-def flash_attempt_locked(translation_key: str, minutes: int) -> None:
-    message = TRANSLATIONS[current_language()][translation_key].format(
+def attempt_locked_message(translation_key: str, minutes: int) -> str:
+    return TRANSLATIONS[current_language()][translation_key].format(
         minutes=minutes
     )
-    flash(message, "error")
+
+
+def flash_action_error(error: CourtActionError) -> None:
+    flash_message(error.message, "error")
+
+
+def api_request_active() -> bool:
+    return bool(g.get("api_request"))
+
+
+def api_error_response(
+    code: str,
+    status: int,
+    message: str | None = None,
+    fields: dict[str, str] | None = None,
+):
+    error: dict[str, Any] = {
+        "code": code,
+        "message": message
+        or TRANSLATIONS[current_language()].get(code)
+        or API_ERROR_MESSAGES.get(code, {}).get(current_language())
+        or code,
+    }
+    if fields:
+        error["fields"] = fields
+    return jsonify({"error": error}), status
 
 
 def csrf_token() -> str:
@@ -4890,6 +4458,37 @@ def validated_push_endpoint(value: Any) -> str | None:
     return endpoint
 
 
+def fcm_client() -> FcmClient | None:
+    """The FCM sender, created once per app; ``None`` when not configured."""
+    extensions = current_app.extensions
+    if "fcm_client" not in extensions:
+        path = str(current_app.config.get("FCM_SERVICE_ACCOUNT_FILE", "")).strip()
+        client = None
+        if path:
+            try:
+                client = FcmClient(
+                    path, timeout=float(current_app.config["FCM_TIMEOUT"])
+                )
+            except (OSError, ValueError, KeyError) as error:
+                current_app.logger.warning(
+                    "FCM disabled: cannot load the service account key (%s)",
+                    type(error).__name__,
+                )
+        extensions["fcm_client"] = client
+    return extensions["fcm_client"]
+
+
+def fcm_enabled() -> bool:
+    return fcm_client() is not None
+
+
+def validated_fcm_token(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    token = value.strip()
+    return token if FCM_TOKEN_PATTERN.fullmatch(token) else None
+
+
 def validated_push_subscription(value: Any) -> tuple[str, str, str] | None:
     if not isinstance(value, dict):
         return None
@@ -4932,8 +4531,15 @@ def valid_auth_secret(value: str) -> bool:
     return bool(decoded and len(decoded) == 16)
 
 
+def flash_message(message: str, category: str) -> None:
+    # API clients receive results in the JSON body; flashing would only
+    # create an unused session cookie.
+    if not api_request_active():
+        flash(message, category)
+
+
 def flash_t(key: str, category: str) -> None:
-    flash(TRANSLATIONS[current_language()].get(key, key), category)
+    flash_message(TRANSLATIONS[current_language()].get(key, key), category)
 
 
 def turnstile_enabled() -> bool:
@@ -4944,10 +4550,14 @@ def turnstile_enabled() -> bool:
     )
 
 
-def verify_turnstile_response(expected_action: str) -> bool:
+def verify_turnstile_response(
+    expected_action: str, token: str | None = None
+) -> bool:
     if not turnstile_enabled():
         return True
-    token = request.form.get("cf-turnstile-response", "").strip()
+    if token is None:
+        token = request.form.get("cf-turnstile-response", "")
+    token = str(token).strip()
     if not token or len(token) > 2048:
         return False
 
@@ -5057,7 +4667,10 @@ def organizer_required(view: Callable) -> Callable:
 
 
 def current_member() -> sqlite3.Row | None:
-    user_id = session.get("user_id")
+    api_request = api_request_active()
+    # API requests never fall back to the session cookie, so cross-site
+    # requests cannot ride a browser session without a CSRF token.
+    user_id = g.get("api_user_id") if api_request else session.get("user_id")
     if not user_id:
         return None
     user = get_db().execute(
@@ -5066,6 +4679,10 @@ def current_member() -> sqlite3.Row | None:
         "FROM users WHERE id = ?",
         (user_id,),
     ).fetchone()
+    if api_request:
+        if user is None or user["archived"] or user["banned"]:
+            return None
+        return user
     if user is None or user["archived"] or user["banned"]:
         session.pop("user_id", None)
         session.pop("user_username", None)
@@ -5788,6 +5405,17 @@ def remove_court_media_files(filenames: list[str]) -> None:
             (media_folder / filename).unlink(missing_ok=True)
 
 
+PUSH_BODY_KEYS = {
+    "updated": "push_event_updated_body",
+    "archived": "push_event_archived_body",
+    "restored": "push_event_restored_body",
+    "roll_started": "push_event_roll_started_body",
+    "editing_restored": "push_event_editing_restored_body",
+    "deleted": "push_event_deleted_body",
+    "members_changed": "push_members_changed_body",
+}
+
+
 def fetch_court_push_subscriptions(court_id: int) -> list[sqlite3.Row]:
     if not web_push_enabled():
         return []
@@ -5798,21 +5426,64 @@ def fetch_court_push_subscriptions(court_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def fetch_court_fcm_subscriptions(court_id: int) -> list[sqlite3.Row]:
+    if not fcm_enabled():
+        return []
+    return get_db().execute(
+        "SELECT id, token, language "
+        "FROM fcm_subscriptions WHERE court_id = ? ORDER BY id",
+        (court_id,),
+    ).fetchall()
+
+
+def fetch_court_owner_fcm_targets(court: sqlite3.Row) -> list[sqlite3.Row]:
+    """The organizer's signed-in Android devices, when they want court alerts.
+
+    Changes the organizer makes themselves are skipped: they already know.
+    """
+    if not fcm_enabled() or not court["owner_id"] or not court["owner_notifications"]:
+        return []
+    actor = current_member()
+    if actor is not None and actor["id"] == court["owner_id"]:
+        return []
+    return get_db().execute(
+        """
+        SELECT MIN(t.id) AS id, t.fcm_token AS token,
+               MAX(t.fcm_language) AS language
+        FROM api_tokens t
+        JOIN users u ON u.id = t.user_id
+        WHERE t.user_id = ? AND t.fcm_token IS NOT NULL AND t.fcm_token != ''
+          AND t.expires_at > ? AND u.archived = 0 AND u.banned = 0
+        GROUP BY t.fcm_token
+        ORDER BY MIN(t.id)
+        """,
+        (court["owner_id"], datetime.now().isoformat(timespec="seconds")),
+    ).fetchall()
+
+
 def send_court_push_notifications(guid: str, change_type: str) -> None:
-    if not web_push_enabled():
+    if not (web_push_enabled() or fcm_enabled()):
         return
     court = get_db().execute(
-        "SELECT id, guid, event_name, hall_name FROM courts WHERE guid = ?",
+        "SELECT id, guid, event_name, hall_name, owner_id, owner_notifications "
+        "FROM courts WHERE guid = ?",
         (guid,),
     ).fetchone()
     if court is None:
         return
-    subscriptions = fetch_court_push_subscriptions(court["id"])
+    court_name = court["event_name"] or court["hall_name"]
     deliver_court_push_notifications(
         guid=court["guid"],
-        court_name=court["event_name"] or court["hall_name"],
+        court_name=court_name,
         change_type=change_type,
-        subscriptions=subscriptions,
+        subscriptions=fetch_court_push_subscriptions(court["id"]),
+    )
+    deliver_court_fcm_notifications(
+        guid=court["guid"],
+        court_name=court_name,
+        change_type=change_type,
+        subscriptions=fetch_court_fcm_subscriptions(court["id"]),
+        owner_targets=fetch_court_owner_fcm_targets(court),
     )
 
 
@@ -5825,16 +5496,7 @@ def deliver_court_push_notifications(
 ) -> None:
     if not web_push_enabled() or not subscriptions:
         return
-    body_keys = {
-        "updated": "push_event_updated_body",
-        "archived": "push_event_archived_body",
-        "restored": "push_event_restored_body",
-        "roll_started": "push_event_roll_started_body",
-        "editing_restored": "push_event_editing_restored_body",
-        "deleted": "push_event_deleted_body",
-        "members_changed": "push_members_changed_body",
-    }
-    body_key = body_keys.get(change_type, "push_event_updated_body")
+    body_key = PUSH_BODY_KEYS.get(change_type, "push_event_updated_body")
     stale_subscription_ids: list[int] = []
     target_url = url_for("court_detail", guid=guid, _external=True)
     icon_url = url_for(
@@ -5899,6 +5561,89 @@ def deliver_court_push_notifications(
         db.commit()
 
 
+def deliver_court_fcm_notifications(
+    *,
+    guid: str,
+    court_name: str,
+    change_type: str,
+    subscriptions: list[sqlite3.Row],
+    owner_targets: list[sqlite3.Row] | None = None,
+) -> None:
+    client = fcm_client()
+    owner_targets = owner_targets or []
+    if client is None or not (subscriptions or owner_targets):
+        return
+    body_key = PUSH_BODY_KEYS.get(change_type, "push_event_updated_body")
+    target_url = url_for("court_detail", guid=guid, _external=True)
+    # A device subscribed to the court that is also the organizer's gets one
+    # notification, worded for the organizer.
+    owner_tokens = {target["token"] for target in owner_targets}
+    recipients = [
+        ("subscription", row, "push_event_updated_title")
+        for row in subscriptions
+        if row["token"] not in owner_tokens
+    ] + [("owner", row, "push_owner_title") for row in owner_targets]
+    stale_subscription_ids: list[int] = []
+    stale_owner_tokens: list[str] = []
+    for kind, recipient, title_key in recipients:
+        language = (
+            recipient["language"]
+            if recipient["language"] in LANGUAGES
+            else "en-us"
+        )
+        translations = TRANSLATIONS[language]
+        try:
+            client.send(
+                recipient["token"],
+                {
+                    "type": "court_changed",
+                    "guid": guid,
+                    "change": change_type,
+                    "audience": kind,
+                    "title": translations[title_key].format(name=court_name),
+                    "body": translations[body_key],
+                    "url": target_url,
+                },
+                collapse_key=f"court-{guid}",
+            )
+        except FcmError as error:
+            if error.stale_token:
+                if kind == "owner":
+                    stale_owner_tokens.append(recipient["token"])
+                else:
+                    stale_subscription_ids.append(recipient["id"])
+            current_app.logger.warning(
+                "FCM delivery failed for %s %s (%s %s)",
+                kind,
+                recipient["id"],
+                error.status,
+                error.code,
+            )
+        except Exception as error:
+            current_app.logger.warning(
+                "FCM delivery failed for %s %s (%s)",
+                kind,
+                recipient["id"],
+                type(error).__name__,
+            )
+    if stale_subscription_ids or stale_owner_tokens:
+        db = get_db()
+        if stale_subscription_ids:
+            placeholders = ",".join("?" for _ in stale_subscription_ids)
+            db.execute(
+                f"DELETE FROM fcm_subscriptions WHERE id IN ({placeholders})",
+                stale_subscription_ids,
+            )
+        if stale_owner_tokens:
+            placeholders = ",".join("?" for _ in stale_owner_tokens)
+            db.execute(
+                "UPDATE api_tokens SET fcm_token = NULL "
+                f"WHERE fcm_token IN ({placeholders})",
+                stale_owner_tokens,
+            )
+        db.commit()
+
+
 def delete_court_record(guid: str, owner_id: int | None = None) -> bool:
     db = get_db()
     parameters: tuple[Any, ...] = (
@@ -5906,8 +5651,8 @@ def delete_court_record(guid: str, owner_id: int | None = None) -> bool:
     )
     ownership_clause = " AND owner_id = ?" if owner_id is not None else ""
     court = db.execute(
-        "SELECT id, guid, event_name, hall_name FROM courts "
-        f"WHERE guid = ?{ownership_clause}",
+        "SELECT id, guid, event_name, hall_name, owner_id, owner_notifications "
+        f"FROM courts WHERE guid = ?{ownership_clause}",
         parameters,
     ).fetchone()
     if court is None:
@@ -5918,6 +5663,8 @@ def delete_court_record(guid: str, owner_id: int | None = None) -> bool:
         (court["id"],),
     ).fetchall()
     subscriptions = fetch_court_push_subscriptions(court["id"])
+    fcm_subscriptions = fetch_court_fcm_subscriptions(court["id"])
+    owner_targets = fetch_court_owner_fcm_targets(court)
     result = db.execute(
         "DELETE FROM courts WHERE id = ?",
         (court["id"],),
@@ -5933,6 +5680,13 @@ def delete_court_record(guid: str, owner_id: int | None = None) -> bool:
         court_name=court["event_name"] or court["hall_name"],
         change_type="deleted",
         subscriptions=subscriptions,
+    )
+    deliver_court_fcm_notifications(
+        guid=court["guid"],
+        court_name=court["event_name"] or court["hall_name"],
+        change_type="deleted",
+        subscriptions=fcm_subscriptions,
+        owner_targets=owner_targets,
     )
     return True
 
@@ -6504,6 +6258,832 @@ def validate_court(values: dict[str, str]) -> tuple[dict[str, Any], dict[str, st
             errors[field] = "Invalid coordinate"
 
     return cleaned, errors
+
+
+# ---------------------------------------------------------------------------
+# Shared actions
+#
+# These functions hold the business rules used by both the HTML views and the
+# JSON API (api.py). They raise CourtActionError instead of flashing or
+# redirecting so each caller can present the failure in its own format.
+# ---------------------------------------------------------------------------
+
+API_ERROR_MESSAGES = {
+    "not_found": {
+        "en-us": "The requested resource was not found.",
+        "zh-tw": "找不到要求的資源。",
+    },
+    "unauthorized": {
+        "en-us": "Sign in to continue.",
+        "zh-tw": "請先登入後再繼續。",
+    },
+    "invalid_token": {
+        "en-us": "The access token is invalid or has expired.",
+        "zh-tw": "存取權杖無效或已過期。",
+    },
+    "forbidden": {
+        "en-us": "You do not have permission to do this.",
+        "zh-tw": "你沒有執行此操作的權限。",
+    },
+    "bad_request": {
+        "en-us": "The request could not be understood.",
+        "zh-tw": "無法解析此要求。",
+    },
+    "method_not_allowed": {
+        "en-us": "This method is not allowed for the endpoint.",
+        "zh-tw": "此端點不允許使用這個方法。",
+    },
+    "payload_too_large": {
+        "en-us": "The request body is too large.",
+        "zh-tw": "要求內容過大。",
+    },
+    "conflict": {
+        "en-us": "The request conflicts with the current state.",
+        "zh-tw": "此要求與目前狀態衝突。",
+    },
+    "server_error": {
+        "en-us": "An unexpected server error occurred.",
+        "zh-tw": "伺服器發生未預期的錯誤。",
+    },
+    "court_not_read_only": {
+        "en-us": "Start roll call and clearing before saving member statuses.",
+        "zh-tw": "請先開始點名與結帳，再儲存成員狀態。",
+    },
+    "participant_not_found": {
+        "en-us": "That participant is not part of this event.",
+        "zh-tw": "此參與者不屬於這個場次。",
+    },
+    "unknown_member": {
+        "en-us": "One or more member IDs do not belong to this event.",
+        "zh-tw": "有成員編號不屬於這個場次。",
+    },
+    "media_not_found": {
+        "en-us": "That media file is not attached to this event.",
+        "zh-tw": "此媒體檔案不屬於這個場次。",
+    },
+    "user_not_found": {
+        "en-us": "That account does not exist.",
+        "zh-tw": "找不到此帳號。",
+    },
+    "message_not_found": {
+        "en-us": "That message does not exist.",
+        "zh-tw": "找不到此訊息。",
+    },
+    "push_unavailable": {
+        "en-us": "Push notifications are not configured on this server.",
+        "zh-tw": "此伺服器尚未設定推播通知。",
+    },
+}
+
+
+def build_court_filters(
+    args: Any, *, admin: bool = False
+) -> tuple[list[str], list[Any], dict[str, Any]]:
+    """Translate list filters into SQL clauses shared by pages and the API."""
+    search = args.get("q", "").strip()[:100]
+    legacy_date = "" if admin else args.get("date", "").strip()
+    date_from = args.get("date_from", "").strip() or legacy_date
+    date_to = args.get("date_to", "").strip() or legacy_date
+    level_value = args.get("level", "").strip()
+    gender = args.get("gender", "both").strip()
+    status = args.get("status", "").strip()
+    show_expired = args.get("show_expired", "") == "1"
+    clauses: list[str] = [] if admin else ["c.archived = 0"]
+    parameters: list[Any] = []
+    if not show_expired:
+        clauses.append(
+            f"c.archived = 1 OR NOT {COURT_EXPIRED_SQL}"
+            if admin
+            else f"NOT {COURT_EXPIRED_SQL}"
+        )
+
+    if search:
+        search_pattern = f"%{search}%"
+        clauses.append(
+            "c.event_name LIKE ? OR c.badminton_name LIKE ? "
+            "OR c.hall_name LIKE ? OR c.location LIKE ? OR c.court_id LIKE ? "
+            "OR COALESCE(NULLIF(c.creator_name, ''), u.username, ?) LIKE ?"
+        )
+        parameters.extend(
+            [search_pattern] * 5
+            + [current_app_config("ADMIN_USERNAME"), search_pattern]
+        )
+
+    parsed_date_from = parse_filter_date(date_from)
+    parsed_date_to = parse_filter_date(date_to)
+    if parsed_date_from:
+        clauses.append("c.court_date >= ?")
+        parameters.append(parsed_date_from.isoformat())
+    if parsed_date_to:
+        clauses.append("c.court_date <= ?")
+        parameters.append(parsed_date_to.isoformat())
+
+    try:
+        level = int(level_value) if level_value else None
+    except ValueError:
+        level = None
+    if gender not in {"male", "female", "both"}:
+        gender = "both"
+    if level is not None and 1 <= level <= 18:
+        if gender == "male":
+            clauses.append("? BETWEEN c.male_level_min AND c.male_level_max")
+            parameters.append(level)
+        elif gender == "female":
+            clauses.append("? BETWEEN c.female_level_min AND c.female_level_max")
+            parameters.append(level)
+        else:
+            clauses.append(
+                "? BETWEEN c.male_level_min AND c.male_level_max "
+                "AND ? BETWEEN c.female_level_min AND c.female_level_max"
+            )
+            parameters.extend([level, level])
+    else:
+        level_value = ""
+
+    capacity_count = (
+        "c.ordered_count + (SELECT COUNT(*) FROM participants fp "
+        "WHERE fp.court_id = c.id AND fp.waitlisted = 0)"
+    )
+    active = f"c.archived = 0 AND NOT {COURT_EXPIRED_SQL}"
+    if status == "open":
+        clauses.append(
+            f"{active} AND c.roll_clearing_locked = 0 "
+            f"AND {capacity_count} < c.member_max"
+        )
+    elif status == "full":
+        clauses.append(
+            f"{active} AND c.roll_clearing_locked = 0 "
+            f"AND {capacity_count} >= c.member_max"
+        )
+    elif status == "read_only":
+        clauses.append(f"{active} AND c.roll_clearing_locked = 1")
+    elif status == "archived" and admin:
+        clauses.append("c.archived = 1")
+    else:
+        status = ""
+
+    filters = {
+        "q": search,
+        "date_from": format_filter_date(parsed_date_from),
+        "date_to": format_filter_date(parsed_date_to),
+        "level": level_value,
+        "gender": gender,
+        "status": status,
+        "show_expired": show_expired,
+    }
+    return [f"({clause})" for clause in clauses], parameters, filters
+
+
+def court_where_sql(clauses: list[str]) -> str:
+    return " WHERE " + " AND ".join(clauses) if clauses else ""
+
+
+def join_court_entry(court: sqlite3.Row, raw_username: str, raw_pin: str) -> bool:
+    """Sign a player up; returns True when they were placed on the waitlist."""
+    if court["archived"]:
+        raise CourtActionError("court_closed", 409)
+    if court["is_expired"]:
+        raise CourtActionError("court_expired", 409)
+    if court["roll_clearing_locked"]:
+        raise CourtActionError("court_read_only", 409)
+
+    username = clean_username(raw_username)
+    pin = raw_pin.strip()
+    if not 2 <= len(username) <= 40:
+        raise CourtActionError("invalid_username")
+    if not PIN_PATTERN.fullmatch(pin):
+        raise CourtActionError("invalid_pin")
+
+    db = get_db()
+    try:
+        # Serialize the capacity check with the insert so simultaneous
+        # sign-ups are assigned confirmed/waiting positions in order.
+        db.execute("BEGIN IMMEDIATE")
+        current = db.execute(
+            """
+            SELECT c.archived, c.roll_clearing_locked, c.member_max,
+                   CASE WHEN """
+            + COURT_EXPIRED_SQL
+            + """ THEN 1 ELSE 0 END AS is_expired,
+                   c.ordered_count +
+                   (SELECT COUNT(*) FROM participants p
+                    WHERE p.court_id = c.id AND p.waitlisted = 0)
+                       AS total_count
+            FROM courts c
+            WHERE c.id = ?
+            """,
+            (court["id"],),
+        ).fetchone()
+        if current is None or current["archived"]:
+            db.rollback()
+            raise CourtActionError("court_closed", 409)
+        if current["is_expired"]:
+            db.rollback()
+            raise CourtActionError("court_expired", 409)
+        if current["roll_clearing_locked"]:
+            db.rollback()
+            raise CourtActionError("court_read_only", 409)
+        waitlisted = int(current["total_count"] >= current["member_max"])
+        occurred_at = datetime.now().isoformat(timespec="seconds")
+        db.execute(
+            "INSERT INTO participants "
+            "(court_id, username, username_key, pin_hash, waitlisted, joined_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                court["id"],
+                username,
+                username.casefold(),
+                generate_password_hash(pin),
+                waitlisted,
+                occurred_at,
+            ),
+        )
+        record_participation_event(db, court["id"], username, "join", occurred_at)
+        db.commit()
+    except sqlite3.IntegrityError:
+        db.rollback()
+        raise CourtActionError("duplicate_username", 409) from None
+
+    send_court_push_notifications(court["guid"], "members_changed")
+    return bool(waitlisted)
+
+
+def leave_court_entry(court: sqlite3.Row, raw_username: str, raw_pin: str) -> None:
+    if court["is_expired"]:
+        raise CourtActionError("court_expired", 409)
+    if court["roll_clearing_locked"]:
+        raise CourtActionError("court_read_only", 409)
+    if court["leave_deadline_passed"]:
+        raise CourtActionError("leave_deadline_passed", 409)
+
+    username = clean_username(raw_username)
+    pin = raw_pin.strip()
+    leave_attempt_scope = court_leave_attempt_scope(court["id"])
+    locked_minutes = login_lock_minutes(leave_attempt_scope, username)
+    if locked_minutes:
+        raise CourtActionError(
+            "leave_locked",
+            429,
+            attempt_locked_message("leave_locked", locked_minutes),
+        )
+    if not 2 <= len(username) <= 40 or not PIN_PATTERN.fullmatch(pin):
+        raise CourtActionError(
+            "leave_failed", 403, record_leave_failure(court["id"], username)
+        )
+
+    db = get_db()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        current = db.execute(
+            "SELECT roll_clearing_locked, CASE WHEN "
+            + COURT_EXPIRED_SQL
+            + " THEN 1 ELSE 0 END AS is_expired, CASE WHEN "
+            + LEAVE_DEADLINE_PASSED_SQL
+            + " THEN 1 ELSE 0 END AS leave_deadline_passed "
+            "FROM courts c WHERE id = ?",
+            (court["id"],),
+        ).fetchone()
+        if current is None:
+            db.rollback()
+            abort(404)
+        if current["is_expired"]:
+            db.rollback()
+            raise CourtActionError("court_expired", 409)
+        if current["roll_clearing_locked"]:
+            db.rollback()
+            raise CourtActionError("court_read_only", 409)
+        if current["leave_deadline_passed"]:
+            db.rollback()
+            raise CourtActionError("leave_deadline_passed", 409)
+        participant = db.execute(
+            "SELECT id, pin_hash FROM participants "
+            "WHERE court_id = ? AND username_key = ?",
+            (court["id"], username.casefold()),
+        ).fetchone()
+        if participant is None or not check_password_hash(
+            participant["pin_hash"], pin
+        ):
+            db.rollback()
+            raise CourtActionError(
+                "leave_failed", 403, record_leave_failure(court["id"], username)
+            )
+
+        db.execute(
+            "DELETE FROM login_attempts WHERE attempt_key = ?",
+            (login_attempt_key(leave_attempt_scope, username),),
+        )
+        db.execute("DELETE FROM participants WHERE id = ?", (participant["id"],))
+        rebalance_participants(db, court["id"])
+        record_participation_event(
+            db,
+            court["id"],
+            username,
+            "leave",
+            datetime.now().isoformat(timespec="seconds"),
+        )
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        raise
+    send_court_push_notifications(court["guid"], "members_changed")
+
+
+def start_roll_clearing_mode(court: sqlite3.Row) -> bool:
+    """Lock the event for roll call; returns True when it was newly locked."""
+    db = get_db()
+    changed = False
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        current = db.execute(
+            "SELECT id, ordered_count, roll_clearing_locked "
+            "FROM courts WHERE id = ?",
+            (court["id"],),
+        ).fetchone()
+        if current is None:
+            db.rollback()
+            abort(404)
+        if not current["roll_clearing_locked"]:
+            nicknames = reserved_nickname_values(
+                current["id"], current["ordered_count"]
+            )
+            sync_reserved_members(db, current["id"], nicknames)
+            db.execute(
+                "UPDATE courts SET roll_clearing_locked = 1 WHERE id = ?",
+                (current["id"],),
+            )
+            changed = True
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        raise
+    if changed:
+        send_court_push_notifications(court["guid"], "roll_started")
+    return changed
+
+
+def save_roll_clearing_statuses(
+    court: sqlite3.Row,
+    participant_statuses: dict[int, tuple[bool, bool]],
+    reserved_statuses: dict[int, tuple[bool, bool]],
+    *,
+    reset_unlisted: bool,
+) -> None:
+    """Store (roll_called, cleared) flags for confirmed and reserved members.
+
+    With ``reset_unlisted`` every member missing from the mappings is reset
+    to (False, False), matching the checkbox form. Otherwise only the listed
+    members change and unknown IDs are rejected.
+    """
+    if not court["roll_clearing_locked"]:
+        raise CourtActionError("court_not_read_only", 409)
+    db = get_db()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        participant_ids = {
+            row["id"]
+            for row in db.execute(
+                "SELECT id FROM participants "
+                "WHERE court_id = ? AND waitlisted = 0",
+                (court["id"],),
+            ).fetchall()
+        }
+        reserved_ids = {
+            row["id"]
+            for row in db.execute(
+                "SELECT id FROM reserved_members WHERE court_id = ?",
+                (court["id"],),
+            ).fetchall()
+        }
+        if not reset_unlisted and (
+            participant_statuses.keys() - participant_ids
+            or reserved_statuses.keys() - reserved_ids
+        ):
+            db.rollback()
+            raise CourtActionError("unknown_member")
+        for table, member_ids, statuses in (
+            ("participants", participant_ids, participant_statuses),
+            ("reserved_members", reserved_ids, reserved_statuses),
+        ):
+            targets = member_ids if reset_unlisted else statuses.keys()
+            db.executemany(
+                f"UPDATE {table} SET roll_called = ?, cleared = ? "
+                "WHERE id = ? AND court_id = ?",
+                [
+                    (
+                        int(bool(statuses.get(member_id, (False, False))[0])),
+                        int(bool(statuses.get(member_id, (False, False))[1])),
+                        member_id,
+                        court["id"],
+                    )
+                    for member_id in targets
+                ],
+            )
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        raise
+
+
+def restore_court_editing_mode(court: sqlite3.Row) -> None:
+    db = get_db()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        result = db.execute(
+            "UPDATE courts SET roll_clearing_locked = 0 WHERE id = ?",
+            (court["id"],),
+        )
+        if result.rowcount == 0:
+            db.rollback()
+            abort(404)
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        raise
+    if court["roll_clearing_locked"]:
+        send_court_push_notifications(court["guid"], "editing_restored")
+
+
+def rename_court_participant(
+    court: sqlite3.Row, participant_id: int, raw_username: str
+) -> None:
+    if court["roll_clearing_locked"]:
+        raise CourtActionError("court_read_only", 409)
+    username = clean_username(raw_username)
+    if not 2 <= len(username) <= 40:
+        raise CourtActionError("invalid_username")
+
+    db = get_db()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        participant = db.execute(
+            "SELECT username FROM participants WHERE id = ? AND court_id = ?",
+            (participant_id, court["id"]),
+        ).fetchone()
+        if participant is None:
+            db.rollback()
+            raise CourtActionError("participant_not_found", 404)
+        changed = participant["username"] != username
+        db.execute(
+            "UPDATE participants SET username = ?, username_key = ? "
+            "WHERE id = ? AND court_id = ?",
+            (username, username.casefold(), participant_id, court["id"]),
+        )
+        db.commit()
+    except sqlite3.IntegrityError:
+        db.rollback()
+        raise CourtActionError("duplicate_username", 409) from None
+    except sqlite3.Error:
+        db.rollback()
+        raise
+    if changed:
+        send_court_push_notifications(court["guid"], "members_changed")
+
+
+def reset_court_participant_pin(
+    court: sqlite3.Row, participant_id: int, raw_pin: str
+) -> None:
+    if court["roll_clearing_locked"]:
+        raise CourtActionError("court_read_only", 409)
+    pin = raw_pin.strip()
+    if not PIN_PATTERN.fullmatch(pin):
+        raise CourtActionError("invalid_pin")
+    db = get_db()
+    result = db.execute(
+        "UPDATE participants SET pin_hash = ? WHERE id = ? AND court_id = ?",
+        (generate_password_hash(pin), participant_id, court["id"]),
+    )
+    if result.rowcount == 0:
+        db.rollback()
+        raise CourtActionError("participant_not_found", 404)
+    db.commit()
+
+
+def remove_court_participant(court: sqlite3.Row, participant_id: int) -> None:
+    if court["roll_clearing_locked"]:
+        raise CourtActionError("court_read_only", 409)
+    db = get_db()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        result = db.execute(
+            "DELETE FROM participants WHERE id = ? AND court_id = ?",
+            (participant_id, court["id"]),
+        )
+        if result.rowcount == 0:
+            db.rollback()
+            raise CourtActionError("participant_not_found", 404)
+        rebalance_participants(db, court["id"])
+        db.commit()
+    except sqlite3.Error:
+        db.rollback()
+        raise
+    send_court_push_notifications(court["guid"], "members_changed")
+
+
+def authenticate_member(username: str, password: str) -> sqlite3.Row:
+    """Check credentials with lockout handling and record the sign-in."""
+    username = username.strip()
+    user = get_db().execute(
+        "SELECT id, username, password_hash, role, archived, banned, "
+        "must_change_password FROM users WHERE username_key = ?",
+        (username.casefold(),),
+    ).fetchone()
+    login_scope = (
+        "admin" if user is not None and user["role"] in ADMIN_ROLES else "member"
+    )
+    locked_minutes = login_lock_minutes(login_scope, username)
+    if locked_minutes:
+        raise CourtActionError(
+            "login_locked",
+            429,
+            attempt_locked_message("login_locked", locked_minutes),
+        )
+    if user is None or not check_password_hash(user["password_hash"], password):
+        raise CourtActionError(
+            "invalid_credentials", 401, record_login_failure(login_scope, username)
+        )
+    if user["banned"]:
+        clear_login_failures(login_scope, username)
+        raise CourtActionError("account_banned", 403)
+    if user["archived"]:
+        clear_login_failures(login_scope, username)
+        raise CourtActionError("account_archived", 403)
+
+    clear_login_failures(login_scope, username)
+    db = get_db()
+    db.execute(
+        "UPDATE users SET last_login_at = ?, last_login_ip = ? WHERE id = ?",
+        (
+            datetime.now().isoformat(timespec="seconds"),
+            client_ip_address(),
+            user["id"],
+        ),
+    )
+    db.commit()
+    return user
+
+
+def register_member(username: str, password: str, confirmation: str) -> int:
+    username = username.strip()
+    if not ACCOUNT_USERNAME_PATTERN.fullmatch(username):
+        raise CourtActionError("account_username_help")
+    if len(password) < 8:
+        raise CourtActionError("password_too_short")
+    if password != confirmation:
+        raise CourtActionError("password_mismatch")
+    db = get_db()
+    now = datetime.now().isoformat(timespec="seconds")
+    try:
+        cursor = db.execute(
+            "INSERT INTO users "
+            "(username, username_key, password_hash, created_at, "
+            "last_login_at, last_login_ip) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                username,
+                username.casefold(),
+                generate_password_hash(password),
+                now,
+                now,
+                client_ip_address(),
+            ),
+        )
+        db.commit()
+    except sqlite3.IntegrityError:
+        db.rollback()
+        raise CourtActionError("username_taken", 409) from None
+    return int(cursor.lastrowid)
+
+
+def revoke_api_tokens(user_id: int, keep_token_id: int | None = None) -> None:
+    db = get_db()
+    db.execute(
+        "DELETE FROM api_tokens WHERE user_id = ? AND id IS NOT ?",
+        (user_id, keep_token_id),
+    )
+    db.commit()
+
+
+def change_member_password(
+    member_id: int, current_password: str, new_password: str, confirmation: str
+) -> None:
+    account = get_db().execute(
+        "SELECT password_hash FROM users WHERE id = ?", (member_id,)
+    ).fetchone()
+    if account is None or not check_password_hash(
+        account["password_hash"], current_password
+    ):
+        raise CourtActionError("invalid_credentials", 403)
+    if len(new_password) < 8:
+        raise CourtActionError("password_too_short")
+    if new_password != confirmation:
+        raise CourtActionError("password_mismatch")
+    db = get_db()
+    db.execute(
+        "UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?",
+        (generate_password_hash(new_password), member_id),
+    )
+    db.commit()
+    # A new password signs out other app devices; keep the caller's token.
+    revoke_api_tokens(member_id, g.get("api_token_id"))
+
+
+def save_member_avatar(member: sqlite3.Row, uploaded: Any) -> str:
+    if uploaded is None or not uploaded.filename:
+        raise CourtActionError("invalid_avatar")
+    image_data = uploaded.stream.read(MAX_AVATAR_BYTES + 1)
+    if len(image_data) > MAX_AVATAR_BYTES:
+        raise CourtActionError("avatar_too_large", 413)
+    extension = detect_image_extension(image_data)
+    if extension is None:
+        raise CourtActionError("invalid_avatar")
+
+    filename = f"{secrets.token_hex(16)}.{extension}"
+    avatar_path = Path(current_app_config("AVATAR_FOLDER")) / filename
+    avatar_path.write_bytes(image_data)
+    db = get_db()
+    db.execute(
+        "UPDATE users SET avatar_filename = ? WHERE id = ?",
+        (filename, member["id"]),
+    )
+    db.commit()
+    remove_avatar_file(member["avatar_filename"])
+    return filename
+
+
+def remove_member_avatar(member: sqlite3.Row) -> None:
+    db = get_db()
+    db.execute("UPDATE users SET avatar_filename = '' WHERE id = ?", (member["id"],))
+    db.commit()
+    remove_avatar_file(member["avatar_filename"])
+
+
+def delete_member_account(member: sqlite3.Row, password: str) -> None:
+    if member["role"] in ADMIN_ROLES:
+        raise CourtActionError("admin_account_delete_disabled", 403)
+    account = get_db().execute(
+        "SELECT password_hash FROM users WHERE id = ?", (member["id"],)
+    ).fetchone()
+    if account is None or not check_password_hash(account["password_hash"], password):
+        raise CourtActionError("invalid_credentials", 403)
+    db = get_db()
+    db.execute("DELETE FROM users WHERE id = ?", (member["id"],))
+    db.commit()
+    remove_avatar_file(member["avatar_filename"])
+
+
+def validate_contact_message(values: dict[str, str]) -> dict[str, str]:
+    errors: dict[str, str] = {}
+    for field_name in ("sender_name", "subject", "message"):
+        if not values[field_name]:
+            errors[field_name] = "contact_form_required"
+    length_rules = (
+        ("sender_name", MAX_CONTACT_NAME_LENGTH, "contact_name_too_long"),
+        ("reply_contact", MAX_CONTACT_REPLY_LENGTH, "contact_reply_too_long"),
+        ("subject", MAX_CONTACT_SUBJECT_LENGTH, "contact_subject_too_long"),
+        ("message", MAX_CONTACT_MESSAGE_LENGTH, "contact_message_too_long"),
+    )
+    for field_name, maximum, error_key in length_rules:
+        if len(values[field_name]) > maximum:
+            errors[field_name] = error_key
+    for field_name, field_value in values.items():
+        if contains_disallowed_control_characters(
+            field_value, multiline=field_name == "message"
+        ):
+            errors[field_name] = "contact_form_invalid"
+    return errors
+
+
+def store_contact_message(
+    values: dict[str, str], lang: str, client: dict[str, str] | None = None
+) -> int:
+    submitted_at = datetime.now().isoformat(timespec="seconds")
+    db = get_db()
+    cursor = db.execute(
+        """
+        INSERT INTO contact_messages
+            (sender_name, reply_contact, subject, message, language, submitted_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            values["sender_name"],
+            values["reply_contact"],
+            values["subject"],
+            values["message"],
+            lang,
+            submitted_at,
+        ),
+    )
+    db.commit()
+    message_id = int(cursor.lastrowid)
+    send_contact_message_notifications(
+        {
+            "id": message_id,
+            **values,
+            **contact_message_context(client),
+            "language": lang,
+            "submitted_at": submitted_at,
+        }
+    )
+    return message_id
+
+
+def set_member_role(actor: sqlite3.Row, user_id: int, raw_role: str) -> None:
+    if user_id == actor["id"]:
+        raise CourtActionError("cannot_change_own_role", 409)
+    role = raw_role.strip()
+    if role not in ACCOUNT_ROLES:
+        raise CourtActionError("invalid_role")
+    db = get_db()
+    result = db.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+    if result.rowcount == 0:
+        db.rollback()
+        raise CourtActionError("user_not_found", 404)
+    db.commit()
+
+
+def delete_archived_member(user_id: int) -> None:
+    """Delete a non-admin account; it must be archived first."""
+    db = get_db()
+    user = db.execute(
+        "SELECT role, archived, avatar_filename FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    if user is None:
+        abort(404)
+    if user["role"] in ADMIN_ROLES:
+        abort(403)
+    if not user["archived"]:
+        raise CourtActionError("account_must_be_archived", 409)
+    db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    db.commit()
+    remove_avatar_file(user["avatar_filename"])
+
+
+def fetch_admin_user_rows() -> list[sqlite3.Row]:
+    return get_db().execute(
+        """
+        SELECT u.id, u.username, u.role, u.archived, u.banned, u.must_change_password,
+               u.created_at, u.last_login_at, u.last_login_ip,
+               COUNT(c.id) AS court_count,
+               COALESCE(
+                   (
+                       SELECT SUM(la.failed_count)
+                       FROM login_attempts la
+                       WHERE la.scope = 'member'
+                         AND la.username_key = u.username_key
+                   ),
+                   0
+               ) AS failed_login_attempts
+        FROM users u
+        LEFT JOIN courts c ON c.owner_id = u.id
+        GROUP BY u.id
+        ORDER BY u.banned DESC, u.archived, u.username_key
+        """
+    ).fetchall()
+
+
+def fetch_contact_message_page(
+    message_status: str, page: int, per_page: int = 50
+) -> dict[str, Any]:
+    where_clause = ""
+    if message_status == "unread":
+        where_clause = " WHERE read_at IS NULL"
+    elif message_status == "read":
+        where_clause = " WHERE read_at IS NOT NULL"
+    db = get_db()
+    total_count = db.execute(
+        f"SELECT COUNT(*) AS count FROM contact_messages{where_clause}"
+    ).fetchone()["count"]
+    unread_count = db.execute(
+        "SELECT COUNT(*) AS count FROM contact_messages WHERE read_at IS NULL"
+    ).fetchone()["count"]
+    page_count = max(1, (total_count + per_page - 1) // per_page)
+    page = min(max(1, page), page_count)
+    messages = db.execute(
+        "SELECT id, sender_name, reply_contact, subject, message, "
+        "language, submitted_at, read_at FROM contact_messages"
+        f"{where_clause} "
+        "ORDER BY submitted_at DESC, id DESC LIMIT ? OFFSET ?",
+        (per_page, (page - 1) * per_page),
+    ).fetchall()
+    return {
+        "messages": messages,
+        "total_count": total_count,
+        "unread_count": unread_count,
+        "page": page,
+        "page_count": page_count,
+    }
+
+
+def set_contact_message_read(message_id: int, mark_read: bool) -> bool:
+    read_at = datetime.now().isoformat(timespec="seconds") if mark_read else None
+    db = get_db()
+    cursor = db.execute(
+        "UPDATE contact_messages SET read_at = ? WHERE id = ?",
+        (read_at, message_id),
+    )
+    db.commit()
+    return cursor.rowcount > 0
 
 
 def update_court_status(guid: str, archived: int) -> None:

@@ -86,6 +86,7 @@ Badminton Court Control Panel is a bilingual Flask application for organizing ba
 | `/admin/courts/export.csv` | Administrator-only export of every court event |
 | `/admin/users` | Member administration |
 | `/licenses` | Asset licenses and development acknowledgments |
+| `/api/v1/...` | JSON API for apps and integrations (see [API.md](API.md)) |
 
 ## Update history content
 
@@ -93,7 +94,7 @@ The bilingual `/updates` timeline is maintained in `data/update_history.json`, n
 
 ## Local setup
 
-Python 3.10 or newer is recommended.
+Python 3.10 or newer is recommended. The web application lives in the repository's `Web/` directory; run every command in this document from there.
 
 ```bash
 python3 -m venv .venv
@@ -130,6 +131,8 @@ The development bootstrap credentials are `admin` / `change-me`. Always replace 
 | `WEB_PUSH_PRIVATE_KEY` | Empty | Secret VAPID private key value or PEM-file path. |
 | `WEB_PUSH_SUBJECT` | Empty | Operator contact URI used in VAPID claims, such as `mailto:admin@example.com`. |
 | `WEB_PUSH_TIMEOUT` | `5` | Per-recipient push delivery timeout in seconds. |
+| `FCM_SERVICE_ACCOUNT_FILE` | Empty | Path to a Firebase service account key JSON. Enables Android app notifications through Firebase Cloud Messaging. |
+| `FCM_TIMEOUT` | `5` | Per-recipient FCM delivery timeout in seconds. |
 | `SOCIAL_THUMBNAIL_FFMPEG` | Bundled executable | Optional FFmpeg executable override used to extract the preview frame when the first event-media item is a video. |
 | `SOCIAL_THUMBNAIL_FONT` | Bundled Noto Sans TC | Optional path to a TrueType/OpenType font that overrides the bundled font used for generated information thumbnails. |
 | `SESSION_COOKIE_SECURE` | `0` | Set to `1` when the site is served exclusively over HTTPS. |
@@ -143,14 +146,16 @@ The development bootstrap credentials are `admin` / `change-me`. Always replace 
 | `ADMIN_CONTACT_DISCORD` | Empty | Optional Discord invite code; `/contact` automatically builds its official `discord.gg` link. |
 | `ADMIN_CONTACT_LINE` | Empty | Optional LINE Official Account ID, with or without `@`; `/contact` automatically builds its official `line.me` link. |
 | `ADMIN_CONTACT_TELEGRAM` | Empty | Optional Telegram public username, with or without `@`; `/contact` automatically builds its official `t.me` link. |
-| `CONTACT_DISCORD_WEBHOOK_URL` | Empty | Secret Discord incoming-webhook URL used for enabled new-message alerts. |
-| `CONTACT_TELEGRAM_BOT_TOKEN` | Empty | Secret Telegram Bot API token used for enabled new-message alerts. |
-| `CONTACT_TELEGRAM_CHAT_ID` | Empty | Telegram numeric chat ID or public `@channel` username that receives enabled alerts. |
+| `CONTACT_DISCORD_WEBHOOK_URL` | Empty | Secret Discord incoming-webhook URL used for new-message alerts after an administrator enables them. |
+| `CONTACT_TELEGRAM_BOT_TOKEN` | Empty | Secret Telegram Bot API token. With `CONTACT_TELEGRAM_CHAT_ID`, every new contact message is reported to Telegram. |
+| `CONTACT_TELEGRAM_CHAT_ID` | Empty | Telegram numeric chat ID or public `@channel` username that receives contact reports. |
 | `CONTACT_NOTIFICATION_TIMEOUT` | `5` | Per-service Discord/Telegram delivery timeout in seconds. |
+| `ANDROID_APP_URL` | Empty | Optional HTTPS download link (for example a Google Play listing) shown on the `/android` page. Without it, the page asks visitors to get in touch. |
 | `LOGIN_MAX_ATTEMPTS` | `5` | Failed sign-ins allowed before temporary lockout. |
 | `LOGIN_LOCKOUT_SECONDS` | `900` | Lockout duration in seconds. |
 | `LEAVE_MAX_ATTEMPTS` | `5` | Incorrect nickname/PIN leave attempts allowed per court, nickname, and client IP before temporary lockout. |
 | `LEAVE_LOCKOUT_SECONDS` | `900` | Leave-attempt lockout duration in seconds. |
+| `API_TOKEN_TTL_DAYS` | `90` | Lifetime in days of bearer tokens issued by the JSON API. |
 
 Values already present in the process environment take precedence over `.env`.
 
@@ -162,7 +167,7 @@ Missing, rejected, expired, reused, oversized, malformed, action-mismatched, and
 
 ## Contact message notifications
 
-Public messages are always committed to SQLite before optional external delivery. Configure `CONTACT_DISCORD_WEBHOOK_URL` and/or both Telegram settings. An administrator or super-administrator can then enable notifications from `/admin/messages`. Discord URLs must be official HTTPS incoming-webhook endpoints; Telegram bot tokens and chat IDs are validated before the switch becomes available. Webhook URLs and bot tokens remain server-side and are never rendered in the inbox. A timeout or provider error is logged without its secret endpoint and does not discard the stored message.
+Public messages are always committed to SQLite before optional external delivery. When both Telegram settings are valid, every new message from the website or the Android app is reported to that Telegram chat. The report lists the subject, message, sender name, reply contact, signed-in account, source (website with a broad device type, or the Android app with its version, Android version, and device model), language, time, and inbox link. Discord is optional: configure `CONTACT_DISCORD_WEBHOOK_URL`, then an administrator or super-administrator turns it on from `/admin/messages`. Discord URLs must be official HTTPS incoming-webhook endpoints, and Telegram bot tokens and chat IDs are validated before use. Webhook URLs and bot tokens remain server-side and are never rendered in the inbox. A timeout or provider error is logged without its secret endpoint and does not discard the stored message.
 
 ## Google hall search
 
@@ -216,6 +221,20 @@ WEB_PUSH_SUBJECT=mailto:your-contact@example.com
 Keep the private key and the entire `instance` directory persistent across deployments. Changing the VAPID key pair invalidates existing browser subscriptions. Production push requires HTTPS and browser permission; localhost is treated as a secure development context by supporting browsers.
 
 If any required VAPID setting is missing, the court-page switch remains disabled. Expired push-service endpoints are removed automatically after a `404` or `410` delivery response.
+
+### Android app notifications (FCM)
+
+The Android app receives the same court notifications through Firebase Cloud Messaging. In the Firebase console, open **Project settings → Service accounts**, generate a private key, store it somewhere persistent (for example `instance/firebase-service-account.json`), and set:
+
+```text
+FCM_SERVICE_ACCOUNT_FILE=instance/firebase-service-account.json
+```
+
+With Docker, put the file in the `/instance` volume and set `FCM_SERVICE_ACCOUNT_FILE=/instance/firebase-service-account.json`. Without it, the app hides the notification switch. Tokens FCM reports as unregistered are removed automatically.
+
+## JSON API
+
+`/api/v1` exposes the player, organizer, account, and administrator functions as JSON for the Android app and other clients. Clients sign in with `POST /api/v1/auth/login` and send the returned token as `Authorization: Bearer <token>`. API requests never use the browser session cookie, so they need no CSRF token. The API and the HTML pages share the same validation, throttling, and permission rules. See [API.md](API.md) for the endpoint reference.
 
 ## Docker
 

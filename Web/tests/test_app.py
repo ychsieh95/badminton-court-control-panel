@@ -30,6 +30,7 @@ def app(tmp_path):
             "WEB_PUSH_PUBLIC_KEY": "",
             "WEB_PUSH_PRIVATE_KEY": "",
             "WEB_PUSH_SUBJECT": "",
+            "FCM_SERVICE_ACCOUNT_FILE": "",
             "WEB_PUSH_TIMEOUT": 1,
             "TURNSTILE_SITE_KEY": "",
             "TURNSTILE_SECRET_KEY": "",
@@ -2470,7 +2471,7 @@ def test_privacy_policy_is_bilingual_public_and_linked_from_footer(client, app):
     assert "完整 User-Agent 或裝置指紋".encode() in privacy.data
     assert "Google Fonts".encode() in privacy.data
     assert "聯絡留言：訪客填寫的名稱".encode() in privacy.data
-    assert "Discord Webhook 及／或 Telegram Bot".encode() in privacy.data
+    assert "每則聯絡留言都會回報至該聊天室".encode() in privacy.data
     assert "尚未設定專用的隱私權聯絡方式".encode() in privacy.data
     assert b"PRIVACY_CONTACT" not in privacy.data
 
@@ -2880,7 +2881,7 @@ def test_admin_cannot_enable_contact_notifications_without_a_channel(
         },
         follow_redirects=True,
     )
-    assert "啟用通知前".encode() in response.data
+    assert "啟用 Discord 通知前".encode() in response.data
     with app.app_context():
         assert get_db().execute(
             "SELECT 1 FROM app_settings "

@@ -17,6 +17,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 
 COPY ./uwsgi.ini /app/uwsgi.ini
 COPY ./app.py /app/app.py
+COPY ./api.py /app/api.py
+COPY ./fcm.py /app/fcm.py
 COPY ./data /app/data
 COPY ./templates /app/templates
 COPY ./static /app/static

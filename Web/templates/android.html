@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}{{ t('android_page_nav') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+
+<section class="intro-hero android-hero">
+  <div class="intro-orbit intro-orbit-one" aria-hidden="true"></div>
+  <div class="intro-orbit intro-orbit-two" aria-hidden="true"></div>
+  <div class="shell intro-hero-inner">
+    <div class="intro-hero-copy">
+      <p class="eyebrow">{{ t('android_page_eyebrow') }}</p>
+      <h1>{{ t('android_page_title') }}</h1>
+      <p>{{ t('android_page_body') }}</p>
+      <div class="intro-actions">
+        {% if android_download_url %}
+          <a class="button button-primary android-download" href="{{ android_download_url }}" rel="noopener">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+            {{ t('android_page_download') }}
+          </a>
+        {% else %}
+          <a class="button button-primary" href="{{ url_for('contact') }}#contact-form">{{ t('android_page_contact') }}</a>
+        {% endif %}
+        <a class="button button-secondary" href="{{ url_for('public_courts') }}">{{ t('intro_browse') }}</a>
+      </div>
+      <p class="android-note">
+        {% if not android_download_url %}{{ t('android_page_unavailable') }}<br>{% endif %}
+        {{ t('android_page_requirements') }}
+      </p>
+    </div>
+    <div class="android-phone" aria-hidden="true">
+      <div class="android-phone-screen">
+        <div class="android-phone-bar"><span></span></div>
+        <div class="android-phone-notice">
+          <div class="android-phone-notice-icon">{% include "_brand_mark.html" %}</div>
+          <div>
+            <strong>{{ t('push_owner_title').format(name='Friday Doubles') }}</strong>
+            <span>{{ t('push_members_changed_body') }}</span>
+          </div>
+        </div>
+        <div class="android-phone-card">
+          <span class="android-phone-chip">{{ t('level') }} 6–10</span>
+          <strong>Friday Doubles</strong>
+          <span>19:00 – 21:00</span>
+          <div class="android-phone-meter"><span></span></div>
+          <div class="android-phone-row"><span></span><span></span><span></span><span></span></div>
+        </div>
+        <div class="android-phone-card android-phone-card-muted">
+          <strong></strong>
+          <span></span>
+        </div>
+        <div class="android-phone-nav"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section shell">
+  <div class="section-heading intro-section-heading">
+    <div>
+      <p class="eyebrow">{{ t('android_page_features_eyebrow') }}</p>
+      <h2>{{ t('android_page_features_title') }}</h2>
+      <p>{{ t('android_page_features_body') }}</p>
+    </div>
+  </div>
+  <div class="intro-feature-grid">
+    {% set features = [
+      ('search', 'android_page_find_title', 'android_page_find_body'),
+      ('join', 'android_page_join_title', 'android_page_join_body'),
+      ('bell', 'android_page_follow_title', 'android_page_follow_body'),
+      ('members', 'android_page_organizer_title', 'android_page_organizer_body'),
+      ('owner', 'android_page_owner_title', 'android_page_owner_body'),
+      ('palette', 'android_page_style_title', 'android_page_style_body')
+    ] %}
+    {% for icon, title, body in features %}
+      <article class="panel intro-feature-card">
+        <div class="intro-feature-icon">
+          {% if icon == 'search' %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          {% elif icon == 'join' %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8M19 8v6M22 11h-6"/></svg>
+          {% elif icon == 'bell' %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          {% elif icon == 'members' %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          {% elif icon == 'owner' %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m9 9 2 2 4-4"/></svg>
+          {% else %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c.93 0 1.5-.75 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99a1.5 1.5 0 0 1 1.5-1.5H16a6 6 0 0 0 6-6c0-4.97-4.48-9-10-9Z"/></svg>
+          {% endif %}
+        </div>
+        <h3>{{ t(title) }}</h3>
+        <p>{{ t(body) }}</p>
+      </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section intro-how-section">
+  <div class="shell">
+    <div class="section-heading intro-section-heading">
+      <div>
+        <p class="eyebrow">{{ t('android_page_eyebrow') }}</p>
+        <h2>{{ t('android_page_steps_title') }}</h2>
+      </div>
+    </div>
+    <div class="intro-steps">
+      {% for title, body in [
+        ('android_page_step_one_title', 'android_page_step_one_body'),
+        ('android_page_step_two_title', 'android_page_step_two_body'),
+        ('android_page_step_three_title', 'android_page_step_three_body')
+      ] %}
+        <article class="intro-step">
+          <span>0{{ loop.index }}</span>
+          <h3>{{ t(title) }}</h3>
+          <p>{{ t(body) }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="intro-cta">
+  <div class="shell intro-cta-inner">
+    <div>
+      <h2>{{ t('android_page_title') }}</h2>
+      <p>{{ t('android_page_features_body') }}</p>
+    </div>
+    <div class="intro-actions">
+      {% if android_download_url %}
+        <a class="button button-primary" href="{{ android_download_url }}" rel="noopener">{{ t('android_page_download') }}</a>
+      {% else %}
+        <a class="button button-primary" href="{{ url_for('contact') }}#contact-form">{{ t('android_page_contact') }}</a>
+      {% endif %}
+      <a class="button button-secondary" href="{{ url_for('introduction') }}">{{ t('introduction') }}</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -39,7 +39,7 @@
           type="checkbox"
           value="1"
           {% if contact_notifications_enabled %}checked{% endif %}
-          {% if not discord_notification_ready and not telegram_notification_ready %}disabled{% endif %}
+          {% if not discord_notification_ready %}disabled{% endif %}
         >
         <span class="push-toggle-track" aria-hidden="true"><i></i></span>
         <strong>{{ t('contact_notification_enable') }}</strong>

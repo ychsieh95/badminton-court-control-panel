@@ -1414,20 +1414,33 @@ select:focus-visible {
   transform: rotate(2deg);
 }
 
+.intro-overview-header {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding-bottom: 18px;
+}
+
 .intro-overview-mark {
   display: grid;
-  width: 54px;
-  height: 54px;
-  margin-bottom: 25px;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
   place-items: center;
-  border-radius: 15px;
+  border-radius: 13px;
   background: var(--primary-soft);
   color: var(--primary);
 }
 
 .intro-overview-mark .brand-mark {
-  width: 34px;
-  height: 34px;
+  width: 29px;
+  height: 29px;
+}
+
+.intro-overview-title {
+  min-width: 0;
+  font-size: .96rem;
+  line-height: 1.25;
 }
 
 .intro-overview-row {
@@ -1435,69 +1448,68 @@ select:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 15px 0;
+  min-height: 48px;
+  padding: 10px 0;
   border-top: 1px solid var(--border);
 }
 
-.intro-overview-row span {
+.intro-overview-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
   color: var(--muted);
   font-size: .78rem;
+  line-height: 1.2;
+}
+
+.intro-overview-label svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
 }
 
 .intro-overview-row strong {
+  flex: 0 0 auto;
   font-size: .86rem;
+  line-height: 1.2;
 }
 
 .intro-overview-court {
-  position: relative;
-  height: 130px;
-  margin-top: 18px;
+  margin-top: 16px;
   overflow: hidden;
-  border: 2px solid color-mix(in srgb, var(--primary) 65%, transparent);
   border-radius: 14px;
   background: var(--primary-soft);
+  color: var(--primary);
 }
 
-.intro-overview-court::before,
-.intro-overview-court::after,
-.intro-overview-court span {
-  position: absolute;
-  content: "";
-  background: color-mix(in srgb, var(--primary) 55%, transparent);
+.intro-overview-court svg {
+  display: block;
+  width: 100%;
+  /* The global svg rule sets 20px; let aspect-ratio size the court. */
+  height: auto;
+  aspect-ratio: 2.2 / 1;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: square;
+  stroke-linejoin: round;
 }
 
-.intro-overview-court::before {
-  top: 50%;
-  right: 0;
-  left: 0;
-  height: 2px;
+.intro-overview-court-lines {
+  opacity: .68;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
 }
 
-.intro-overview-court::after {
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 2px;
-}
-
-.intro-overview-court span:nth-child(1),
-.intro-overview-court span:nth-child(2) {
-  top: 25%;
-  right: 0;
-  left: 0;
-  height: 1px;
-}
-
-.intro-overview-court span:nth-child(2) {
-  top: 75%;
-}
-
-.intro-overview-court span:nth-child(3) {
-  top: 0;
-  bottom: 0;
-  left: calc(50% - 18px);
-  width: 36px;
-  background: repeating-linear-gradient(90deg, transparent 0 5px, color-mix(in srgb, var(--primary) 35%, transparent) 5px 7px);
+.intro-overview-court-net {
+  opacity: .92;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
 }
 
 .intro-orbit {
@@ -5844,6 +5856,10 @@ td small {
     gap: 42px;
   }
 
+  .intro-overview {
+    padding: 20px;
+  }
+
   .intro-feature-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -5970,6 +5986,7 @@ td small {
 
   .intro-overview {
     width: min(100%, 440px);
+    padding: 22px;
     transform: none;
   }
 
@@ -6295,5 +6312,194 @@ td small {
   *::after {
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
+  }
+}
+
+/* Android app page */
+.android-download svg {
+  width: 18px;
+  height: 18px;
+  margin-right: 2px;
+}
+
+.intro-hero-copy > p.android-note {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: .86rem;
+  line-height: 1.6;
+}
+
+.android-phone {
+  justify-self: center;
+  width: min(100%, 290px);
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 42px;
+  background: var(--text);
+  box-shadow: var(--shadow-lg);
+  transform: rotate(2deg);
+}
+
+.android-phone-screen {
+  display: grid;
+  gap: 12px;
+  min-height: 520px;
+  align-content: start;
+  padding: 14px 14px 18px;
+  border-radius: 31px;
+  background: var(--bg);
+}
+
+.android-phone-bar {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 4px;
+}
+
+.android-phone-bar span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text);
+}
+
+.android-phone-notice {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border-radius: 18px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.android-phone-notice-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.android-phone-notice-icon .brand-mark {
+  width: 20px;
+  height: 20px;
+}
+
+.android-phone-notice strong,
+.android-phone-notice span {
+  display: block;
+  font-size: .74rem;
+  line-height: 1.4;
+}
+
+.android-phone-notice span {
+  color: var(--muted);
+}
+
+.android-phone-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.android-phone-card strong {
+  font-size: 1rem;
+}
+
+.android-phone-card > span:not(.android-phone-chip) {
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.android-phone-chip {
+  justify-self: start;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+.android-phone-meter {
+  height: 6px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.android-phone-meter span {
+  display: block;
+  width: 72%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.android-phone-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.android-phone-row span {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  border: 2px solid var(--surface);
+}
+
+.android-phone-card-muted strong,
+.android-phone-card-muted span {
+  display: block;
+  height: 10px;
+  border-radius: 6px;
+  background: var(--surface-soft);
+}
+
+.android-phone-card-muted strong {
+  width: 60%;
+}
+
+.android-phone-card-muted span {
+  width: 40%;
+}
+
+.android-phone-nav {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.android-phone-nav span {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--surface-soft);
+}
+
+.android-phone-nav span:first-child {
+  background: var(--primary-soft);
+}
+
+@media (max-width: 720px) {
+  .android-phone {
+    width: min(100%, 260px);
+    transform: none;
+  }
+
+  .android-phone-screen {
+    min-height: 440px;
   }
 }

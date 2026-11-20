@@ -20,23 +20,47 @@
       </div>
     </div>
     <div class="intro-overview panel" aria-hidden="true">
-      <div class="intro-overview-mark">
-        {% include "_brand_mark.html" %}
+      <div class="intro-overview-header">
+        <div class="intro-overview-mark">
+          {% include "_brand_mark.html" %}
+        </div>
+        <strong class="intro-overview-title">{{ t('brand') }}</strong>
       </div>
       <div class="intro-overview-row">
-        <span>{{ t('level') }}</span>
+        <span class="intro-overview-label">
+          <svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-8M22 19V3"/></svg>
+          {{ t('level') }}
+        </span>
         <strong>1–18</strong>
       </div>
       <div class="intro-overview-row">
-        <span>{{ t('join') }}</span>
+        <span class="intro-overview-label">
+          <svg viewBox="0 0 24 24"><path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8M19 8v6M22 11h-6"/></svg>
+          {{ t('join') }}
+        </span>
         <strong>PIN · 6</strong>
       </div>
       <div class="intro-overview-row">
-        <span>{{ t('public_link') }}</span>
+        <span class="intro-overview-label">
+          <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+          {{ t('public_link') }}
+        </span>
         <strong>GUID</strong>
       </div>
       <div class="intro-overview-court">
-        <span></span><span></span><span></span>
+        <svg viewBox="0 0 440 200" preserveAspectRatio="none">
+          <g class="intro-overview-court-lines">
+            <rect x="10" y="5" width="420" height="190" rx="2"/>
+            <path d="M10 19H430M10 181H430"/>
+            <path d="M34 5V195M406 5V195"/>
+            <path d="M158 5V195M282 5V195"/>
+            <path d="M10 100H158M282 100H430"/>
+          </g>
+          <g class="intro-overview-court-net">
+            <path d="M216 3V197M220 3V197M224 3V197"/>
+            <path d="M216 30H224M216 54H224M216 78H224M216 102H224M216 126H224M216 150H224M216 174H224"/>
+          </g>
+        </svg>
       </div>
     </div>
   </div>
