@@ -3,17 +3,37 @@
 *.sqlite3
 instance/
 
-# Development environments and secrets
+# Claude Code local settings
+.claude/settings.local.json
+
+# Credentials and keys (never commit)
+*-firebase-adminsdk-*.json
+*.jks
+*.key
+*.keystore
+*.p12
+*.pem
+*.pfx
+*service-account*.json
 .env
 .env.*
+client_secret*.json
+credentials.json
+keystore.properties
+signing.properties
+# Keep the example env file (must follow .env.*)
 !.env.example
-.venv/
 
-# Private project files
+# Firebase Android config (Firebase console > Project settings > Your apps)
+google-services.json
+
+# Private and temporary files
 private/
+tmp/
 
-# Python-generated files
+# Python environments and generated files
 *.py[cod]
+.venv/
 __pycache__/
 
 # Tests and coverage
