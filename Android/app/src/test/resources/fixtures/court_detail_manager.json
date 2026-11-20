@@ -1,0 +1,153 @@
+{
+    "court": {
+        "archived": false,
+        "badminton_name": "Taipei Smashers",
+        "court_date": "2026-11-21",
+        "court_id": "A3",
+        "cover_image_url": null,
+        "created_at": "2026-11-20T18:29:26",
+        "creator_username": "organizer",
+        "end_time": "21:00",
+        "event_name": "Friday evening games",
+        "expired": false,
+        "form_values": {
+            "badminton_name": "Taipei Smashers",
+            "court_date": "2026-11-21",
+            "court_id": "A3",
+            "end_time": "21:00",
+            "event_name": "Friday evening games",
+            "female_level_max": "8",
+            "female_level_min": "4",
+            "female_price": "200",
+            "google_place_id": "",
+            "hall_name": "Daan Sports Center",
+            "latitude": "",
+            "leave_deadline_at": "2026-11-21T12:00",
+            "leave_deadline_enabled": "1",
+            "location": "No. 55, Section 3, Xinsheng S Rd, Da'an District, Taipei",
+            "longitude": "",
+            "male_level_max": "9",
+            "male_level_min": "5",
+            "male_price": "250",
+            "member_max": "8",
+            "member_min": "4",
+            "ordered_count": "2",
+            "remark": "Meet at the main entrance 10 minutes early.",
+            "reserved_names_visible": "1",
+            "shuttlecock_info": "RSL Classic Tourney",
+            "start_time": "19:00"
+        },
+        "google_place_id": "",
+        "guid": "84ca68c6-7348-49f0-a7fb-8c5bd18d03c8",
+        "hall_name": "Daan Sports Center",
+        "latitude": null,
+        "leave_deadline": {
+            "at": "2026-11-21T12:00",
+            "enabled": true,
+            "passed": false
+        },
+        "levels": {
+            "female": {
+                "max": 8,
+                "min": 4
+            },
+            "male": {
+                "max": 9,
+                "min": 5
+            }
+        },
+        "location": "No. 55, Section 3, Xinsheng S Rd, Da'an District, Taipei",
+        "longitude": null,
+        "media": [],
+        "members": {
+            "confirmed_total": 5,
+            "max": 8,
+            "min": 4,
+            "reserved": 2,
+            "signed_up": 3,
+            "waiting": 0
+        },
+        "participants": [
+            {
+                "cleared": false,
+                "id": 1,
+                "joined_at": "2026-11-20T18:29:26",
+                "roll_called": false,
+                "username": "Ben"
+            },
+            {
+                "cleared": false,
+                "id": 2,
+                "joined_at": "2026-11-20T18:29:26",
+                "roll_called": false,
+                "username": "Chloe"
+            },
+            {
+                "cleared": false,
+                "id": 3,
+                "joined_at": "2026-11-20T18:29:26",
+                "roll_called": false,
+                "username": "David"
+            }
+        ],
+        "participation_history": [
+            {
+                "event_type": "join",
+                "id": 3,
+                "occurred_at": "2026-11-20T18:29:26",
+                "username": "David"
+            },
+            {
+                "event_type": "join",
+                "id": 2,
+                "occurred_at": "2026-11-20T18:29:26",
+                "username": "Chloe"
+            },
+            {
+                "event_type": "join",
+                "id": 1,
+                "occurred_at": "2026-11-20T18:29:26",
+                "username": "Ben"
+            }
+        ],
+        "prices": {
+            "female": 200,
+            "male": 250
+        },
+        "remark": "Meet at the main entrance 10 minutes early.",
+        "reserved_members": [
+            {
+                "cleared": false,
+                "id": 1,
+                "nickname": "Amy",
+                "position": 0,
+                "roll_called": false
+            },
+            {
+                "cleared": false,
+                "id": 2,
+                "nickname": "",
+                "position": 1,
+                "roll_called": false
+            }
+        ],
+        "reserved_names_visible": true,
+        "reserved_nicknames": [
+            "Amy",
+            ""
+        ],
+        "roll_clearing_locked": false,
+        "shuttlecock_info": "RSL Classic Tourney",
+        "start_time": "19:00",
+        "status": "open",
+        "owner_notifications": false,
+        "thumbnail_url": "http://127.0.0.1:5055/84ca68c6-7348-49f0-a7fb-8c5bd18d03c8/thumbnail.jpg",
+        "viewer": {
+            "can_manage": true,
+            "is_admin": false,
+            "is_owner": true
+        },
+        "waiting_participants": [],
+        "web_url": "http://127.0.0.1:5055/84ca68c6-7348-49f0-a7fb-8c5bd18d03c8"
+    }
+}

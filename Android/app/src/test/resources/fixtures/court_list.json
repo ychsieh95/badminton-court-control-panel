@@ -1,0 +1,124 @@
+{
+    "courts": [
+        {
+            "archived": false,
+            "badminton_name": "Taipei Smashers",
+            "court_date": "2026-11-21",
+            "court_id": "A3",
+            "cover_image_url": null,
+            "created_at": "2026-11-20T18:29:26",
+            "creator_username": "organizer",
+            "end_time": "21:00",
+            "event_name": "Friday evening games",
+            "expired": false,
+            "google_place_id": "",
+            "guid": "84ca68c6-7348-49f0-a7fb-8c5bd18d03c8",
+            "hall_name": "Daan Sports Center",
+            "latitude": null,
+            "leave_deadline": {
+                "at": "2026-11-21T12:00",
+                "enabled": true,
+                "passed": false
+            },
+            "levels": {
+                "female": {
+                    "max": 8,
+                    "min": 4
+                },
+                "male": {
+                    "max": 9,
+                    "min": 5
+                }
+            },
+            "location": "No. 55, Section 3, Xinsheng S Rd, Da'an District, Taipei",
+            "longitude": null,
+            "members": {
+                "confirmed_total": 5,
+                "max": 8,
+                "min": 4,
+                "reserved": 2,
+                "signed_up": 3,
+                "waiting": 0
+            },
+            "prices": {
+                "female": 200,
+                "male": 250
+            },
+            "remark": "Meet at the main entrance 10 minutes early.",
+            "reserved_names_visible": true,
+            "roll_clearing_locked": false,
+            "shuttlecock_info": "RSL Classic Tourney",
+            "start_time": "19:00",
+            "status": "open",
+            "thumbnail_url": "http://127.0.0.1:5055/84ca68c6-7348-49f0-a7fb-8c5bd18d03c8/thumbnail.jpg",
+            "web_url": "http://127.0.0.1:5055/84ca68c6-7348-49f0-a7fb-8c5bd18d03c8"
+        },
+        {
+            "archived": false,
+            "badminton_name": "",
+            "court_date": "2026-11-23",
+            "court_id": "B1",
+            "cover_image_url": null,
+            "created_at": "2026-11-20T18:29:26",
+            "creator_username": "organizer",
+            "end_time": "10:00",
+            "event_name": "",
+            "expired": false,
+            "google_place_id": "",
+            "guid": "8c955f9a-7b16-4d7a-833e-7ed327a5e09e",
+            "hall_name": "Zhongshan Sports Center",
+            "latitude": null,
+            "leave_deadline": {
+                "at": null,
+                "enabled": false,
+                "passed": false
+            },
+            "levels": {
+                "female": {
+                    "max": 18,
+                    "min": 1
+                },
+                "male": {
+                    "max": 18,
+                    "min": 1
+                }
+            },
+            "location": "Taipei",
+            "longitude": null,
+            "members": {
+                "confirmed_total": 4,
+                "max": 4,
+                "min": 2,
+                "reserved": 0,
+                "signed_up": 4,
+                "waiting": 1
+            },
+            "prices": {
+                "female": 0,
+                "male": 0
+            },
+            "remark": "",
+            "reserved_names_visible": true,
+            "roll_clearing_locked": false,
+            "shuttlecock_info": "",
+            "start_time": "08:00",
+            "status": "full",
+            "thumbnail_url": "http://127.0.0.1:5055/8c955f9a-7b16-4d7a-833e-7ed327a5e09e/thumbnail.jpg",
+            "web_url": "http://127.0.0.1:5055/8c955f9a-7b16-4d7a-833e-7ed327a5e09e"
+        }
+    ],
+    "filters": {
+        "date_from": "",
+        "date_to": "",
+        "gender": "both",
+        "level": "",
+        "q": "",
+        "show_expired": false,
+        "status": ""
+    },
+    "pagination": {
+        "limit": 5,
+        "offset": 0,
+        "total": 2
+    }
+}

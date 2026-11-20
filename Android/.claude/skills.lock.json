@@ -1,0 +1,56 @@
+{
+  "sources": [
+    {
+      "name": "claude-android-ninja",
+      "repo": "https://github.com/Drjacky/claude-android-ninja.git",
+      "ref": "HEAD",
+      "commit": "5d40f862493a5e43daffa2cfaf5619a013b8f114",
+      "layout": "root",
+      "installed": ["claude-android-ninja"]
+    },
+    {
+      "name": "claude-android-skill",
+      "repo": "https://github.com/dpconde/claude-android-skill.git",
+      "ref": "HEAD",
+      "commit": "edfca5e36ceb7532708c28fd2fd5215a9f01d105",
+      "layout": "root",
+      "installed": ["claude-android-skill"]
+    },
+    {
+      "name": "mobile-app-ui-design",
+      "repo": "https://github.com/ceorkm/mobile-app-ui-design.git",
+      "ref": "HEAD",
+      "commit": "0ad61f025fc647417d4b8fb0ca786cb493c5156a",
+      "layout": "root",
+      "installed": ["mobile-app-ui-design"]
+    },
+    {
+      "name": "android-skills",
+      "repo": "https://github.com/rcosteira79/android-skills.git",
+      "ref": "HEAD",
+      "commit": "fa39ae26f224fac45b32280f66ac839ae57b4c64",
+      "layout": "plugin",
+      "skills_path": "plugins/android-skills/skills",
+      "plugin_prefix": "android-skills",
+      "copy_files": ["LICENSE"],
+      "installed": [
+        "android-data-layer", "android-debugging", "android-dev", "android-gradle-logic",
+        "android-retrofit", "android-source-search", "android-testing", "android-ux",
+        "coil-compose", "compose", "datastore", "gradle-build-performance",
+        "kmp-boundaries", "kmp-ktor", "koin", "kotlin-coroutines", "kotlin-flows",
+        "modularization", "paging", "pdf-annotations", "rxjava-migration"
+      ]
+    },
+    {
+      "name": "android-reverse-engineering-skill",
+      "repo": "https://github.com/SimoneAvogadro/android-reverse-engineering-skill.git",
+      "ref": "HEAD",
+      "commit": "0c7cf89830993df7dfc178498f69952262808bea",
+      "layout": "plugin",
+      "skills_path": "plugins/android-reverse-engineering/skills",
+      "plugin_prefix": "android-reverse-engineering",
+      "copy_files": ["LICENSE", "THIRD_PARTY_NOTICES.md"],
+      "installed": ["android-reverse-engineering"]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+    "error": {
+        "code": "duplicate_username",
+        "message": "That username has already joined this court."
+    }
+}
