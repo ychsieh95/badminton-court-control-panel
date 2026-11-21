@@ -26,7 +26,7 @@ enum class Palette { Mono, Green, Purple, Yellow, Dynamic }
 data class AppSettings(
     val serverUrl: String = BuildConfig.DEFAULT_SERVER_URL,
     val themeMode: ThemeMode = ThemeMode.System,
-    val palette: Palette = Palette.Green,
+    val palette: Palette = Palette.Yellow,
     val lastJoinName: String = "",
     val loaded: Boolean = false,
 )
@@ -62,7 +62,7 @@ class SettingsStore @Inject constructor(
     private fun Preferences.toSettings() = AppSettings(
         serverUrl = this[SERVER_URL] ?: BuildConfig.DEFAULT_SERVER_URL,
         themeMode = this[THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
-        palette = this[PALETTE]?.let { runCatching { Palette.valueOf(it) }.getOrNull() } ?: Palette.Green,
+        palette = this[PALETTE]?.let { runCatching { Palette.valueOf(it) }.getOrNull() } ?: Palette.Yellow,
         lastJoinName = this[LAST_JOIN_NAME].orEmpty(),
         loaded = true,
     )

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="window_background">#F5F7F2</color>
+    <color name="window_background">#FAF8F0</color>
     <!-- The website icon's blue; tints the notification icon. -->
     <color name="notification_accent">#4A72B8</color>
 </resources>
