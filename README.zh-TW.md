@@ -1,6 +1,6 @@
 # 羽球場控面板
 
-[![Last commit](https://img.shields.io/github/last-commit/ychsieh95/badminton-court-control-panel)](https://github.com/ychsieh95/badminton-court-control-panel/commits/main) [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![Flask 3.1](https://img.shields.io/badge/Flask-3.1-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/) [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Web/docker/compose.yaml) [![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B%20(API%2026)-34A853?logo=android&logoColor=white)](https://developer.android.com/) [![Kotlin 2.2](https://img.shields.io/badge/Kotlin-2.2-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/) [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Languages](https://img.shields.io/badge/i18n-en--US%20%7C%20zh--TW-blue?logo=googletranslate&logoColor=white)
+[![Web CI](https://github.com/ychsieh95/badminton-court-control-panel/actions/workflows/web.yml/badge.svg)](https://github.com/ychsieh95/badminton-court-control-panel/actions/workflows/web.yml) [![Android CI](https://github.com/ychsieh95/badminton-court-control-panel/actions/workflows/android.yml/badge.svg)](https://github.com/ychsieh95/badminton-court-control-panel/actions/workflows/android.yml) [![Last commit](https://img.shields.io/github/last-commit/ychsieh95/badminton-court-control-panel)](https://github.com/ychsieh95/badminton-court-control-panel/commits/main) [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![Flask 3.1](https://img.shields.io/badge/Flask-3.1-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/) [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Web/docker/compose.yaml) [![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B%20(API%2026)-34A853?logo=android&logoColor=white)](https://developer.android.com/) [![Kotlin 2.2](https://img.shields.io/badge/Kotlin-2.2-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/) [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Languages](https://img.shields.io/badge/i18n-en--US%20%7C%20zh--TW-blue?logo=googletranslate&logoColor=white)
 
 [English](README.md) · **繁體中文**
 
@@ -50,6 +50,8 @@ cd Android
 (cd Web && .venv/bin/pytest -q)
 (cd Android && ./gradlew :app:testDebugUnitTest)
 ```
+
+推送或發出 Pull Request 至 `main` 時，GitHub Actions 會執行相同的檢查：[`web.yml`](.github/workflows/web.yml) 在 Python 3.10 與 3.13 上執行，[`android.yml`](.github/workflows/android.yml) 另外會檢查產生的字串資源是否為最新。Android 工作流程需要儲存庫密鑰 `GOOGLE_SERVICES_JSON`，內容為以 `base64 -w0` 編碼的 `app/google-services.json`。
 
 ## 同時開發兩個部分
 

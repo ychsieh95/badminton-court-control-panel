@@ -1,0 +1,56 @@
+name: Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Web/**"
+      - ".github/workflows/web.yml"
+  pull_request:
+    paths:
+      - "Web/**"
+      - ".github/workflows/web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest supported version and a current one.
+        python: ["3.10", "3.13"]
+    defaults:
+      run:
+        working-directory: Web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: Web/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Python tests
+        run: pytest -q
+
+      - name: Browser-control tests
+        run: |
+          node tests/test_court_controls.cjs
+          node tests/test_court_navigation.cjs
