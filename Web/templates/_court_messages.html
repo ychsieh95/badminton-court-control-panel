@@ -1,0 +1,106 @@
+{#- Message board body. Rendered inside court.html and on its own after an
+    in-page post (see post_court_message), so it computes its own context. -#}
+{% set can_manage_court = is_admin or (current_user and court.owner_id == current_user.id) %}
+<div class="court-messages-body" data-court-messages-body data-version="{{ court_messages_version }}">
+  {% macro court_message_identity_fields(form_draft) %}
+    <input type="hidden" name="push_endpoint" value="" data-court-message-push-endpoint>
+    {% if can_manage_court %}
+      <p class="court-message-identity">
+        {{ t('court_message_posting_as')|replace('{name}', current_user.username) }}
+        <span class="court-message-badge">{{ t('court_message_organizer') }}</span>
+      </p>
+    {% else %}
+      <div class="court-message-credentials">
+        <label class="field">
+          <span>{{ t('username') }}</span>
+          <input name="username" minlength="2" maxlength="40" autocomplete="nickname" required value="{{ form_draft.username if form_draft else '' }}">
+        </label>
+        <label class="field">
+          <span>{{ t('pin') }}</span>
+          <input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
+        </label>
+      </div>
+    {% endif %}
+    <p class="field-error court-message-error" data-court-message-error role="alert"{% if not (form_draft and form_draft.error) %} hidden{% endif %}>{{ form_draft.error if form_draft else '' }}</p>
+  {% endmacro %}
+  {% if court.archived %}
+    <p class="muted">{{ t('court_message_closed') }}</p>
+  {% else %}
+    <form class="court-message-form" method="post" action="{{ url_for('post_court_message', guid=court.guid) }}" data-court-message-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if not can_manage_court %}
+        <p class="court-message-hint">{{ t('court_message_join_required') }}{% if web_push_enabled %} {{ t('court_message_notify_hint') }}{% endif %}</p>
+      {% endif %}
+      {% set top_draft = message_draft if message_draft and not message_draft.parent_id else none %}
+      {{ court_message_identity_fields(top_draft) }}
+      <label class="field">
+        <span>{{ t('court_message_body') }}</span>
+        <textarea name="message" rows="3" maxlength="500" required placeholder="{{ t('court_message_placeholder') }}">{{ top_draft.message if top_draft else '' }}</textarea>
+      </label>
+      <button class="button button-primary" type="submit">{{ t('court_message_submit') }}</button>
+    </form>
+  {% endif %}
+  {% macro court_message_row(entry, has_replies=false) %}
+    <div class="court-message{% if entry.parent_id %} court-message-reply{% endif %}">
+      <span class="avatar">{{ entry.author_name[:1]|upper }}</span>
+      <div class="court-message-content">
+        <div class="court-message-meta">
+          <strong>{{ entry.author_name }}</strong>
+          {% if entry.author_kind == 'organizer' %}
+            <span class="court-message-badge">{{ t('court_message_organizer') }}</span>
+          {% endif %}
+          <time datetime="{{ entry.posted_at }}">{{ entry.posted_at|audit_datetime }}</time>
+          {% if is_admin and entry.ip_address %}
+            <code class="ip-address">{{ entry.ip_address }}</code>
+          {% endif %}
+        </div>
+        <p class="court-message-body">{{ entry.message }}</p>
+      </div>
+      {% if can_manage_court %}
+        <form method="post" action="{{ url_for('delete_court_message', guid=court.guid, message_id=entry.id) }}" data-confirm="{{ t('court_message_delete_thread_confirm') if has_replies else t('court_message_delete_confirm') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="court-message-delete" type="submit" aria-label="{{ t('court_message_delete') }}" title="{{ t('court_message_delete') }}">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  {% endmacro %}
+  {% if court_message_threads %}
+    <ol class="court-message-list">
+      {% for entry, replies in court_message_threads %}
+        <li class="court-message-thread" id="court-message-{{ entry.id }}">
+          {{ court_message_row(entry, replies|length > 0) }}
+          {% if replies %}
+            <ol class="court-message-replies">
+              {% for reply in replies %}
+                <li>{{ court_message_row(reply) }}</li>
+              {% endfor %}
+            </ol>
+          {% endif %}
+          {% if not court.archived %}
+            {% set reply_draft = message_draft if message_draft and message_draft.parent_id == entry.id|string else none %}
+            <details class="court-message-reply-toggle"{% if reply_draft %} open{% endif %}>
+              <summary>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+                {{ t('court_message_reply') }}
+              </summary>
+              <form class="court-message-form court-message-reply-form" method="post" action="{{ url_for('post_court_message', guid=court.guid) }}" data-court-message-form>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="parent_id" value="{{ entry.id }}">
+                {{ court_message_identity_fields(reply_draft) }}
+                <label class="field">
+                  <span>{{ t('court_message_reply_to')|replace('{name}', entry.author_name) }}</span>
+                  <textarea name="message" rows="2" maxlength="500" required placeholder="{{ t('court_message_reply_placeholder') }}">{{ reply_draft.message if reply_draft else '' }}</textarea>
+                </label>
+                <button class="button button-primary" type="submit">{{ t('court_message_reply_submit') }}</button>
+              </form>
+            </details>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  {% elif not court.archived %}
+    <p class="muted court-message-empty">{{ t('court_messages_empty') }}</p>
+  {% endif %}
+</div>

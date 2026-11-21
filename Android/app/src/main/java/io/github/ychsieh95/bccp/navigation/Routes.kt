@@ -7,7 +7,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object AdminRoute
 @Serializable data object AccountRoute
 
-@Serializable data class CourtDetailRoute(val guid: String)
+/** [showMessages] scrolls to the message board, as when opened from a message notification. */
+@Serializable data class CourtDetailRoute(val guid: String, val showMessages: Boolean = false)
 
 /** [guid] edits an existing court; [copyFrom] prefills a new one from another court's form values. */
 @Serializable data class CourtFormRoute(val guid: String? = null, val copyFrom: String? = null)

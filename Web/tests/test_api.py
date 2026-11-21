@@ -846,3 +846,142 @@ def test_android_app_page(app, client):
     assert b'href="https://play.google.com/store/apps/details?id=example"' in page.data
     app.config["ANDROID_APP_URL"] = "javascript:alert(1)"
     assert b"javascript:" not in client.get("/android").data
+
+
+def test_court_message_board_via_api(client):
+    owner = signup(client)
+    guid = create_court(client, owner, member_max=4)["guid"]
+    board_url = f"{API}/courts/{guid}/messages"
+    client.post(f"{API}/courts/{guid}/join", json={"username": "Amy", "pin": "123456"})
+    client.post(f"{API}/courts/{guid}/join", json={"username": "Ben", "pin": "654321"})
+
+    empty = client.get(board_url).get_json()
+    assert empty["changed"] is True and empty["messages"] == [] and empty["count"] == 0
+    assert client.get(f"{API}/courts/missing/messages").status_code == 404
+
+    # Not joined / wrong PIN.
+    stranger = client.post(board_url, json={"username": "Zed", "pin": "123456", "message": "Hi"})
+    assert stranger.status_code == 403
+    assert stranger.get_json()["error"]["code"] == "court_message_auth_failed"
+    wrong_pin = client.post(board_url, json={"username": "Amy", "pin": "000000", "message": "Hi"})
+    assert wrong_pin.get_json()["error"]["code"] == "court_message_auth_failed"
+    blank = client.post(board_url, json={"username": "Amy", "pin": "123456", "message": "  "})
+    assert blank.get_json()["error"]["code"] == "court_message_invalid_body"
+
+    posted = client.post(
+        board_url, json={"username": "amy", "pin": "123456", "message": "Who brings shuttles?"}
+    )
+    assert posted.status_code == 201
+    body = posted.get_json()
+    top_id = body["message_id"]
+    assert body["thread_id"] == top_id
+    assert body["messages"][0]["author_name"] == "Amy"
+    assert body["messages"][0]["author_kind"] == "participant"
+    assert "ip_address" not in body["messages"][0]
+
+    reply = client.post(
+        board_url,
+        json={"username": "Ben", "pin": "654321", "message": "I will", "parent_id": top_id},
+    ).get_json()
+    # Replying to a reply attaches to the top-level message.
+    organizer = client.post(
+        board_url,
+        json={"message": "Thanks both", "parent_id": reply["message_id"]},
+        headers=auth(owner),
+    ).get_json()
+    assert organizer["thread_id"] == top_id
+    thread = organizer["messages"][0]
+    assert [r["author_name"] for r in thread["replies"]] == ["Ben", "organizer"]
+    assert thread["replies"][1]["author_kind"] == "organizer"
+    assert organizer["count"] == 3
+
+    unchanged = client.get(board_url, query_string={"version": organizer["version"]}).get_json()
+    assert unchanged == {"changed": False, "version": organizer["version"]}
+
+    missing = client.post(
+        board_url, json={"username": "Amy", "pin": "123456", "message": "x", "parent_id": 999}
+    )
+    assert missing.status_code == 404
+    assert missing.get_json()["error"]["code"] == "court_message_reply_missing"
+
+    # Admins see audit details; only managers delete.
+    admin = admin_token(client)
+    assert "ip_address" in client.get(board_url, headers=auth(admin)).get_json()["messages"][0]
+    assert client.delete(f"{board_url}/{top_id}").status_code == 401
+    other = signup(client, username="someone")
+    assert client.delete(f"{board_url}/{top_id}", headers=auth(other)).status_code == 404
+    deleted = client.delete(f"{board_url}/{top_id}", headers=auth(owner))
+    assert deleted.status_code == 200
+    assert deleted.get_json()["messages"] == [] and deleted.get_json()["count"] == 0
+    again = client.delete(f"{board_url}/{top_id}", headers=auth(owner))
+    assert again.status_code == 404
+    assert again.get_json()["error"]["code"] == "court_message_missing"
+
+    client.post(f"{API}/courts/{guid}/archive", headers=auth(owner))
+    closed = client.post(board_url, json={"username": "Amy", "pin": "123456", "message": "Hi"})
+    assert closed.get_json()["error"]["code"] == "court_message_closed"
+
+
+def test_court_message_notifications_reach_app_devices(app, client):
+    fake = FakeFcm()
+    app.extensions["fcm_client"] = fake
+    owner = signup(client)
+    client.put(f"{API}/me/push-token", json={"token": OWNER_PHONE}, headers=auth(owner))
+    guid = create_court(client, owner, event_name="Friday Night", member_max=4)["guid"]
+    board_url = f"{API}/courts/{guid}/messages"
+    client.post(f"{API}/courts/{guid}/join", json={"username": "Amy", "pin": "123456"})
+    client.post(f"{API}/courts/{guid}/join", json={"username": "Ben", "pin": "654321"})
+    # Amy's phone follows the court; Ben's tablet does not.
+    client.put(f"{API}/courts/{guid}/push", json={"token": PHONE})
+    fake.sent.clear()
+
+    top = client.post(
+        board_url,
+        json={"username": "Amy", "pin": "123456", "message": "Hello", "fcm_token": PHONE},
+    ).get_json()
+    assert [(m["token"], m["data"]["audience"], m["data"]["change"]) for m in fake.sent] == [
+        (OWNER_PHONE, "owner", "message")
+    ]
+    sent = fake.sent[0]
+    assert sent["data"]["type"] == "court_changed"
+    assert sent["collapse_key"] == f"court-{guid}-messages"
+    assert "Hello" not in str(sent["data"])
+
+    fake.sent.clear()
+    client.post(
+        board_url,
+        json={"username": "Ben", "pin": "654321", "message": "Hi", "parent_id": top["message_id"], "fcm_token": TABLET},
+    )
+    assert sorted((m["token"], m["data"]["audience"], m["data"]["change"]) for m in fake.sent) == [
+        (OWNER_PHONE, "owner", "reply"),
+        (PHONE, "author", "reply"),
+    ]
+
+    # Ben's unsubscribed token was not stored, so a reply from Amy to Ben's
+    # own thread can't reach it; Amy replying to herself alerts nobody but the owner.
+    ben_top = client.post(
+        board_url, json={"username": "Ben", "pin": "654321", "message": "Q", "fcm_token": TABLET}
+    ).get_json()
+    fake.sent.clear()
+    client.post(
+        board_url,
+        json={"username": "Amy", "pin": "123456", "message": "A", "parent_id": ben_top["message_id"], "fcm_token": PHONE},
+    )
+    assert [m["token"] for m in fake.sent] == [OWNER_PHONE]
+    fake.sent.clear()
+    client.post(
+        board_url,
+        json={"username": "Amy", "pin": "123456", "message": "Me again", "parent_id": top["message_id"], "fcm_token": PHONE},
+    )
+    assert [m["token"] for m in fake.sent] == [OWNER_PHONE]
+
+    # The organizer's own reply goes to the author, not back to the organizer.
+    fake.sent.clear()
+    noted = client.post(
+        board_url,
+        json={"message": "Noted", "parent_id": top["message_id"]},
+        headers=auth(owner),
+        environ_base={"REMOTE_ADDR": "10.0.0.9"},  # five posts per IP per 10 minutes
+    )
+    assert noted.status_code == 201, noted.get_json()
+    assert [(m["token"], m["data"]["audience"]) for m in fake.sent] == [(PHONE, "author")]

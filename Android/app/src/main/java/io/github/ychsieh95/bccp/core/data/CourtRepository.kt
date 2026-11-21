@@ -3,6 +3,7 @@ package io.github.ychsieh95.bccp.core.data
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.ychsieh95.bccp.core.model.Court
+import io.github.ychsieh95.bccp.core.model.MessageBoard
 import io.github.ychsieh95.bccp.core.network.BccpApi
 import io.github.ychsieh95.bccp.core.network.CourtListResponse
 import io.github.ychsieh95.bccp.core.network.CourtResponse
@@ -108,6 +109,34 @@ class CourtRepository @Inject constructor(
     }
 
     suspend fun removeParticipant(guid: String, id: Int): Result<Court> = apiCall(json) { api.deleteParticipant(guid, id).court }
+
+    /** [version] is the board the caller already shows; an unchanged board answers `changed = false`. */
+    suspend fun messages(guid: String, version: String? = null): Result<MessageBoard> = apiCall(json) {
+        api.messages(guid, version?.takeIf { it.isNotEmpty() })
+    }
+
+    /**
+     * Players send the [username] and [pin] they joined with; an organizer's account needs neither.
+     * [fcmToken] lets replies reach this device when it follows the court.
+     */
+    suspend fun postMessage(
+        guid: String,
+        username: String,
+        pin: String,
+        message: String,
+        parentId: Int?,
+        fcmToken: String?,
+    ): Result<MessageBoard> = apiCall(json) {
+        api.postMessage(guid, buildJsonObject {
+            put("username", username.trim())
+            put("pin", pin)
+            put("message", message.trim())
+            parentId?.let { put("parent_id", it) }
+            fcmToken?.let { put("fcm_token", it) }
+        })
+    }
+
+    suspend fun deleteMessage(guid: String, id: Int): Result<MessageBoard> = apiCall(json) { api.deleteMessage(guid, id) }
 
     private fun credentials(username: String, pin: String) = buildJsonObject {
         put("username", username.trim())

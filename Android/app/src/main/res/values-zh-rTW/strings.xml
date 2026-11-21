@@ -578,4 +578,27 @@
     <string name="weekday_thursday">星期四</string>
     <string name="weekday_tuesday">星期二</string>
     <string name="weekday_wednesday">星期三</string>
+    <string name="messages">留言板</string>
+    <string name="messages_eyebrow">討論</string>
+    <string name="messages_empty">目前尚無留言，歡迎提問或留言給其他球友。</string>
+    <string name="message_write">我要留言</string>
+    <string name="message_reply">回覆</string>
+    <string name="message_reply_to">回覆 %1$s</string>
+    <string name="message_body">留言內容</string>
+    <string name="message_placeholder">詢問活動相關問題，或留言給其他球友…</string>
+    <string name="message_reply_placeholder">輸入回覆內容…</string>
+    <string name="message_submit">送出留言</string>
+    <string name="message_reply_submit">送出回覆</string>
+    <string name="message_posted">留言已送出。</string>
+    <string name="message_reply_posted">回覆已送出。</string>
+    <string name="message_deleted">留言已刪除。</string>
+    <string name="message_delete">刪除留言</string>
+    <string name="message_delete_confirm">確定要刪除這則留言嗎？</string>
+    <string name="message_delete_thread_confirm">確定要刪除這則留言及其所有回覆嗎？</string>
+    <string name="message_join_required">只有已加入此場次的球友可以留言，請使用加入時的暱稱與 PIN 碼。</string>
+    <string name="message_posting_as">以 %1$s 身分留言</string>
+    <string name="message_organizer">團主</string>
+    <string name="message_notify_hint">開啟此場次的通知，即可在有人回覆你時收到通知。</string>
+    <string name="message_closed">此場次已封存，暫停新增留言。</string>
+    <string name="message_length">%1$d / %2$d</string>
 </resources>

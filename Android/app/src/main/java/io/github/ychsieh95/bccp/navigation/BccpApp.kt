@@ -62,7 +62,7 @@ import kotlin.reflect.KClass
 private data class Tab(val route: Any, val routeClass: KClass<*>, val label: Int, val icon: ImageVector, val selectedIcon: ImageVector)
 
 @Composable
-fun BccpApp(sharedGuid: String?, onSharedGuidHandled: () -> Unit, viewModel: AppViewModel = hiltViewModel()) {
+fun BccpApp(sharedCourt: CourtDetailRoute?, onSharedCourtHandled: () -> Unit, viewModel: AppViewModel = hiltViewModel()) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val session by viewModel.session.collectAsStateWithLifecycle()
 
@@ -76,8 +76,8 @@ fun BccpApp(sharedGuid: String?, onSharedGuidHandled: () -> Unit, viewModel: App
                     else -> MainScaffold(
                         isSignedIn = session.signedIn,
                         moderates = session.user?.role?.moderatesCourts == true,
-                        sharedGuid = sharedGuid,
-                        onSharedGuidHandled = onSharedGuidHandled,
+                        sharedCourt = sharedCourt,
+                        onSharedCourtHandled = onSharedCourtHandled,
                     )
                 }
             }
@@ -86,7 +86,7 @@ fun BccpApp(sharedGuid: String?, onSharedGuidHandled: () -> Unit, viewModel: App
 }
 
 @Composable
-private fun MainScaffold(isSignedIn: Boolean, moderates: Boolean, sharedGuid: String?, onSharedGuidHandled: () -> Unit) {
+private fun MainScaffold(isSignedIn: Boolean, moderates: Boolean, sharedCourt: CourtDetailRoute?, onSharedCourtHandled: () -> Unit) {
     val nav = rememberNavController()
     val tabs = buildList {
         add(Tab(CourtsRoute, CourtsRoute::class, R.string.nav_courts, Icons.Outlined.SportsTennis, Icons.Filled.SportsTennis))
@@ -98,10 +98,10 @@ private fun MainScaffold(isSignedIn: Boolean, moderates: Boolean, sharedGuid: St
     val destination = backStack?.destination
     val onTab = tabs.any { tab -> destination?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true }
 
-    LaunchedEffect(sharedGuid) {
-        if (sharedGuid != null) {
-            nav.navigate(CourtDetailRoute(sharedGuid))
-            onSharedGuidHandled()
+    LaunchedEffect(sharedCourt) {
+        if (sharedCourt != null) {
+            nav.navigate(sharedCourt)
+            onSharedCourtHandled()
         }
     }
 
@@ -182,8 +182,9 @@ private fun AppNavHost(nav: NavHostController, signedIn: State<Boolean>) {
                 onSettings = { nav.navigate(SettingsRoute) },
             )
         }
-        composable<CourtDetailRoute> {
+        composable<CourtDetailRoute> { entry ->
             CourtDetailScreen(
+                showMessages = entry.toRoute<CourtDetailRoute>().showMessages,
                 onBack = back,
                 onEdit = { guid -> nav.navigate(CourtFormRoute(guid = guid)) },
                 onDuplicate = { guid -> nav.navigate(CourtFormRoute(copyFrom = guid)) },

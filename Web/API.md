@@ -35,12 +35,12 @@ Error messages are localized. Set the language with `?lang=zh-tw|en-us` or `Acce
 | --- | --- |
 | 400 | `bad_request`, `invalid_username`, `invalid_pin`, `password_too_short`, `unknown_member` |
 | 401 | `unauthorized`, `invalid_token`, `invalid_credentials` |
-| 403 | `forbidden`, `temporary_password_required`, `leave_failed`, `account_banned`, `turnstile_required` |
-| 404 | `not_found`, `participant_not_found` |
-| 409 | `court_closed`, `court_expired`, `court_read_only`, `leave_deadline_passed`, `duplicate_username`, `username_taken`, `court_not_read_only` |
+| 403 | `forbidden`, `temporary_password_required`, `leave_failed`, `court_message_auth_failed`, `account_banned`, `turnstile_required` |
+| 404 | `not_found`, `participant_not_found`, `court_message_reply_missing`, `court_message_missing` |
+| 409 | `court_closed`, `court_expired`, `court_read_only`, `leave_deadline_passed`, `duplicate_username`, `username_taken`, `court_not_read_only`, `court_message_closed` |
 | 413 | `payload_too_large`, `avatar_too_large` |
 | 422 | `invalid_form`, `contact_form_invalid` (see `fields`) |
-| 429 | `login_locked`, `leave_locked` |
+| 429 | `login_locked`, `leave_locked`, `court_message_locked`, `court_message_rate_limited` |
 
 ## Objects
 
@@ -88,7 +88,18 @@ List responses include `pagination: {total, limit, offset}`. Use `?limit=` (1–
 | GET | `/courts/<guid>` | | Court detail |
 | POST | `/courts/<guid>/join` | `{username, pin}` (6-digit PIN) | `201 {court, waitlisted}` |
 | POST | `/courts/<guid>/leave` | `{username, pin}` | `200 {court}`. Throttled per court |
+| GET | `/courts/<guid>/messages` | `version?` | Message board. `{changed: true, messages, count, version}`; with the current `version`, just `{changed: false, version}` |
+| POST | `/courts/<guid>/messages` | `{username, pin, message, parent_id?, fcm_token?}` | `201 {message_id, thread_id, changed, messages, count, version}`. See below |
+| DELETE | `/courts/<guid>/messages/<id>` | | Organizer or admin. Removes the message and its replies; returns the board |
 | POST | `/contact` | `{sender_name, reply_contact?, subject, message, client?, turnstile_token?}` | `201 {sent: true}`. `client: {platform, app_version, os_version, device_model}` (strings, each ≤ 60 characters) is added to the Telegram/Discord report |
+
+### Message board
+
+`messages` lists threads newest first: `{id, author_name, author_kind: participant | organizer, message, posted_at, ip_address (admins only), replies: [...]}`, with replies oldest first. Replies to a reply attach to the top-level message.
+
+- **Who can post.** A player must have joined the court and sends the `username` and `pin` they joined with. Wrong PINs count toward a lockout (`court_message_locked`). A signed-in organizer of the court, or an administrator, posts as their account with `author_kind: organizer` and needs no PIN.
+- **Limits.** `message` is 1–500 characters. Five posts per IP per court in 10 minutes (`court_message_rate_limited`). Archived courts reject posts (`court_message_closed`).
+- **Notifications.** The organizer gets one for each new message or reply; the thread's author gets one for each reply. Payloads use `type: court_changed` with `change: message | reply` and no message text. Send `fcm_token` to get reply notifications on a device that follows the court (it is ignored otherwise); signed-in authors are reached through their account's devices.
 
 ### Push notifications (Android, FCM)
 

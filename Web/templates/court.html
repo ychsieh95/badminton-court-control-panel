@@ -620,6 +620,22 @@
       </details>
     {% endif %}
 
+    <details class="panel court-messages-panel" {{ section_state('messages') }}>
+      <summary class="court-section-summary">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">{{ t('court_messages_eyebrow') }}</p>
+            <h2>{{ t('court_messages') }}</h2>
+          </div>
+          <span class="count-badge" data-court-messages-count>{{ court_messages|length }}</span>
+          {{ section_chevron() }}
+        </div>
+      </summary>
+      <p class="court-message-status" data-court-message-status data-board-url="{{ url_for('court_messages_board', guid=court.guid) }}" data-network-error="{{ t('court_message_network_error') }}" role="status" aria-live="polite" hidden></p>
+      <button class="court-messages-new" type="button" data-court-messages-new hidden>{{ t('court_messages_new_available') }}</button>
+      {% include '_court_messages.html' %}
+    </details>
+
     <details class="panel participation-history-panel" {{ section_state('history') }}>
       <summary class="participation-history-summary">
         <div class="panel-heading">

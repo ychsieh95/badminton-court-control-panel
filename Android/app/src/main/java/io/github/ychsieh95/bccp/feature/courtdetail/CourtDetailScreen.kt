@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.FactCheck
@@ -62,6 +63,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import io.github.ychsieh95.bccp.R
 import io.github.ychsieh95.bccp.core.model.Court
@@ -81,6 +83,7 @@ fun CourtDetailScreen(
     onBack: () -> Unit,
     onEdit: (String) -> Unit,
     onDuplicate: (String) -> Unit,
+    showMessages: Boolean = false,
     viewModel: CourtDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -106,6 +109,24 @@ fun CourtDetailScreen(
     }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
+    // Keep the message board live while the screen is in front (the web page polls the same way).
+    LaunchedEffect(Unit) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                delay(MESSAGE_REFRESH_MS)
+                viewModel.refreshMessages()
+            }
+        }
+    }
+    val listState = rememberLazyListState()
+    var scrolledToMessages by rememberSaveable { mutableStateOf(!showMessages) }
+    // Opened from a message notification: bring the board into view once it has loaded.
+    LaunchedEffect(state.board != null, state.court != null) {
+        val loadedCourt = state.court
+        if (scrolledToMessages || state.board == null || loadedCourt == null) return@LaunchedEffect
+        listState.animateScrollToItem(messagesIndex(loadedCourt))
+        scrolledToMessages = true
+    }
     LaunchedEffect(Unit) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.effects.collect { effect ->
@@ -165,7 +186,9 @@ fun CourtDetailScreen(
                     rollDraft = state.rollDraft,
                     rollDirty = state.rollDirty,
                     busy = state.busy,
+                    board = state.board,
                     actions = viewModel,
+                    listState = listState,
                 )
             }
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
@@ -181,6 +204,20 @@ fun CourtDetailScreen(
             onPinChange = viewModel::setPlayerPin,
             onSubmit = viewModel::submitPlayerForm,
             onDismiss = { playerSheetOpen = false },
+        )
+    }
+
+    if (state.messageForm.open && court != null) {
+        MessageSheet(
+            form = state.messageForm,
+            asOrganizer = court.viewer.canManage,
+            accountName = state.accountName,
+            showNotifyHint = state.push.available && !state.push.subscribed,
+            onNameChange = viewModel::setMessageName,
+            onPinChange = viewModel::setMessagePin,
+            onMessageChange = viewModel::setMessageText,
+            onSubmit = viewModel::submitMessage,
+            onDismiss = viewModel::closeMessageSheet,
         )
     }
 
@@ -285,3 +322,21 @@ private fun PlayerBar(court: Court, onOpen: (PlayerMode) -> Unit) {
 private fun CoroutineScope.showMessage(snackbar: SnackbarHostState, message: String) {
     launch { snackbar.showSnackbar(message) }
 }
+
+private const val MESSAGE_REFRESH_MS = 30_000L
+
+/** Position of the message board in [CourtDetailContent]'s list; mirrors its item order. */
+private fun messagesIndex(court: Court): Int = listOf(
+    true, // hero
+    true, // info
+    court.media.isNotEmpty(),
+    true, // capacity
+    !court.acceptsPlayers,
+    court.rollClearingLocked && court.viewer.canManage,
+    true, // price
+    true, // level
+    court.remark.isNotBlank(),
+    court.reservedMembers.isNotEmpty(),
+    true, // players
+    court.waitingParticipants.isNotEmpty(),
+).count { it }

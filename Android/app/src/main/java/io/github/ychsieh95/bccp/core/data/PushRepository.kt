@@ -47,6 +47,9 @@ class PushRepository @Inject constructor(
         if (subscribed) api.subscribePush(guid, body).subscribed else api.unsubscribePush(guid, body).subscribed
     }
 
+    /** This device's FCM token if it already has one; never registers. */
+    suspend fun knownToken(): String? = storedToken()
+
     /** FCM issued a token. If it replaces an older one, move this device's court subscriptions to it. */
     suspend fun onTokenRegistered(token: String) {
         val previous = storedToken()

@@ -4277,3 +4277,478 @@ def test_member_can_choose_12_or_24_hour_datetime_format(client, app):
     )
     assert b"2026-08-23 19:05" in restored.data
     assert b"19:00\xe2\x80\x9321:00" in client.get(court_location).data
+
+
+MESSAGE_COURT_DATE = (datetime.now() + timedelta(days=7)).date().isoformat()
+
+
+def message_player(app, court_path, ip):
+    player = app.test_client()
+    player.environ_base["REMOTE_ADDR"] = ip
+    player.set_cookie("court_lang", "en-us")
+    return player
+
+
+def join_as(player, court_path, username, pin="123456"):
+    response = player.post(
+        f"{court_path}/join",
+        data={"csrf_token": csrf(player, court_path), "username": username, "pin": pin},
+    )
+    assert response.status_code == 302
+
+
+def post_message(player, court_path, message, username="", pin="", **extra):
+    return player.post(
+        f"{court_path}/messages",
+        data={
+            "csrf_token": csrf(player, court_path),
+            "username": username,
+            "pin": pin,
+            "message": message,
+            **extra,
+        },
+    )
+
+
+def stored_messages(app):
+    with app.app_context():
+        return [
+            dict(row)
+            for row in get_db().execute(
+                "SELECT id, parent_id, author_name, author_kind, participant_key, "
+                "author_user_id, notify_endpoint, message FROM court_messages ORDER BY id"
+            )
+        ]
+
+
+def test_court_message_requires_joined_nickname_and_pin(client, app):
+    login(client)
+    client.set_cookie("court_lang", "en-us")
+    court_path = create_court(client, court_date=MESSAGE_COURT_DATE)
+    visitor = message_player(app, court_path, "10.0.0.1")
+
+    page = visitor.get(court_path).data
+    assert b'id="court-section-messages"' in page
+    assert b"Only players who joined this court can post" in page
+    assert b'name="pin"' in page.split(b'id="court-section-messages"', 1)[1]
+
+    # Not joined yet: rejected and nothing stored.
+    post_message(visitor, court_path, "Hello?", "Amy", "123456")
+    assert b"you have not joined this court" in visitor.get(court_path).data
+    assert stored_messages(app) == []
+
+    join_as(visitor, court_path, "Amy")
+    post_message(visitor, court_path, "Hello?", "Amy", "654321")
+    assert b"you have not joined this court. Attempts remaining" in visitor.get(court_path).data
+    assert stored_messages(app) == []
+
+    # Nickname matching is case-insensitive; the joined spelling is shown.
+    response = post_message(
+        visitor, court_path, "Is parking available?\r\nThanks <b>!</b>", " amy ", "123456"
+    )
+    assert response.status_code == 302
+    page = visitor.get(court_path).data
+    assert b"Message posted." in page
+    assert b"Is parking available?\nThanks &lt;b&gt;!&lt;/b&gt;" in page
+    [message] = stored_messages(app)
+    assert message["author_name"] == "Amy"
+    assert message["author_kind"] == "participant"
+    assert message["participant_key"] == "amy"
+    assert b"/messages/" not in page  # visitors cannot delete
+
+    for body in ("   ", "x" * 501):
+        post_message(visitor, court_path, body, "Amy", "123456")
+        assert b"Message must be" in visitor.get(court_path).data
+    assert (
+        visitor.post(
+            f"{court_path}/messages",
+            data={"username": "Amy", "pin": "123456", "message": "no csrf"},
+        ).status_code
+        == 400
+    )
+
+    # Organizer posts as their account, without a PIN, with a badge.
+    owner_page = client.get(court_path).data.decode()
+    messages_section = owner_page.split('id="court-section-messages"', 1)[1].split(
+        'id="court-section-history"', 1
+    )[0]
+    assert "Posting as manager" in messages_section
+    assert 'name="pin"' not in messages_section
+    post_message(client, court_path, "Yes, under the building.")
+    organizer_message = stored_messages(app)[-1]
+    assert organizer_message["author_name"] == "manager"
+    assert organizer_message["author_kind"] == "organizer"
+    assert 'class="court-message-badge">Organizer<' in client.get(court_path).data.decode()
+
+    message_id = message["id"]
+    assert (
+        visitor.post(
+            f"{court_path}/messages/{message_id}/delete",
+            data={"csrf_token": csrf(visitor, court_path)},
+        ).status_code
+        == 404
+    )
+    assert f"/messages/{message_id}/delete" in client.get(court_path).data.decode()
+    client.post(
+        f"{court_path}/messages/{message_id}/delete",
+        data={"csrf_token": csrf(client, court_path)},
+    )
+    assert b"Message deleted." in client.get(court_path).data
+    assert [row["id"] for row in stored_messages(app)] == [organizer_message["id"]]
+
+
+def test_court_message_wrong_pin_attempts_lock_out(client, app):
+    login(client)
+    court_path = create_court(client, court_date=MESSAGE_COURT_DATE)
+    visitor = message_player(app, court_path, "10.0.0.2")
+    join_as(visitor, court_path, "Amy")
+    for _ in range(app.config["LEAVE_MAX_ATTEMPTS"]):
+        post_message(visitor, court_path, "hi", "Amy", "000000")
+    response = post_message(visitor, court_path, "hi", "Amy", "123456")
+    assert response.status_code == 302
+    assert b"Too many failed attempts" in visitor.get(court_path).data
+    assert stored_messages(app) == []
+
+
+def test_court_message_board_rate_limits_by_ip(client, app):
+    login(client)
+    court_path = create_court(client, court_date=MESSAGE_COURT_DATE)
+    visitor = message_player(app, court_path, "10.0.0.3")
+    join_as(visitor, court_path, "Amy")
+    for index in range(app_module.COURT_MESSAGE_RATE_LIMIT + 1):
+        post_message(visitor, court_path, f"m{index}", "Amy", "123456")
+    assert b"posting too quickly" in visitor.get(court_path).data
+    assert len(stored_messages(app)) == app_module.COURT_MESSAGE_RATE_LIMIT
+
+
+def test_court_message_replies_thread_under_parent_and_cascade_delete(client, app):
+    login(client)
+    client.set_cookie("court_lang", "en-us")
+    court_path = create_court(client, court_date=MESSAGE_COURT_DATE)
+    other_court_path = create_court(client, court_date=MESSAGE_COURT_DATE)
+    amy = message_player(app, court_path, "10.0.0.4")
+    join_as(amy, court_path, "Amy")
+    join_as(amy, other_court_path, "Amy")
+
+    post_message(amy, court_path, "Is parking available?", "Amy", "123456")
+    post_message(amy, other_court_path, "Other court question", "Amy", "123456")
+    ids = {row["message"]: row["id"] for row in stored_messages(app)}
+    parent_id = ids["Is parking available?"]
+
+    response = post_message(client, court_path, "Yes, under the building.", parent_id=parent_id)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"#court-message-{parent_id}")
+    assert b"Reply posted." in client.get(court_path).data
+
+    reply_id = stored_messages(app)[-1]["id"]
+    post_message(amy, court_path, "Thanks!", "Amy", "123456", parent_id=reply_id)
+    assert stored_messages(app)[-1]["parent_id"] == parent_id  # flattened
+
+    for bad_parent in ("999999", "abc", str(ids["Other court question"])):
+        post_message(amy, court_path, "orphan", "Amy", "123456", parent_id=bad_parent)
+        assert b"no longer exists" in amy.get(court_path).data
+    assert "orphan" not in [row["message"] for row in stored_messages(app)]
+
+    page = amy.get(court_path).data.decode()
+    thread = page.split(f'id="court-message-{parent_id}"', 1)[1]
+    assert (
+        thread.index("Is parking available?")
+        < thread.index("Yes, under the building.")
+        < thread.index("Thanks!")
+    )
+    assert f'name="parent_id" value="{parent_id}"' in page
+
+    assert "Delete this message and all of its replies?" in client.get(court_path).data.decode()
+    client.post(
+        f"{court_path}/messages/{parent_id}/delete",
+        data={"csrf_token": csrf(client, court_path)},
+    )
+    assert [row["message"] for row in stored_messages(app)] == ["Other court question"]
+
+
+def test_failed_message_post_keeps_draft_after_redirect(client, app):
+    login(client)
+    court_path = create_court(client, court_date=MESSAGE_COURT_DATE)
+    amy = message_player(app, court_path, "10.0.2.1")
+    join_as(amy, court_path, "Amy")
+
+    response = post_message(amy, court_path, "Keep this <draft>", "Amy", "000000")
+    assert response.status_code == 302
+    page = amy.get(court_path).data.decode()
+    form = page.split("data-court-message-form", 1)[1].split("</form>", 1)[0]
+    assert ">Keep this &lt;draft&gt;</textarea>" in form
+    assert 'name="username" minlength="2" maxlength="40" autocomplete="nickname" required value="Amy"' in form
+    assert "you have not joined this court. Attempts remaining" in form
+    assert 'name="pin" type="password"' in form and "000000" not in page
+    # The draft is shown once.
+    assert "Keep this &lt;draft&gt;" not in amy.get(court_path).data.decode()
+
+    # A failed reply reopens its thread's reply form with the text.
+    post_message(amy, court_path, "Top message", "Amy", "123456")
+    parent_id = stored_messages(app)[-1]["id"]
+    response = post_message(amy, court_path, "My reply draft", "Amy", "999999",
+                            parent_id=parent_id)
+    assert response.headers["Location"].endswith(f"#court-message-{parent_id}")
+    page = amy.get(court_path).data.decode()
+    thread = page.split(f'id="court-message-{parent_id}"', 1)[1]
+    assert '<details class="court-message-reply-toggle" open>' in thread
+    assert ">My reply draft</textarea>" in thread
+
+    # A reply to a deleted message comes back in the main box instead.
+    post_message(amy, court_path, "Orphan draft", "Amy", "123456", parent_id="999999")
+    page = amy.get(court_path).data.decode()
+    top_form = page.split("data-court-message-form", 1)[1].split("</form>", 1)[0]
+    assert ">Orphan draft</textarea>" in top_form
+    assert "no longer exists" in top_form
+
+
+def test_in_page_message_post_returns_json_and_refreshed_board(client, app):
+    login(client)
+    client.set_cookie("court_lang", "en-us")
+    court_path = create_court(client, court_date=MESSAGE_COURT_DATE)
+    amy = message_player(app, court_path, "10.0.2.2")
+    join_as(amy, court_path, "Amy")
+    headers = {"X-Requested-With": "fetch"}
+
+    response = amy.post(
+        f"{court_path}/messages",
+        data={"csrf_token": csrf(amy, court_path), "username": "Amy",
+              "pin": "111111", "message": "Wrong pin"},
+        headers=headers,
+    )
+    assert response.status_code == 403
+    assert response.json["ok"] is False
+    assert "you have not joined this court" in response.json["error"]
+    assert stored_messages(app) == []
+
+    response = amy.post(
+        f"{court_path}/messages",
+        data={"csrf_token": csrf(amy, court_path), "username": "Amy",
+              "pin": "123456", "message": "Hello <everyone>"},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json
+    message_id = stored_messages(app)[-1]["id"]
+    assert body["ok"] is True
+    assert body["message"] == "Message posted."
+    assert body["count"] == 1
+    assert body["anchor"] == f"court-message-{message_id}"
+    assert "data-court-messages-body" in body["html"]
+    assert "Hello &lt;everyone&gt;" in body["html"]
+    assert f'name="parent_id" value="{message_id}"' in body["html"]
+    assert "/delete" not in body["html"]  # rendered for this viewer, not the owner
+    # No flash or draft leaks into the next full page load.
+    page = amy.get(court_path).data.decode()
+    assert "Message posted." not in page and "Wrong pin" not in page
+
+    response = client.post(
+        f"{court_path}/messages",
+        data={"csrf_token": csrf(client, court_path), "message": "Reply",
+              "parent_id": str(message_id)},
+        headers=headers,
+    )
+    assert response.json["message"] == "Reply posted."
+    assert response.json["count"] == 2
+    assert f"/messages/{message_id}/delete" in response.json["html"]
+    assert "Posting as manager" in response.json["html"]
+
+
+def test_live_message_board_endpoint_reports_changes(client, app):
+    login(client)
+    client.set_cookie("court_lang", "en-us")
+    court_path = create_court(client, court_date=MESSAGE_COURT_DATE)
+    viewer = message_player(app, court_path, "10.0.3.1")
+    page = viewer.get(court_path).data.decode()
+    version = re.search(r'data-court-messages-body data-version="([0-9a-f]+)"', page).group(1)
+    assert f'data-board-url="{court_path}/messages"' in page
+
+    unchanged = viewer.get(f"{court_path}/messages?version={version}")
+    assert unchanged.status_code == 200
+    assert unchanged.json == {"changed": False, "version": version}
+    assert unchanged.headers["Cache-Control"] == "private, no-store"
+
+    join_as(viewer, court_path, "Amy")
+    post_message(viewer, court_path, "Live update test", "Amy", "123456")
+    changed = viewer.get(f"{court_path}/messages?version={version}").json
+    assert changed["changed"] is True
+    assert changed["count"] == 1
+    assert changed["version"] != version
+    assert "Live update test" in changed["html"]
+    assert f'data-version="{changed["version"]}"' in changed["html"]
+    assert "/delete" not in changed["html"]
+
+    # Deleting also changes the version; the organizer's copy has delete buttons.
+    owner_view = client.get(f"{court_path}/messages").json
+    assert "/delete" in owner_view["html"]
+    message_id = stored_messages(app)[-1]["id"]
+    client.post(
+        f"{court_path}/messages/{message_id}/delete",
+        data={"csrf_token": csrf(client, court_path)},
+    )
+    after_delete = viewer.get(f"{court_path}/messages?version={changed['version']}").json
+    assert after_delete["changed"] is True and after_delete["count"] == 0
+    assert after_delete["version"] == version  # same contents as the empty board
+
+    assert viewer.get("/00000000-0000-0000-0000-000000000000/messages").status_code == 404
+
+
+class RecordingFcm:
+    def __init__(self):
+        self.sent = []
+
+    def send(self, token, data, *, collapse_key, ttl_seconds=86_400):
+        self.sent.append({"token": token, "data": data, "collapse_key": collapse_key})
+
+
+def test_court_message_notifications_reach_owner_and_thread_author(
+    client, app, monkeypatch
+):
+    enable_web_push(app)
+    fcm = RecordingFcm()
+    app.extensions["fcm_client"] = fcm
+    login(client)
+    client.set_cookie("court_lang", "en-us")
+    court_path = create_court(client, event_name="Message Alerts", court_date=MESSAGE_COURT_DATE)
+    guid = court_path.rsplit("/", 1)[-1]
+    base = "https://updates.push.services.mozilla.com/wpush/v2/"
+    owner_endpoint, amy_endpoint, ben_endpoint = (
+        base + "owner-browser", base + "amy-browser", base + "ben-browser"
+    )
+
+    def subscribe(browser, endpoint):
+        response = browser.post(
+            f"/{guid}/push-subscription",
+            json={"subscription": push_subscription_payload(endpoint)},
+            headers={"X-CSRF-Token": csrf(browser, court_path)},
+        )
+        assert response.status_code == 200
+
+    subscribe(client, owner_endpoint)
+    amy = message_player(app, court_path, "10.0.1.1")
+    ben = message_player(app, court_path, "10.0.1.2")
+    subscribe(amy, amy_endpoint)
+    subscribe(ben, ben_endpoint)
+    join_as(amy, court_path, "Amy")
+    join_as(ben, court_path, "Ben")
+
+    with app.app_context():
+        db = get_db()
+        owner_id = db.execute(
+            "SELECT user_id FROM push_subscriptions WHERE endpoint = ?", (owner_endpoint,)
+        ).fetchone()[0]
+        assert owner_id is not None
+        assert db.execute(
+            "SELECT user_id FROM push_subscriptions WHERE endpoint = ?", (amy_endpoint,)
+        ).fetchone()[0] is None
+        db.execute(
+            "INSERT INTO api_tokens (user_id, token_hash, created_at, expires_at, fcm_token) "
+            "VALUES (?, 'hash', '2026-01-01T00:00:00', '2999-01-01T00:00:00', 'owner-phone')",
+            (owner_id,),
+        )
+        db.commit()
+
+    delivered = []
+    monkeypatch.setattr(
+        app_module,
+        "webpush",
+        lambda **kwargs: delivered.append(
+            (kwargs["subscription_info"]["endpoint"], json.loads(kwargs["data"]))
+        ),
+    )
+
+    def take():
+        web = {endpoint: payload["body"] for endpoint, payload in delivered}
+        android = {item["token"]: item["data"] for item in fcm.sent}
+        delivered.clear()
+        fcm.sent.clear()
+        return web, android
+
+    # New top-level message: organizer only, generic text.
+    post_message(amy, court_path, "Secret parking question", "Amy", "123456",
+                 push_endpoint=amy_endpoint)
+    amy_message = stored_messages(app)[-1]
+    assert amy_message["notify_endpoint"] == amy_endpoint
+    payloads = json.dumps(delivered) + json.dumps(fcm.sent)
+    assert "Amy" not in payloads and "Secret parking" not in payloads
+    web, android = take()
+    assert web == {owner_endpoint: "Someone posted on your court's message board."}
+    assert android["owner-phone"]["type"] == "court_changed"
+    assert android["owner-phone"]["change"] == "message"
+    assert android["owner-phone"]["audience"] == "owner"
+    assert android["owner-phone"]["title"] == "New message on Message Alerts"
+    assert android["owner-phone"]["url"].endswith(f"#court-message-{amy_message['id']}")
+
+    # Ben replies: organizer and Amy (thread author), not Ben.
+    post_message(ben, court_path, "Garage under the hall", "Ben", "123456",
+                 parent_id=amy_message["id"], push_endpoint=ben_endpoint)
+    web, android = take()
+    assert web == {
+        owner_endpoint: "Someone replied to a message on your court's message board.",
+        amy_endpoint: "Someone replied to your message.",
+    }
+    assert set(android) == {"owner-phone"}
+
+    # Amy replies in her own thread: organizer only.
+    post_message(amy, court_path, "Thanks Ben", "Amy", "123456",
+                 parent_id=amy_message["id"], push_endpoint=amy_endpoint)
+    web, _ = take()
+    assert web == {
+        owner_endpoint: "Someone replied to a message on your court's message board."
+    }
+
+    # Organizer replies: Amy only; the organizer isn't told about their own post.
+    post_message(client, court_path, "Free for 2 hours", parent_id=amy_message["id"],
+                 push_endpoint=owner_endpoint)
+    web, android = take()
+    assert web == {amy_endpoint: "Someone replied to your message."}
+    assert android == {}
+
+    # Replies to the organizer's own message reach the organizer once, as author.
+    post_message(client, court_path, "Bring indoor shoes", push_endpoint=owner_endpoint)
+    organizer_message = stored_messages(app)[-1]
+    take()
+    post_message(ben, court_path, "Noted", "Ben", "123456", parent_id=organizer_message["id"])
+    web, android = take()
+    assert web == {owner_endpoint: "Someone replied to your message."}
+    assert android["owner-phone"]["audience"] == "author"
+
+    # Endpoints not subscribed to this court are never stored.
+    post_message(ben, court_path, "Forged", "Ben", "123456",
+                 push_endpoint=base + "someone-else")
+    assert stored_messages(app)[-1]["notify_endpoint"] == ""
+    take()
+
+    # Organizer alerts respect the owner_notifications setting.
+    with app.app_context():
+        get_db().execute("UPDATE courts SET owner_notifications = 0")
+        get_db().commit()
+    post_message(ben, court_path, "Anyone?", "Ben", "123456")
+    assert take() == ({}, {})
+
+
+def test_court_messages_table_migrates_parent_column(tmp_path):
+    import sqlite3
+
+    database = tmp_path / "legacy.sqlite"
+    connection = sqlite3.connect(database)
+    connection.executescript(
+        """
+        CREATE TABLE court_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            court_id INTEGER NOT NULL,
+            author_name TEXT NOT NULL,
+            message TEXT NOT NULL,
+            posted_at TEXT NOT NULL,
+            ip_address TEXT NOT NULL DEFAULT '',
+            device_information TEXT NOT NULL DEFAULT ''
+        );
+        """
+    )
+    connection.close()
+    create_app({"TESTING": True, "DATABASE": str(database), "SECRET_KEY": "x"})
+    connection = sqlite3.connect(database)
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(court_messages)")}
+    connection.close()
+    assert {"parent_id", "author_kind", "participant_key", "author_user_id",
+            "notify_endpoint"} <= columns

@@ -406,6 +406,156 @@
     }
   }
 
+  // Message board: post without reloading. The board is re-rendered by the
+  // server and swapped in; on failure the error shows inline and everything
+  // typed stays in place. Without JavaScript the form posts normally and the
+  // server restores the draft after the redirect.
+  const messagesBody = document.querySelector('[data-court-messages-body]');
+  const messagesStatus = document.querySelector('[data-court-message-status]');
+  const messagesCount = document.querySelector('[data-court-messages-count]');
+  const messagesNewButton = document.querySelector('[data-court-messages-new]');
+  let pendingBoard = null;
+
+  const applyBoard = (result) => {
+    if (!messagesBody) return;
+    const template = document.createElement('template');
+    template.innerHTML = result.html.trim();
+    const freshBody = template.content.querySelector('[data-court-messages-body]');
+    if (!freshBody) return;
+    messagesBody.replaceChildren(...freshBody.childNodes);
+    messagesBody.dataset.version = result.version;
+    if (messagesCount) messagesCount.textContent = String(result.count);
+    pendingBoard = null;
+    if (messagesNewButton) messagesNewButton.hidden = true;
+  };
+
+  // Someone is writing: never swap the board out from under them.
+  const boardBusy = () => {
+    if (!messagesBody) return false;
+    if (messagesBody.contains(document.activeElement)) return true;
+    if (messagesBody.querySelector('[data-court-message-form][data-sending]')) return true;
+    if (messagesBody.querySelector('.court-message-reply-toggle[open]')) return true;
+    return [...messagesBody.querySelectorAll('textarea')].some((field) => field.value.trim());
+  };
+
+  // Live board: check every 30 seconds while the tab is visible.
+  const boardUrl = messagesStatus?.dataset.boardUrl;
+  const LIVE_INTERVAL = 30000;
+  let liveTimer = null;
+  const scheduleLive = () => {
+    window.clearTimeout(liveTimer);
+    liveTimer = window.setTimeout(checkBoard, LIVE_INTERVAL);
+  };
+  async function checkBoard() {
+    if (!messagesBody || !boardUrl || !window.fetch) return;
+    if (document.hidden) return;
+    try {
+      const url = `${boardUrl}?version=${encodeURIComponent(messagesBody.dataset.version || '')}`;
+      const response = await window.fetch(url, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.changed) {
+          if (boardBusy()) {
+            pendingBoard = result;
+            if (messagesNewButton) messagesNewButton.hidden = false;
+          } else {
+            applyBoard(result);
+          }
+        }
+      }
+    } catch {
+      // Offline or server restarting: try again next round.
+    }
+    scheduleLive();
+  }
+  if (messagesBody && boardUrl) {
+    scheduleLive();
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        window.clearTimeout(liveTimer);
+      } else {
+        checkBoard();
+      }
+    });
+    messagesNewButton?.addEventListener('click', () => {
+      if (pendingBoard) applyBoard(pendingBoard);
+    });
+  }
+  const currentPushEndpoint = async () => {
+    if (!('serviceWorker' in navigator)) return '';
+    try {
+      const registration = await navigator.serviceWorker.getRegistration('/');
+      const subscription = await registration?.pushManager?.getSubscription();
+      return subscription?.endpoint || '';
+    } catch {
+      return '';
+    }
+  };
+  document.addEventListener('submit', async (event) => {
+    const form = event.target.closest('[data-court-message-form]');
+    if (!form || !messagesBody || !window.fetch) return;
+    event.preventDefault();
+    if (form.dataset.sending === 'true') return;
+    const errorBox = form.querySelector('[data-court-message-error]');
+    const submitButton = form.querySelector('button[type="submit"]');
+    const endpointField = form.querySelector('[data-court-message-push-endpoint]');
+    const showError = (text) => {
+      if (!errorBox) return;
+      errorBox.textContent = text;
+      errorBox.hidden = false;
+    };
+    form.dataset.sending = 'true';
+    if (submitButton) submitButton.disabled = true;
+    if (errorBox) errorBox.hidden = true;
+    if (endpointField) endpointField.value = await currentPushEndpoint();
+    try {
+      const response = await window.fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'fetch', Accept: 'application/json' },
+      });
+      let result = null;
+      try {
+        result = await response.json();
+      } catch {
+        result = null;
+      }
+      if (!response.ok || !result?.ok) {
+        showError(result?.error || messagesStatus?.dataset.networkError || 'Error');
+        const pinField = form.querySelector('input[name="pin"]');
+        if (pinField && response.status === 403) {
+          pinField.value = '';
+          pinField.focus();
+        }
+        return;
+      }
+      // Blur first so the swapped-in board isn't treated as "busy".
+      document.activeElement?.blur?.();
+      applyBoard(result);
+      scheduleLive();
+      if (messagesStatus) {
+        messagesStatus.textContent = result.message;
+        messagesStatus.hidden = false;
+      }
+      const thread = document.getElementById(result.anchor);
+      if (thread) {
+        thread.classList.add('is-new');
+        thread.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        window.setTimeout(() => thread.classList.remove('is-new'), 2400);
+      }
+    } catch {
+      showError(messagesStatus?.dataset.networkError || 'Error');
+    } finally {
+      delete form.dataset.sending;
+      if (submitButton) submitButton.disabled = false;
+    }
+  });
+
   document.querySelectorAll('.flash-close').forEach((button) => {
     button.addEventListener('click', () => button.closest('.flash')?.remove());
   });
@@ -464,11 +614,15 @@
     if (tempPasswordInput) tempPasswordInput.value = '';
   });
 
-  document.querySelectorAll('form[data-confirm]').forEach((form) => {
-    form.addEventListener('submit', (event) => {
-      if (!window.confirm(form.dataset.confirm)) event.preventDefault();
-    });
-  });
+  // Delegated (capture phase) so forms added later, such as a re-rendered
+  // message board, still ask before submitting.
+  document.addEventListener('submit', (event) => {
+    const form = event.target.closest('form[data-confirm]');
+    if (form && !window.confirm(form.dataset.confirm)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
 
   document.querySelectorAll('.join-tab').forEach((tab) => {
     tab.addEventListener('click', () => {

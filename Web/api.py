@@ -625,6 +625,78 @@ def leave_court(guid: str):
     return court_detail_response(guid)
 
 
+# Message board. Players post with the nickname and PIN they joined with; the
+# court's organizer (or an administrator) posts as their account.
+
+
+def serialize_court_message(row: Any, show_audit: bool) -> dict[str, Any]:
+    data = {
+        "id": row["id"],
+        "author_name": row["author_name"],
+        "author_kind": row["author_kind"],
+        "message": row["message"],
+        "posted_at": row["posted_at"],
+    }
+    if show_audit:
+        data["ip_address"] = row["ip_address"]
+    return data
+
+
+def court_messages_body(court: Any) -> dict[str, Any]:
+    court_messages, threads = core.fetch_court_message_threads(court["id"])
+    show_audit = viewer_is_admin()
+    return {
+        "messages": [
+            {
+                **serialize_court_message(top, show_audit),
+                "replies": [serialize_court_message(r, show_audit) for r in replies],
+            }
+            for top, replies in threads
+        ],
+        "count": len(court_messages),
+        "version": core.court_messages_version(court_messages),
+    }
+
+
+@bp.get("/courts/<guid>/messages")
+def list_court_messages(guid: str):
+    court = fetch_public_court(guid)
+    body = court_messages_body(court)
+    if request.args.get("version", "") == body["version"]:
+        return jsonify({"changed": False, "version": body["version"]})
+    return jsonify({"changed": True, **body})
+
+
+@bp.post("/courts/<guid>/messages")
+def post_court_message(guid: str):
+    payload = json_body()
+    court = fetch_public_court(guid)
+    message_id, thread_id = core.create_court_message(
+        court,
+        text_value(payload, "username"),
+        text_value(payload, "pin"),
+        text_value(payload, "message"),
+        text_value(payload, "parent_id"),
+        raw_fcm_token=text_value(payload, "fcm_token"),
+    )
+    return jsonify(
+        {
+            "message_id": message_id,
+            "thread_id": thread_id,
+            "changed": True,
+            **court_messages_body(court),
+        }
+    ), 201
+
+
+@bp.delete("/courts/<guid>/messages/<int:message_id>")
+@require_member()
+def delete_court_message(guid: str, message_id: int):
+    court = core.fetch_managed_court(guid)
+    core.delete_court_message_entry(court, message_id)
+    return jsonify({"changed": True, **court_messages_body(court)})
+
+
 # Android push (FCM). The device's registration token identifies the
 # subscriber, so no account is needed, the same as browser Web Push.
 

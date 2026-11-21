@@ -1,6 +1,7 @@
 package io.github.ychsieh95.bccp.core.network
 
 import io.github.ychsieh95.bccp.core.model.Meta
+import io.github.ychsieh95.bccp.core.model.MessageBoard
 import kotlinx.serialization.json.JsonObject
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -26,6 +27,9 @@ interface BccpApi {
     @GET("courts/{guid}") suspend fun court(@Path("guid") guid: String): CourtResponse
     @POST("courts/{guid}/join") suspend fun join(@Path("guid") guid: String, @Body body: JsonObject): CourtResponse
     @POST("courts/{guid}/leave") suspend fun leave(@Path("guid") guid: String, @Body body: JsonObject): CourtResponse
+    @GET("courts/{guid}/messages") suspend fun messages(@Path("guid") guid: String, @Query("version") version: String?): MessageBoard
+    @POST("courts/{guid}/messages") suspend fun postMessage(@Path("guid") guid: String, @Body body: JsonObject): MessageBoard
+    @DELETE("courts/{guid}/messages/{id}") suspend fun deleteMessage(@Path("guid") guid: String, @Path("id") id: Int): MessageBoard
     @POST("contact") suspend fun contact(@Body body: JsonObject): JsonObject
 
     @POST("courts/{guid}/push/status") suspend fun pushStatus(@Path("guid") guid: String, @Body body: JsonObject): PushStatusResponse

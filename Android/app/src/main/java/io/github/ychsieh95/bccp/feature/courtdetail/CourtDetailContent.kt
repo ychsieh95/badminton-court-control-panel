@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -71,6 +73,7 @@ import io.github.ychsieh95.bccp.R
 import io.github.ychsieh95.bccp.core.model.Court
 import io.github.ychsieh95.bccp.core.model.HistoryEvent
 import io.github.ychsieh95.bccp.core.model.LevelRange
+import io.github.ychsieh95.bccp.core.model.MessageBoard
 import io.github.ychsieh95.bccp.core.ui.component.CountBadge
 import io.github.ychsieh95.bccp.core.ui.component.IconLine
 import io.github.ychsieh95.bccp.core.ui.component.PanelCard
@@ -91,9 +94,12 @@ internal fun CourtDetailContent(
     rollDraft: RollDraft,
     rollDirty: Boolean,
     busy: Boolean,
+    board: MessageBoard?,
     actions: CourtDetailActions,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -123,6 +129,7 @@ internal fun CourtDetailContent(
         if (court.waitingParticipants.isNotEmpty()) {
             item(key = "waiting") { PlayersSection(court, waiting = true, actions = actions, modifier = section) }
         }
+        if (board != null) item(key = "messages") { MessagesSection(court, board, actions, section) }
         item(key = "history") { HistorySection(court, section) }
     }
 }

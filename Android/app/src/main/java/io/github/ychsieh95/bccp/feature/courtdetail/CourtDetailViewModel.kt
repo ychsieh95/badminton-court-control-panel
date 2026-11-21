@@ -10,8 +10,12 @@ import io.github.ychsieh95.bccp.core.data.CourtRepository
 import io.github.ychsieh95.bccp.core.data.DataError
 import io.github.ychsieh95.bccp.core.data.PushRepository
 import io.github.ychsieh95.bccp.core.data.RollStatus
+import io.github.ychsieh95.bccp.core.data.SessionStore
 import io.github.ychsieh95.bccp.core.data.SettingsStore
 import io.github.ychsieh95.bccp.core.model.Court
+import io.github.ychsieh95.bccp.core.model.CourtMessage
+import io.github.ychsieh95.bccp.core.model.MessageBoard
+import io.github.ychsieh95.bccp.core.push.CourtNotifications
 import io.github.ychsieh95.bccp.core.ui.UiMessage
 import io.github.ychsieh95.bccp.core.ui.toUiMessage
 import io.github.ychsieh95.bccp.navigation.CourtDetailRoute
@@ -19,6 +23,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -34,6 +39,24 @@ data class PlayerForm(
     val submitting: Boolean = false,
 ) {
     val canSubmit: Boolean get() = username.trim().length in 2..40 && pin.length == 6 && !submitting
+}
+
+const val MESSAGE_MAX_LENGTH = 500
+
+/** The message composer. [replyTo] is the thread being answered, or null for a new message. */
+data class MessageForm(
+    val open: Boolean = false,
+    val replyTo: CourtMessage? = null,
+    val username: String = "",
+    val pin: String = "",
+    val message: String = "",
+    val error: UiMessage? = null,
+    val submitting: Boolean = false,
+) {
+    /** Organizers post as their account, without a player's name and PIN. */
+    fun canSubmit(asOrganizer: Boolean): Boolean =
+        !submitting && message.isNotBlank() && message.length <= MESSAGE_MAX_LENGTH &&
+            (asOrganizer || (username.trim().length in 2..40 && pin.length == 6))
 }
 
 /** Court-change notifications for this device. [available] when the server has FCM set up. */
@@ -56,6 +79,11 @@ data class CourtDetailUiState(
     val rollDirty: Boolean = false,
     val push: PushUi = PushUi(),
     val notificationPrompt: NotificationPrompt? = null,
+    /** Null until the board first loads. */
+    val board: MessageBoard? = null,
+    val messageForm: MessageForm = MessageForm(),
+    /** The signed-in account's name, shown as "Posting as" for organizers. */
+    val accountName: String? = null,
 )
 
 @androidx.compose.runtime.Stable
@@ -67,6 +95,8 @@ interface CourtDetailActions {
     fun renameParticipant(id: Int, name: String)
     fun resetParticipantPin(id: Int, pin: String)
     fun removeParticipant(id: Int)
+    fun composeMessage(replyTo: CourtMessage?)
+    fun deleteMessage(id: Int)
 }
 
 sealed interface CourtDetailEffect {
@@ -81,15 +111,26 @@ class CourtDetailViewModel @Inject constructor(
     private val courts: CourtRepository,
     private val settings: SettingsStore,
     private val push: PushRepository,
+    session: SessionStore,
 ) : ViewModel(), CourtDetailActions {
     val guid: String = savedStateHandle.toRoute<CourtDetailRoute>().guid
 
-    private val _uiState = MutableStateFlow(CourtDetailUiState(playerForm = PlayerForm(username = settings.current.lastJoinName)))
+    private val _uiState = MutableStateFlow(
+        CourtDetailUiState(
+            playerForm = PlayerForm(username = settings.current.lastJoinName),
+            messageForm = MessageForm(username = settings.current.lastJoinName),
+            accountName = session.session.value.user?.username,
+        ),
+    )
     val uiState: StateFlow<CourtDetailUiState> = _uiState.asStateFlow()
     private val _effects = Channel<CourtDetailEffect>(Channel.BUFFERED)
     val effects = _effects.receiveAsFlow()
 
     init {
+        // A push about this court (a new message, players joining…) while it is open.
+        viewModelScope.launch {
+            CourtNotifications.received.filter { it == guid }.collect { refresh() }
+        }
         viewModelScope.launch {
             if (!push.available()) return@launch
             _uiState.update { it.copy(push = it.push.copy(available = true)) }
@@ -134,6 +175,7 @@ class CourtDetailViewModel @Inject constructor(
     }
 
     fun refresh() {
+        refreshMessages()
         _uiState.update { it.copy(loading = it.court == null, error = null) }
         viewModelScope.launch {
             courts.detail(guid)
@@ -157,6 +199,85 @@ class CourtDetailViewModel @Inject constructor(
             )
         }
     }
+
+    // Message board ------------------------------------------------------------------------
+
+    /** Cheap when nothing changed: the server answers just the version. */
+    fun refreshMessages() {
+        viewModelScope.launch {
+            courts.messages(guid, _uiState.value.board?.version).onSuccess(::showBoard)
+        }
+    }
+
+    private fun showBoard(board: MessageBoard) {
+        if (board.changed) _uiState.update { it.copy(board = board) }
+    }
+
+    override fun composeMessage(replyTo: CourtMessage?) = updateMessageForm {
+        // Keep an unsent draft when reopening the same composer.
+        val sameTarget = this.replyTo?.id == replyTo?.id
+        copy(open = true, replyTo = replyTo, message = if (sameTarget) message else "", error = null)
+    }
+
+    fun closeMessageSheet() = updateMessageForm { copy(open = false) }
+    fun setMessageName(name: String) = updateMessageForm { copy(username = name.take(40), error = null) }
+    fun setMessagePin(pin: String) = updateMessageForm { copy(pin = pin, error = null) }
+    fun setMessageText(text: String) = updateMessageForm { copy(message = text.take(MESSAGE_MAX_LENGTH), error = null) }
+
+    fun submitMessage() {
+        val state = _uiState.value
+        val form = state.messageForm
+        val asOrganizer = state.court?.viewer?.canManage == true
+        if (!form.canSubmit(asOrganizer)) return
+        updateMessageForm { copy(submitting = true, error = null) }
+        viewModelScope.launch {
+            // Replies reach this device only if it follows the court; the server checks that too.
+            val token = if (state.push.subscribed) push.knownToken() else null
+            courts.postMessage(
+                guid,
+                username = if (asOrganizer) "" else form.username,
+                pin = if (asOrganizer) "" else form.pin,
+                message = form.message,
+                parentId = form.replyTo?.id,
+                fcmToken = token,
+            )
+                .onSuccess { board ->
+                    if (!asOrganizer) settings.setLastJoinName(form.username.trim())
+                    showBoard(board)
+                    updateMessageForm { MessageForm(username = username) }
+                    val posted = if (form.replyTo != null) R.string.message_reply_posted else R.string.message_posted
+                    _effects.send(CourtDetailEffect.Message(UiMessage.Res(posted)))
+                }
+                .onFailure { e ->
+                    val wrongCredentials = e is DataError.Api && e.status == 403
+                    val gone = e is DataError.Api && e.code == "court_message_reply_missing"
+                    updateMessageForm {
+                        copy(
+                            submitting = false,
+                            error = e.toUiMessage(),
+                            pin = if (wrongCredentials) "" else pin,
+                            // The thread was deleted: keep the text as a new message instead.
+                            replyTo = if (gone) null else replyTo,
+                        )
+                    }
+                    if (gone) refreshMessages()
+                }
+        }
+    }
+
+    override fun deleteMessage(id: Int) {
+        viewModelScope.launch {
+            courts.deleteMessage(guid, id)
+                .onSuccess {
+                    showBoard(it)
+                    _effects.send(CourtDetailEffect.Message(UiMessage.Res(R.string.message_deleted)))
+                }
+                .onFailure(::fail)
+        }
+    }
+
+    private fun updateMessageForm(change: MessageForm.() -> MessageForm) =
+        _uiState.update { it.copy(messageForm = it.messageForm.change()) }
 
     // Join / leave -----------------------------------------------------------------------
 

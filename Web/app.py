@@ -370,6 +370,41 @@ TRANSLATIONS = {
         "remove_participant": "Remove player",
         "remove_participant_confirm": "Remove this player from the court?",
         "participant_removed": "Player removed from the court.",
+        "court_messages": "Message board",
+        "court_messages_eyebrow": "Discussion",
+        "court_messages_empty": "No messages yet. Ask a question or leave a note for other players.",
+        "court_message_body": "Message",
+        "court_message_placeholder": "Ask about the event or leave a note for other players…",
+        "court_message_submit": "Post message",
+        "court_message_posted": "Message posted.",
+        "court_message_deleted": "Message deleted.",
+        "court_message_delete": "Delete message",
+        "court_message_missing": "That message no longer exists.",
+        "court_message_delete_confirm": "Delete this message?",
+        "court_message_invalid_body": "Message must be 1 to 500 characters.",
+        "court_message_rate_limited": "You are posting too quickly. Please wait a few minutes and try again.",
+        "court_message_closed": "This event is archived, so new messages are closed.",
+        "court_message_reply": "Reply",
+        "court_message_join_required": "Only players who joined this court can post. Use the nickname and PIN you joined with.",
+        "court_message_posting_as": "Posting as {name}",
+        "court_message_organizer": "Organizer",
+        "court_message_notify_hint": "Turn on notifications for this court to be told when someone replies to you.",
+        "court_message_auth_failed": "The username or PIN is incorrect, or you have not joined this court.",
+        "court_message_locked": "Too many failed attempts. Try again in {minutes} minutes.",
+        "court_message_network_error": "Could not send your message. Check your connection and try again.",
+        "court_messages_new_available": "New messages · Show",
+        "court_message_attempts_remaining": "The username or PIN is incorrect, or you have not joined this court. Attempts remaining: {count}.",
+        "push_message_title": "New message on {name}",
+        "push_reply_title": "New reply on {name}",
+        "push_message_owner_body": "Someone posted on your court's message board.",
+        "push_reply_owner_body": "Someone replied to a message on your court's message board.",
+        "push_reply_author_body": "Someone replied to your message.",
+        "court_message_reply_to": "Reply to {name}",
+        "court_message_reply_placeholder": "Write a reply…",
+        "court_message_reply_submit": "Post reply",
+        "court_message_reply_posted": "Reply posted.",
+        "court_message_reply_missing": "The message you replied to no longer exists.",
+        "court_message_delete_thread_confirm": "Delete this message and all of its replies?",
         "participation_history": "Join & leave history",
         "participation_history_eyebrow": "Activity",
         "no_participation_history": "No join or leave activity yet.",
@@ -963,6 +998,41 @@ TRANSLATIONS = {
         "remove_participant": "移除球友",
         "remove_participant_confirm": "確定要將此球友移出場次嗎？",
         "participant_removed": "球友已移出場次。",
+        "court_messages": "留言板",
+        "court_messages_eyebrow": "討論",
+        "court_messages_empty": "目前尚無留言，歡迎提問或留言給其他球友。",
+        "court_message_body": "留言內容",
+        "court_message_placeholder": "詢問活動相關問題，或留言給其他球友…",
+        "court_message_submit": "送出留言",
+        "court_message_posted": "留言已送出。",
+        "court_message_deleted": "留言已刪除。",
+        "court_message_delete": "刪除留言",
+        "court_message_missing": "這則留言已不存在。",
+        "court_message_delete_confirm": "確定要刪除這則留言嗎？",
+        "court_message_invalid_body": "留言長度須為 1 至 500 個字元。",
+        "court_message_rate_limited": "留言速度過快，請稍候幾分鐘再試。",
+        "court_message_closed": "此場次已封存，暫停新增留言。",
+        "court_message_reply": "回覆",
+        "court_message_join_required": "只有已加入此場次的球友可以留言，請使用加入時的暱稱與 PIN 碼。",
+        "court_message_posting_as": "以 {name} 身分留言",
+        "court_message_organizer": "團主",
+        "court_message_notify_hint": "開啟此場次的通知，即可在有人回覆你時收到通知。",
+        "court_message_auth_failed": "使用者名稱或 PIN 碼不正確，或你尚未加入此場次。",
+        "court_message_locked": "嘗試失敗次數過多，請在 {minutes} 分鐘後再試。",
+        "court_message_network_error": "無法送出留言，請確認網路連線後再試一次。",
+        "court_messages_new_available": "有新留言 · 顯示",
+        "court_message_attempts_remaining": "使用者名稱或 PIN 碼不正確，或你尚未加入此場次，還可嘗試 {count} 次。",
+        "push_message_title": "{name} 有新留言",
+        "push_reply_title": "{name} 有新回覆",
+        "push_message_owner_body": "有人在你的場次留言板留言。",
+        "push_reply_owner_body": "有人回覆了你的場次留言板上的留言。",
+        "push_reply_author_body": "有人回覆了你的留言。",
+        "court_message_reply_to": "回覆 {name}",
+        "court_message_reply_placeholder": "輸入回覆內容…",
+        "court_message_reply_submit": "送出回覆",
+        "court_message_reply_posted": "回覆已送出。",
+        "court_message_reply_missing": "你要回覆的留言已不存在。",
+        "court_message_delete_thread_confirm": "確定要刪除這則留言及其所有回覆嗎？",
         "participation_history": "加入與退出紀錄",
         "participation_history_eyebrow": "活動紀錄",
         "no_participation_history": "目前尚無加入或退出紀錄。",
@@ -1719,6 +1789,27 @@ CREATE TABLE IF NOT EXISTS reserved_members (
     UNIQUE(court_id, position)
 );
 
+CREATE TABLE IF NOT EXISTS court_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    court_id INTEGER NOT NULL,
+    parent_id INTEGER REFERENCES court_messages(id) ON DELETE CASCADE,
+    author_name TEXT NOT NULL,
+    author_kind TEXT NOT NULL DEFAULT 'participant'
+        CHECK(author_kind IN ('participant', 'organizer')),
+    participant_key TEXT NOT NULL DEFAULT '',
+    author_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    notify_endpoint TEXT NOT NULL DEFAULT '',
+    notify_fcm_token TEXT NOT NULL DEFAULT '',
+    message TEXT NOT NULL,
+    posted_at TEXT NOT NULL,
+    ip_address TEXT NOT NULL DEFAULT '',
+    device_information TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (court_id) REFERENCES courts(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS court_messages_court_time_idx
+ON court_messages(court_id, posted_at DESC, id DESC);
+
 CREATE TABLE IF NOT EXISTS court_media (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     court_id INTEGER NOT NULL,
@@ -1741,6 +1832,7 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     p256dh TEXT NOT NULL,
     auth TEXT NOT NULL,
     language TEXT NOT NULL DEFAULT 'en-us',
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (court_id) REFERENCES courts(id) ON DELETE CASCADE,
@@ -2448,16 +2540,21 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             abort(400)
         endpoint, p256dh, auth = subscription
         now = datetime.now().isoformat(timespec="seconds")
+        member = current_member()
         db = get_db()
+        # The signed-in member is remembered so organizer message alerts can
+        # reach the browsers where they turned on notifications.
         db.execute(
             """
             INSERT INTO push_subscriptions (
-                court_id, endpoint, p256dh, auth, language, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                court_id, endpoint, p256dh, auth, language, user_id,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(court_id, endpoint) DO UPDATE SET
                 p256dh = excluded.p256dh,
                 auth = excluded.auth,
                 language = excluded.language,
+                user_id = excluded.user_id,
                 updated_at = excluded.updated_at
             """,
             (
@@ -2466,6 +2563,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 p256dh,
                 auth,
                 current_language(),
+                member["id"] if member else None,
                 now,
                 now,
             ),
@@ -2540,6 +2638,14 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "ORDER BY occurred_at DESC, id DESC",
                 (court["id"],),
             ).fetchall()
+        court_messages, court_message_threads = fetch_court_message_threads(
+            court["id"]
+        )
+        message_draft = session.get("court_message_draft")
+        if message_draft is not None:
+            session.pop("court_message_draft", None)
+            if message_draft.get("guid") != court["guid"]:
+                message_draft = None
         court_media = fetch_court_media(court["id"])
         social_metadata = court_social_metadata(
             court, court_media[0] if court_media else None
@@ -2553,6 +2659,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             all_reserved_members=all_reserved_members,
             court_media=court_media,
             participation_history=participation_history,
+            court_messages=court_messages,
+            court_message_threads=court_message_threads,
+            message_draft=message_draft,
+            court_messages_version=court_messages_version(court_messages),
             social_metadata=social_metadata,
         )
 
@@ -2638,6 +2748,114 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         else:
             flash_t("left_success", "success")
         return redirect(url_for("court_detail", guid=guid))
+
+    @app.post("/<guid>/messages")
+    def post_court_message(guid: str):
+        if request.content_length is not None and request.content_length > 16_384:
+            abort(413)
+        verify_csrf()
+        court = fetch_court(guid)
+        if court is None:
+            abort(404)
+        # In-page posts (fetch) get JSON plus the refreshed board; plain form
+        # posts redirect back, keeping the draft (never the PIN) on failure.
+        in_page = request.headers.get("X-Requested-With") == "fetch"
+        parent_id = request.form.get("parent_id", "").strip()
+        anchor = "court-section-messages"
+        try:
+            message_id, thread_id = create_court_message(
+                court,
+                request.form.get("username", ""),
+                request.form.get("pin", ""),
+                request.form.get("message", ""),
+                parent_id,
+                request.form.get("push_endpoint", ""),
+            )
+        except CourtActionError as error:
+            if in_page:
+                return jsonify({"ok": False, "error": error.message}), error.status
+            if error.code == "court_message_reply_missing":
+                # The thread is gone, so restore the text into the main box.
+                parent_id = ""
+            session["court_message_draft"] = {
+                "guid": court["guid"],
+                "parent_id": parent_id[:20],
+                "username": request.form.get("username", "")[:40],
+                "message": request.form.get("message", "")[:COURT_MESSAGE_MAX_LENGTH],
+                "error": error.message,
+            }
+            if parent_id.isdigit():
+                anchor = f"court-message-{parent_id}"
+        else:
+            success_key = (
+                "court_message_reply_posted"
+                if thread_id != message_id
+                else "court_message_posted"
+            )
+            anchor = f"court-message-{thread_id}"
+            if in_page:
+                court_messages, court_message_threads = fetch_court_message_threads(
+                    court["id"]
+                )
+                return jsonify(
+                    {
+                        "ok": True,
+                        "message": TRANSLATIONS[current_language()][success_key],
+                        "anchor": anchor,
+                        "count": len(court_messages),
+                        "version": court_messages_version(court_messages),
+                        "html": render_template(
+                            "_court_messages.html",
+                            court=court,
+                            court_messages=court_messages,
+                            court_message_threads=court_message_threads,
+                            court_messages_version=court_messages_version(
+                                court_messages
+                            ),
+                        ),
+                    }
+                )
+            flash_t(success_key, "success")
+        return redirect(url_for("court_detail", guid=guid) + f"#{anchor}")
+
+    @app.get("/<guid>/messages")
+    def court_messages_board(guid: str):
+        """Live board refresh: unchanged boards get a tiny reply."""
+        court = fetch_court(guid)
+        if court is None:
+            abort(404)
+        court_messages, court_message_threads = fetch_court_message_threads(
+            court["id"]
+        )
+        version = court_messages_version(court_messages)
+        if request.args.get("version", "") == version:
+            payload: dict[str, Any] = {"changed": False, "version": version}
+        else:
+            payload = {
+                "changed": True,
+                "version": version,
+                "count": len(court_messages),
+                "html": render_template(
+                    "_court_messages.html",
+                    court=court,
+                    court_messages=court_messages,
+                    court_message_threads=court_message_threads,
+                    court_messages_version=version,
+                ),
+            }
+        response = jsonify(payload)
+        response.headers["Cache-Control"] = "private, no-store"
+        return response
+
+    @app.post("/<guid>/messages/<int:message_id>/delete")
+    def delete_court_message(guid: str, message_id: int):
+        verify_csrf()
+        try:
+            delete_court_message_entry(fetch_managed_court(guid), message_id)
+        except CourtActionError:
+            abort(404)
+        flash_t("court_message_deleted", "success")
+        return redirect(url_for("court_detail", guid=guid) + "#court-section-messages")
 
     @app.route("/admin/login", methods=["GET", "POST"])
     def admin_login():
@@ -3609,6 +3827,39 @@ def init_db() -> None:
         END
         WHERE device_information NOT IN ('ios', 'android', 'mobile', 'web')
         """
+    )
+    court_message_columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(court_messages)").fetchall()
+    }
+    for column, definition in (
+        ("parent_id", "INTEGER REFERENCES court_messages(id) ON DELETE CASCADE"),
+        (
+            "author_kind",
+            "TEXT NOT NULL DEFAULT 'participant' "
+            "CHECK(author_kind IN ('participant', 'organizer'))",
+        ),
+        ("participant_key", "TEXT NOT NULL DEFAULT ''"),
+        ("author_user_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
+        ("notify_endpoint", "TEXT NOT NULL DEFAULT ''"),
+        ("notify_fcm_token", "TEXT NOT NULL DEFAULT ''"),
+    ):
+        if column not in court_message_columns:
+            db.execute(
+                f"ALTER TABLE court_messages ADD COLUMN {column} {definition}"
+            )
+    push_subscription_columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(push_subscriptions)").fetchall()
+    }
+    if "user_id" not in push_subscription_columns:
+        db.execute(
+            "ALTER TABLE push_subscriptions ADD COLUMN user_id INTEGER "
+            "REFERENCES users(id) ON DELETE SET NULL"
+        )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS court_messages_parent_idx "
+        "ON court_messages(parent_id, posted_at, id)"
     )
     db.commit()
 
@@ -5446,6 +5697,13 @@ def fetch_court_owner_fcm_targets(court: sqlite3.Row) -> list[sqlite3.Row]:
     actor = current_member()
     if actor is not None and actor["id"] == court["owner_id"]:
         return []
+    return fetch_user_fcm_targets(court["owner_id"])
+
+
+def fetch_user_fcm_targets(user_id: int) -> list[sqlite3.Row]:
+    """A member's signed-in Android devices that registered for push."""
+    if not fcm_enabled():
+        return []
     return get_db().execute(
         """
         SELECT MIN(t.id) AS id, t.fcm_token AS token,
@@ -5457,7 +5715,7 @@ def fetch_court_owner_fcm_targets(court: sqlite3.Row) -> list[sqlite3.Row]:
         GROUP BY t.fcm_token
         ORDER BY MIN(t.id)
         """,
-        (court["owner_id"], datetime.now().isoformat(timespec="seconds")),
+        (user_id, datetime.now().isoformat(timespec="seconds")),
     ).fetchall()
 
 
@@ -5640,6 +5898,224 @@ def deliver_court_fcm_notifications(
                 "UPDATE api_tokens SET fcm_token = NULL "
                 f"WHERE fcm_token IN ({placeholders})",
                 stale_owner_tokens,
+            )
+        db.commit()
+
+
+def same_court_message_author(first: sqlite3.Row, second: sqlite3.Row) -> bool:
+    if first["author_kind"] != second["author_kind"]:
+        return False
+    if first["author_kind"] == "participant":
+        return bool(first["participant_key"]) and (
+            first["participant_key"] == second["participant_key"]
+        )
+    return first["author_user_id"] is not None and (
+        first["author_user_id"] == second["author_user_id"]
+    )
+
+
+def send_court_message_notifications(
+    court: sqlite3.Row, message_id: int
+) -> None:
+    """Tell the organizer about a new message, and a thread's author about a reply.
+
+    Payloads stay generic (no author or message text), matching the other
+    court notifications. Nobody is notified about their own post.
+    """
+    if not (web_push_enabled() or fcm_enabled()):
+        return
+    db = get_db()
+    court = db.execute(
+        "SELECT id, guid, event_name, hall_name, owner_id, owner_notifications "
+        "FROM courts WHERE id = ?",
+        (court["id"],),
+    ).fetchone()
+    message = db.execute(
+        "SELECT * FROM court_messages WHERE id = ?", (message_id,)
+    ).fetchone()
+    if court is None or message is None:
+        return
+    parent = (
+        db.execute(
+            "SELECT * FROM court_messages WHERE id = ?", (message["parent_id"],)
+        ).fetchone()
+        if message["parent_id"]
+        else None
+    )
+    actor = current_member()
+    owner_posted = bool(
+        court["owner_id"]
+        and (
+            (actor is not None and actor["id"] == court["owner_id"])
+            or message["author_user_id"] == court["owner_id"]
+        )
+    )
+    change = "reply" if parent is not None else "message"
+
+    # endpoint/token -> (row, audience); later audiences replace earlier ones
+    # so a person who is both organizer and thread author gets one alert.
+    web_targets: dict[str, tuple[sqlite3.Row, str]] = {}
+    fcm_targets: dict[str, tuple[sqlite3.Row, str]] = {}
+    if court["owner_id"] and court["owner_notifications"] and not owner_posted:
+        if web_push_enabled():
+            for row in db.execute(
+                "SELECT id, endpoint, p256dh, auth, language "
+                "FROM push_subscriptions WHERE court_id = ? AND user_id = ?",
+                (court["id"], court["owner_id"]),
+            ):
+                web_targets[row["endpoint"]] = (row, "owner")
+        for row in fetch_user_fcm_targets(court["owner_id"]):
+            fcm_targets[row["token"]] = (row, "owner")
+
+    if parent is not None and not same_court_message_author(parent, message):
+        if (
+            web_push_enabled()
+            and parent["notify_endpoint"]
+            and parent["notify_endpoint"] != message["notify_endpoint"]
+        ):
+            row = db.execute(
+                "SELECT id, endpoint, p256dh, auth, language "
+                "FROM push_subscriptions WHERE court_id = ? AND endpoint = ?",
+                (court["id"], parent["notify_endpoint"]),
+            ).fetchone()
+            if row is not None:
+                web_targets[row["endpoint"]] = (row, "author")
+        if (
+            fcm_enabled()
+            and parent["notify_fcm_token"]
+            and parent["notify_fcm_token"] != message["notify_fcm_token"]
+        ):
+            row = db.execute(
+                "SELECT id, token, language FROM fcm_subscriptions "
+                "WHERE court_id = ? AND token = ?",
+                (court["id"], parent["notify_fcm_token"]),
+            ).fetchone()
+            if row is not None:
+                fcm_targets[row["token"]] = (row, "author")
+        if parent["author_user_id"] and not (
+            actor is not None and actor["id"] == parent["author_user_id"]
+        ):
+            for row in fetch_user_fcm_targets(parent["author_user_id"]):
+                fcm_targets[row["token"]] = (row, "author")
+
+    if not (web_targets or fcm_targets):
+        return
+    court_name = court["event_name"] or court["hall_name"]
+    thread_id = message["parent_id"] or message["id"]
+    target_url = (
+        url_for("court_detail", guid=court["guid"], _external=True)
+        + f"#court-message-{thread_id}"
+    )
+
+    def texts(language: str, audience: str) -> tuple[str, str]:
+        translations = TRANSLATIONS[language if language in LANGUAGES else "en-us"]
+        title_key = "push_message_title" if change == "message" else "push_reply_title"
+        if audience == "author":
+            body_key = "push_reply_author_body"
+        elif change == "message":
+            body_key = "push_message_owner_body"
+        else:
+            body_key = "push_reply_owner_body"
+        return translations[title_key].format(name=court_name), translations[body_key]
+
+    stale_web_ids: list[int] = []
+    if web_targets:
+        icon_url = url_for("static", filename="shuttlecock.png", _external=True)
+        for row, audience in web_targets.values():
+            title, body = texts(row["language"], audience)
+            try:
+                webpush(
+                    subscription_info={
+                        "endpoint": row["endpoint"],
+                        "keys": {"p256dh": row["p256dh"], "auth": row["auth"]},
+                    },
+                    data=json.dumps(
+                        {
+                            "title": title,
+                            "body": body,
+                            "icon": icon_url,
+                            "tag": f"court-{court['guid']}-messages",
+                            "url": target_url,
+                        },
+                        ensure_ascii=False,
+                    ),
+                    vapid_private_key=current_app.config["WEB_PUSH_PRIVATE_KEY"],
+                    vapid_claims={"sub": current_app.config["WEB_PUSH_SUBJECT"]},
+                    ttl=86_400,
+                    timeout=float(current_app.config["WEB_PUSH_TIMEOUT"]),
+                )
+            except WebPushException as error:
+                status_code = getattr(error.response, "status_code", None)
+                if status_code in {404, 410}:
+                    stale_web_ids.append(row["id"])
+                current_app.logger.warning(
+                    "Web Push message alert failed for subscription %s (status %s)",
+                    row["id"],
+                    status_code or "unknown",
+                )
+            except Exception as error:
+                current_app.logger.warning(
+                    "Web Push message alert failed for subscription %s (%s)",
+                    row["id"],
+                    type(error).__name__,
+                )
+
+    stale_tokens: list[str] = []
+    client = fcm_client() if fcm_targets else None
+    if client is not None:
+        for row, audience in fcm_targets.values():
+            title, body = texts(row["language"], audience)
+            try:
+                client.send(
+                    row["token"],
+                    {
+                        # Reuses the court_changed type so existing app
+                        # builds display it without an update.
+                        "type": "court_changed",
+                        "guid": court["guid"],
+                        "change": change,
+                        "audience": audience,
+                        "title": title,
+                        "body": body,
+                        "url": target_url,
+                    },
+                    collapse_key=f"court-{court['guid']}-messages",
+                )
+            except FcmError as error:
+                if error.stale_token:
+                    stale_tokens.append(row["token"])
+                current_app.logger.warning(
+                    "FCM message alert failed for %s %s (%s %s)",
+                    audience,
+                    row["id"],
+                    error.status,
+                    error.code,
+                )
+            except Exception as error:
+                current_app.logger.warning(
+                    "FCM message alert failed for %s %s (%s)",
+                    audience,
+                    row["id"],
+                    type(error).__name__,
+                )
+
+    if stale_web_ids or stale_tokens:
+        if stale_web_ids:
+            placeholders = ",".join("?" for _ in stale_web_ids)
+            db.execute(
+                f"DELETE FROM push_subscriptions WHERE id IN ({placeholders})",
+                stale_web_ids,
+            )
+        if stale_tokens:
+            placeholders = ",".join("?" for _ in stale_tokens)
+            db.execute(
+                "UPDATE api_tokens SET fcm_token = NULL "
+                f"WHERE fcm_token IN ({placeholders})",
+                stale_tokens,
+            )
+            db.execute(
+                f"DELETE FROM fcm_subscriptions WHERE token IN ({placeholders})",
+                stale_tokens,
             )
         db.commit()
 
@@ -6436,6 +6912,215 @@ def build_court_filters(
 
 def court_where_sql(clauses: list[str]) -> str:
     return " WHERE " + " AND ".join(clauses) if clauses else ""
+
+
+COURT_MESSAGE_MAX_LENGTH = 500
+COURT_MESSAGE_RATE_LIMIT = 5
+COURT_MESSAGE_RATE_WINDOW = timedelta(minutes=10)
+
+
+def fetch_court_message_threads(
+    court_id: int,
+) -> tuple[list[sqlite3.Row], list[tuple[sqlite3.Row, list[sqlite3.Row]]]]:
+    """All messages (newest first) and threads of (message, replies oldest first)."""
+    court_messages = get_db().execute(
+        "SELECT id, parent_id, author_name, author_kind, message, posted_at, ip_address "
+        "FROM court_messages WHERE court_id = ? "
+        "ORDER BY posted_at DESC, id DESC",
+        (court_id,),
+    ).fetchall()
+    message_replies: dict[int, list[sqlite3.Row]] = {}
+    for entry in reversed(court_messages):
+        if entry["parent_id"] is not None:
+            message_replies.setdefault(entry["parent_id"], []).append(entry)
+    threads = [
+        (entry, message_replies.get(entry["id"], []))
+        for entry in court_messages
+        if entry["parent_id"] is None
+    ]
+    return court_messages, threads
+
+
+def court_messages_version(court_messages: list[sqlite3.Row]) -> str:
+    """A short fingerprint of the board; changes on any post or delete."""
+    ids = ",".join(str(entry["id"]) for entry in court_messages)
+    return hashlib.sha256(ids.encode()).hexdigest()[:16]
+
+
+def court_message_attempt_scope(court_id: int) -> str:
+    return f"court_message:{court_id}"
+
+
+def record_court_message_failure(court_id: int, username: str) -> str:
+    return record_failed_attempt(
+        court_message_attempt_scope(court_id),
+        username,
+        max_attempts_config="LEAVE_MAX_ATTEMPTS",
+        lockout_seconds_config="LEAVE_LOCKOUT_SECONDS",
+        remaining_translation="court_message_attempts_remaining",
+        locked_translation="court_message_locked",
+        store_username_key=False,
+    )
+
+
+def create_court_message(
+    court: sqlite3.Row,
+    raw_username: str,
+    raw_pin: str,
+    raw_message: str,
+    raw_parent_id: str = "",
+    raw_push_endpoint: str = "",
+    raw_fcm_token: str = "",
+) -> tuple[int, int]:
+    """Store a message or reply on a court's message board.
+
+    Players must prove they joined the court with their nickname and PIN.
+    A signed-in organizer of the court (or an administrator) posts as their
+    account without a PIN. Returns ``(message_id, thread_id)``; replies always
+    attach to the thread's top-level message, so the board stays one level
+    deep. Sends the organizer and thread-author notifications.
+    """
+    if court["archived"]:
+        raise CourtActionError("court_message_closed", 409)
+    message = raw_message.replace("\r\n", "\n").strip()
+    if (
+        not 1 <= len(message) <= COURT_MESSAGE_MAX_LENGTH
+        or contains_disallowed_control_characters(message, multiline=True)
+    ):
+        raise CourtActionError("court_message_invalid_body")
+
+    db = get_db()
+    parent_id: int | None = None
+    raw_parent_id = str(raw_parent_id or "").strip()
+    if raw_parent_id:
+        parent = (
+            db.execute(
+                "SELECT id, parent_id FROM court_messages "
+                "WHERE id = ? AND court_id = ?",
+                (int(raw_parent_id), court["id"]),
+            ).fetchone()
+            if raw_parent_id.isdigit()
+            else None
+        )
+        if parent is None:
+            raise CourtActionError("court_message_reply_missing", 404)
+        parent_id = parent["parent_id"] or parent["id"]
+
+    member = current_member()
+    is_manager = member is not None and (
+        member["role"] in ADMIN_ROLES or court["owner_id"] == member["id"]
+    )
+    if is_manager:
+        author_name = member["username"]
+        author_kind = "organizer"
+        participant_key = ""
+    else:
+        username = clean_username(raw_username)
+        pin = raw_pin.strip()
+        attempt_scope = court_message_attempt_scope(court["id"])
+        locked_minutes = login_lock_minutes(attempt_scope, username)
+        if locked_minutes:
+            raise CourtActionError(
+                "court_message_locked",
+                429,
+                attempt_locked_message("court_message_locked", locked_minutes),
+            )
+        participant = (
+            db.execute(
+                "SELECT username, username_key, pin_hash FROM participants "
+                "WHERE court_id = ? AND username_key = ?",
+                (court["id"], username.casefold()),
+            ).fetchone()
+            if 2 <= len(username) <= 40 and PIN_PATTERN.fullmatch(pin)
+            else None
+        )
+        if participant is None or not check_password_hash(
+            participant["pin_hash"], pin
+        ):
+            raise CourtActionError(
+                "court_message_auth_failed",
+                403,
+                record_court_message_failure(court["id"], username),
+            )
+        clear_login_failures(attempt_scope, username)
+        author_name = participant["username"]
+        author_kind = "participant"
+        participant_key = participant["username_key"]
+
+    ip_address = client_ip_address()
+    now = datetime.now()
+    if ip_address:
+        recent_count = db.execute(
+            "SELECT COUNT(*) FROM court_messages "
+            "WHERE court_id = ? AND ip_address = ? AND posted_at >= ?",
+            (
+                court["id"],
+                ip_address,
+                (now - COURT_MESSAGE_RATE_WINDOW).isoformat(timespec="seconds"),
+            ),
+        ).fetchone()[0]
+        if recent_count >= COURT_MESSAGE_RATE_LIMIT:
+            raise CourtActionError("court_message_rate_limited", 429)
+
+    # Only remember an endpoint this browser actually subscribed to for this
+    # court, so replies can't be pointed at arbitrary push endpoints.
+    notify_endpoint = ""
+    endpoint = validated_push_endpoint(raw_push_endpoint) if raw_push_endpoint else None
+    if endpoint and db.execute(
+        "SELECT 1 FROM push_subscriptions WHERE court_id = ? AND endpoint = ?",
+        (court["id"], endpoint),
+    ).fetchone():
+        notify_endpoint = endpoint
+    # The same for an app's FCM token: only one following this court.
+    notify_fcm_token = ""
+    token = validated_fcm_token(raw_fcm_token) if raw_fcm_token else None
+    if token and db.execute(
+        "SELECT 1 FROM fcm_subscriptions WHERE court_id = ? AND token = ?",
+        (court["id"], token),
+    ).fetchone():
+        notify_fcm_token = token
+
+    cursor = db.execute(
+        "INSERT INTO court_messages "
+        "(court_id, parent_id, author_name, author_kind, participant_key, "
+        "author_user_id, notify_endpoint, notify_fcm_token, message, posted_at, "
+        "ip_address, device_information) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            court["id"],
+            parent_id,
+            author_name,
+            author_kind,
+            participant_key,
+            member["id"] if member else None,
+            notify_endpoint,
+            notify_fcm_token,
+            message,
+            now.isoformat(timespec="seconds"),
+            ip_address,
+            client_device_information(),
+        ),
+    )
+    db.commit()
+    message_id = int(cursor.lastrowid)
+    send_court_message_notifications(court, message_id)
+    return message_id, parent_id or message_id
+
+
+def delete_court_message_entry(court: sqlite3.Row, message_id: int) -> None:
+    """Remove a message and its replies; the caller checks management rights."""
+    db = get_db()
+    db.execute(
+        "DELETE FROM court_messages WHERE parent_id = ? AND court_id = ?",
+        (message_id, court["id"]),
+    )
+    result = db.execute(
+        "DELETE FROM court_messages WHERE id = ? AND court_id = ?",
+        (message_id, court["id"]),
+    )
+    db.commit()
+    if result.rowcount == 0:
+        raise CourtActionError("court_message_missing", 404)
 
 
 def join_court_entry(court: sqlite3.Row, raw_username: str, raw_pin: str) -> bool:
