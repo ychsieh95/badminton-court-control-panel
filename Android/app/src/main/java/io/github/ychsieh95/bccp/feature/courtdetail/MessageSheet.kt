@@ -56,7 +56,7 @@ internal fun MessageSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                if (reply != null) stringResource(R.string.message_reply_to, reply.authorName) else stringResource(R.string.message_write),
+                if (reply != null) stringResource(R.string.court_message_reply_to, reply.authorName) else stringResource(R.string.message_write),
                 style = MaterialTheme.typography.titleLarge,
             )
             if (reply != null) {
@@ -72,20 +72,20 @@ internal fun MessageSheet(
             if (asOrganizer) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        stringResource(R.string.message_posting_as, accountName.orEmpty()),
+                        stringResource(R.string.court_message_posting_as, accountName.orEmpty()),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     val accent = LocalExtraColors.current
-                    Pill(stringResource(R.string.message_organizer), accent.accent, accent.onAccent)
+                    Pill(stringResource(R.string.court_message_organizer), accent.accent, accent.onAccent)
                 }
             } else {
                 Text(
-                    stringResource(R.string.message_join_required),
+                    stringResource(R.string.court_message_join_required),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (showNotifyHint) {
-                    Text(stringResource(R.string.message_notify_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.court_message_notify_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 }
                 TextInput(form.username, onNameChange, stringResource(R.string.username), maxLength = 40)
                 SecretInput(form.pin, onPinChange, stringResource(R.string.pin), numeric = true)
@@ -93,8 +93,8 @@ internal fun MessageSheet(
             TextInput(
                 value = form.message,
                 onValueChange = onMessageChange,
-                label = stringResource(R.string.message_body),
-                placeholder = stringResource(if (reply != null) R.string.message_reply_placeholder else R.string.message_placeholder),
+                label = stringResource(R.string.court_message_body),
+                placeholder = stringResource(if (reply != null) R.string.court_message_reply_placeholder else R.string.court_message_placeholder),
                 singleLine = false,
                 minLines = 3,
                 maxLength = MESSAGE_MAX_LENGTH,
@@ -103,7 +103,7 @@ internal fun MessageSheet(
             )
             form.error?.let { Text(it.text(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
             PrimaryActionButton(
-                text = stringResource(if (reply != null) R.string.message_reply_submit else R.string.message_submit),
+                text = stringResource(if (reply != null) R.string.court_message_reply_submit else R.string.court_message_submit),
                 onClick = onSubmit,
                 enabled = form.canSubmit(asOrganizer),
                 busy = form.submitting,

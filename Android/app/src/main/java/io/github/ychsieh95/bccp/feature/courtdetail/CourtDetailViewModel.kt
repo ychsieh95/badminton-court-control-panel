@@ -245,7 +245,7 @@ class CourtDetailViewModel @Inject constructor(
                     if (!asOrganizer) settings.setLastJoinName(form.username.trim())
                     showBoard(board)
                     updateMessageForm { MessageForm(username = username) }
-                    val posted = if (form.replyTo != null) R.string.message_reply_posted else R.string.message_posted
+                    val posted = if (form.replyTo != null) R.string.court_message_reply_posted else R.string.court_message_posted
                     _effects.send(CourtDetailEffect.Message(UiMessage.Res(posted)))
                 }
                 .onFailure { e ->
@@ -270,7 +270,7 @@ class CourtDetailViewModel @Inject constructor(
             courts.deleteMessage(guid, id)
                 .onSuccess {
                     showBoard(it)
-                    _effects.send(CourtDetailEffect.Message(UiMessage.Res(R.string.message_deleted)))
+                    _effects.send(CourtDetailEffect.Message(UiMessage.Res(R.string.court_message_deleted)))
                 }
                 .onFailure(::fail)
         }

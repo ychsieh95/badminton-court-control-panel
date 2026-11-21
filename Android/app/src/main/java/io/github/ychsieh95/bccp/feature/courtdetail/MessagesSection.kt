@@ -55,12 +55,12 @@ internal fun MessagesSection(court: Court, board: MessageBoard, actions: CourtDe
     val canManage = court.viewer.canManage
     PanelCard(modifier) {
         SectionHeader(
-            stringResource(R.string.messages),
-            eyebrow = stringResource(R.string.messages_eyebrow),
+            stringResource(R.string.court_messages),
+            eyebrow = stringResource(R.string.court_messages_eyebrow),
             trailing = { CountBadge(board.count.toString()) },
         )
         if (court.archived) {
-            Text(stringResource(R.string.message_closed), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.court_message_closed), color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             OutlinedButton(onClick = { actions.composeMessage(null) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.EditNote, null, Modifier.padding(end = 8.dp))
@@ -68,7 +68,7 @@ internal fun MessagesSection(court: Court, board: MessageBoard, actions: CourtDe
             }
         }
         if (board.messages.isEmpty() && !court.archived) {
-            Text(stringResource(R.string.messages_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.court_messages_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         board.messages.forEachIndexed { index, thread ->
             if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -103,7 +103,7 @@ internal fun MessagesSection(court: Court, board: MessageBoard, actions: CourtDe
                 if (!court.archived) {
                     TextButton(onClick = { actions.composeMessage(thread) }, modifier = Modifier.padding(start = 44.dp)) {
                         Icon(Icons.AutoMirrored.Outlined.Reply, null, Modifier.padding(end = 6.dp).size(18.dp))
-                        Text(stringResource(R.string.message_reply))
+                        Text(stringResource(R.string.court_message_reply))
                     }
                 }
             }
@@ -111,7 +111,7 @@ internal fun MessagesSection(court: Court, board: MessageBoard, actions: CourtDe
     }
     pendingDelete?.let { id ->
         ConfirmDialog(
-            message = stringResource(if (pendingDeleteHasReplies) R.string.message_delete_thread_confirm else R.string.message_delete_confirm),
+            message = stringResource(if (pendingDeleteHasReplies) R.string.court_message_delete_thread_confirm else R.string.court_message_delete_confirm),
             confirmLabel = stringResource(R.string.delete),
             destructive = true,
             onDismiss = { pendingDelete = null },
@@ -134,7 +134,7 @@ private fun MessageRow(message: CourtMessage, showAudit: Boolean, onDelete: (() 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(message.authorName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                 if (message.isOrganizer) {
-                    Pill(stringResource(R.string.message_organizer), accent.accent, accent.onAccent)
+                    Pill(stringResource(R.string.court_message_organizer), accent.accent, accent.onAccent)
                 }
             }
             val meta = listOfNotNull(dateTime(message.postedAt), message.ipAddress?.takeIf { showAudit && it.isNotBlank() })
@@ -143,7 +143,7 @@ private fun MessageRow(message: CourtMessage, showAudit: Boolean, onDelete: (() 
         }
         if (onDelete != null) {
             IconButton(onClick = onDelete) {
-                Icon(Icons.Outlined.Delete, stringResource(R.string.message_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Outlined.Delete, stringResource(R.string.court_message_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
