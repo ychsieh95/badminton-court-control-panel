@@ -1,208 +1,163 @@
-# badminton-court-control-panel
+# Badminton Court Control Panel — Web
 
-**English (default)** · [繁體中文](README.zh-TW.md)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![Flask 3.1](https://img.shields.io/badge/Flask-3.1-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/) [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/) [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker/compose.yaml) [![JSON API](https://img.shields.io/badge/JSON%20API-%2Fapi%2Fv1-FF6F00?logo=json&logoColor=white)](API.md) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE) ![Languages](https://img.shields.io/badge/i18n-en--US%20%7C%20zh--TW-blue?logo=googletranslate&logoColor=white)
 
-Badminton Court Control Panel is a bilingual Flask application for organizing badminton events. Organizers can publish and manage courts, while players can discover, join, or leave an event without creating an account.
+**English** · [繁體中文](README.zh-TW.md)
+
+The website and JSON API for Badminton Court Control Panel, a bilingual (English / Traditional Chinese) Flask application for organizing badminton events. Organizers publish and manage courts. Players find a court and join or leave it with a nickname and a 6-digit PIN, without creating an account. The same server provides the `/api/v1` JSON API used by the [Android app](../Android/README.md).
+
+## Contents
+
+- [Features](#features)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [Optional integrations](#optional-integrations)
+- [Deployment with Docker](#deployment-with-docker)
+- [Data and storage](#data-and-storage)
+- [Security and privacy](#security-and-privacy)
+- [Development](#development)
+- [Attribution and licenses](#attribution-and-licenses)
 
 ## Features
 
-### For players
+### Players
 
-- Browse active courts and filter by keyword, creator, date range, player level, gender range, capacity, and event status.
-- Join or leave with a nickname and private 6-digit PIN—no account required.
-- See an organizer-defined leave deadline before joining or leaving; after it passes, self-service departure is no longer available.
-- Enter a FIFO waiting list automatically when confirmed places are full.
-- Opt in to court-specific system push notifications when event information or the member list changes.
-- View the schedule, weekday, hall, location, prices, shuttlecock, levels, organizer, remarks, participant lists, and event media.
-- Share court links with a 1200×630 social preview. The preview uses the first event photo or a frame from the first event video. If no media exists, it uses the event information.
-- Download that current 1200×630 preview as a descriptively named JPEG directly from the public court detail page.
-- Use a floating, accessible join dialog on mobile screens.
-- Collapse court sections and jump between them using a draggable floating section navigator.
+- Browse upcoming courts and filter by keyword, organizer, date range, player level, gender level range, capacity, and status.
+- Join or leave with a nickname and a private 6-digit PIN. No account is needed. When the confirmed places are full, new players go onto a first-in, first-out waiting list.
+- See the organizer's leave deadline before joining. After it passes, players can no longer remove themselves.
+- Read the schedule, hall and map location, prices, shuttlecock, level ranges, remarks, player lists, and event photos and videos.
+- Ask questions on the court's **message board**. Players who joined the court post and reply with the nickname and PIN they joined with. The board refreshes itself while the page is open.
+- Turn on browser notifications for a court to hear about edits, archiving, players joining or leaving, and replies to their messages.
+- Share a court link with a 1200×630 social preview, or download that preview as a JPEG.
+- Collapse court sections and jump between them with a draggable section navigator.
 
-### For organizers
+### Organizers
 
-- Create an account and manage personal events from `/my-courts`.
-- Publish optional event and badminton-group names with permanent UUID links in the form `https://your-domain.example/<GUID>`.
-- Configure the date, 24-hour start/end time, Google Place hall, and court ID. Set the capacity range and reserved places. Set male/female level ranges, prices, shuttlecock, and remarks.
-- Optionally set an exact local date and explicit 24-hour `HH:MM` time after which players cannot leave the event themselves. This restriction is disabled by default.
-- Choose a 12-hour (AM/PM) or 24-hour display format on the profile page. The app saves this preference. Court schedules, leave deadlines, login times, and audit timestamps use the signed-in member’s preference.
-- Save frequently used hall locations while creating an event, reuse them without searching, and delete them from the profile page.
-- Add, remove, or reorder individual reserved-player nickname rows while creating or editing an event, and choose whether visitors can see the names.
-- Select minimum, maximum, and reserved-member counts from dropdowns; reserved-nickname rows follow the reserved count.
-- Upload up to 12 JPEG, PNG, WebP, MP4, or WebM files through a themed picker with a selected-file count and photo/video previews. The first image becomes the court-card cover.
-- Export a managed court as `court_info.md` and import it on the new-event form to prefill another event.
-- Edit, duplicate, archive, restore, or delete owned events.
-- Start **Roll call & clearing** to make an event read-only and track attendance and payment-clearing status. Each column supports check/uncheck all across reserved and online members, with a mixed-selection indicator; use **Save member statuses** to save changes.
+- Sign up and manage your events from **My courts** (`/my-courts`). Each court has a permanent link of the form `https://your-domain.example/<GUID>`.
+- Set the date and time, a Google Places hall, court number, capacity and reserved places, male and female level ranges, prices, shuttlecock, remarks, and an optional leave deadline.
+- Reserve places by nickname and choose whether visitors can see those names. Save frequently used halls and reuse them later.
+- Upload up to 12 photos or videos (JPEG, PNG, WebP, MP4, WebM). The first image becomes the court card cover.
+- Reply to messages as the organizer, delete messages, and get a notification for each new message or reply.
+- Edit, duplicate, archive, restore, or delete your courts. Export a court as `court_info.md` and import it later to prefill a new one.
+- Start **Roll call & clearing** to make a court read-only and record attendance and payment for each player.
+- Choose 12-hour or 24-hour time on your profile.
 
-### For administrators
+### Administrators
 
-- Create, edit, duplicate, archive, restore, and delete any court.
-- Export every existing court, including archived and expired events, as a UTF-8 CSV file.
-- Rename court participants, reset their six-digit PINs, or remove them directly from a court page.
-- Use private, account-owned saved locations from the same new-event form as members.
-- Assign member, sub-admin, admin, or super-admin roles; only super-admins can change roles.
-- Filter all courts with the same controls available on the public listing, including archived and expired events.
-- Configure the maximum number of courts displayed on the homepage.
-- Archive, restore, ban, unban, or permanently delete eligible member accounts.
-- Assign temporary passwords that require a password change after sign-in.
-- View member last-login time and IP address.
-- View each court event’s creation date and time from the administrator dashboard.
-- Reset a member’s failed-login retries and active lockouts across all IP addresses.
-- View join/leave history with timestamps, validated IP addresses, and broad device categories: iOS, Android, Mobile, or Web.
+- Manage every court, including archived and expired ones, with the same filters as the public listing. Export all courts as a UTF-8 CSV file.
+- Rename players, reset their PINs, or remove them from a court. See join/leave history with IP addresses and broad device types, and the IP address of each message.
+- Manage members: assign roles (member, sub-admin, admin, super-admin; only super-admins change roles), ban, archive, delete, set a temporary password, or reset failed sign-in lockouts.
+- Read contact messages in a protected inbox and choose how many courts the homepage shows.
 
-### Localization and appearance
+### Language and appearance
 
-- Interface languages: English (`en-US`) and Traditional Chinese (`zh-TW`).
-- Visitors detected in Taiwan default to Traditional Chinese; other visitors default to English.
-- A manually selected language is stored in a cookie and overrides country detection.
-- First-time visitors can choose whether to open a brief introduction; their choice is remembered in the browser.
-- A public bilingual privacy policy explains application data handling, visibility, retention, browser storage, and optional external services.
-- Visitors can leave stored support messages, and administrators can review them in a protected inbox.
-- Monochrome, Green & Lime, Purple, and Yellow palettes are available in system, light, and dark modes.
-- New visitors use **Yellow · Light** by default. Saved preferences take precedence.
-- Includes the Taiwan Badminton Promotion Association 1–18 grading reference.
+- English (`en-US`) and Traditional Chinese (`zh-TW`). Visitors detected in Taiwan start in Traditional Chinese; others start in English. A language chosen by hand is kept in a cookie.
+- Monochrome, Green & Lime, Purple, and Yellow palettes, each in system, light, and dark modes. New visitors get **Yellow · Light**.
+- Includes the Taiwan Badminton Promotion Association 1–18 level guide, a public introduction, an update history, a privacy policy, and a contact page.
 
-## Main routes
+### Main routes
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Homepage and upcoming courts |
-| `/introduction` | Public product introduction |
-| `/updates` | Public bilingual update history |
-| `/contact` | Public bilingual administrator contact page |
-| `/privacy` | Public bilingual privacy policy |
-| `/healthz` | Container health check returning `{"status": "ok"}` after a database probe |
-| `/courts` | Filterable public court listing |
-| `/courts/new` | Shared new-event form for signed-in members and administrators |
-| `/<GUID>` | Public court details and registration |
-| `/<GUID>/thumbnail.jpg` | Public download of the court's current 1200×630 JPEG thumbnail |
-| `/<GUID>/court_info.md` | Organizer-only court-configuration export |
-| `/signup` | Member registration |
-| `/login` | Member and administrator sign-in |
+| `/` | Homepage with upcoming courts |
+| `/courts` | Filterable court listing |
+| `/courts/new` | New court form (signed-in members and administrators) |
+| `/<GUID>` | Court page: details, joining, and the message board |
+| `/<GUID>/thumbnail.jpg` | The court's current 1200×630 preview image |
+| `/<GUID>/court_info.md` | Court settings export (organizers only) |
+| `/signup`, `/login` | Member sign-up; sign-in for members and administrators |
 | `/my-courts` | Organizer dashboard |
-| `/account/profile` | Member profile and avatar |
-| `/admin` | Administrator dashboard |
-| `/admin/messages` | Administrator-only contact-message inbox and notification setting |
-| `/admin/courts/export.csv` | Administrator-only export of every court event |
-| `/admin/users` | Member administration |
-| `/licenses` | Asset licenses and development acknowledgments |
-| `/api/v1/...` | JSON API for apps and integrations (see [API.md](API.md)) |
+| `/account/profile` | Profile, avatar, time format, saved halls |
+| `/admin`, `/admin/users`, `/admin/messages` | Administrator dashboard, member management, contact inbox |
+| `/admin/courts/export.csv` | CSV export of every court (administrators only) |
+| `/introduction`, `/updates`, `/privacy`, `/contact`, `/licenses`, `/android` | Public information pages |
+| `/healthz` | Health check; returns `{"status": "ok"}` after a database probe |
+| `/api/v1/...` | JSON API (see [API.md](API.md)) |
 
-## Update history content
+## Quick start
 
-The bilingual `/updates` timeline is maintained in `data/update_history.json`, newest entry first. Every entry must provide `date`, `date_label`, `title`, `summary`, and a non-empty `items` list for both `en-us` and `zh-tw`. The application validates this structure when it starts, so malformed, incomplete, invalid-date, or incorrectly ordered history fails early instead of rendering partial content.
-
-## Local setup
-
-Python 3.10 or newer is recommended. The web application lives in the repository's `Web/` directory; run every command in this document from there.
+Requires Python 3.10 or newer. Run every command in this document from the `Web/` directory.
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+.venv/bin/pip install -r requirements.txt
 cp .env.example .env
+.venv/bin/flask --app app run --debug
 ```
 
-Update `.env`. Start the development server:
+Open <http://127.0.0.1:5000> and sign in at `/login`. Members land on `/my-courts`; administrators land on `/admin`.
 
-```bash
-flask --app app run --debug
-```
-
-Open <http://127.0.0.1:5000>. Members and administrators use the same `/login` form. Successful member sign-ins redirect to `/my-courts`; administrator roles redirect to `/admin`. The legacy `/admin/login` URL redirects to `/login`.
-
-On a database without a super-admin, the application creates or promotes the configured `ADMIN_USERNAME` as the initial database-backed super-admin and hashes `ADMIN_PASSWORD`. Later environment changes do not overwrite an existing super-admin password; change it from the account password page instead.
-
-The development bootstrap credentials are `admin` / `change-me`. Always replace `SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` before the first production startup.
+On a database without a super-admin, the app creates one from `ADMIN_USERNAME` and `ADMIN_PASSWORD` (development defaults: `admin` / `change-me`). Changing these variables later does not change an existing super-admin's password; use the account password page instead. Replace `SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` before the first production start.
 
 ## Configuration
 
+Settings are read from `.env`. Variables already set in the process environment take precedence. [`.env.example`](.env.example) lists every variable with comments.
+
 | Variable | Default | Description |
 | --- | --- | --- |
-| `SECRET_KEY` | Development value | Flask session and CSRF signing secret. Use a long random production value. |
-| `ADMIN_USERNAME` | `admin` | Username used to bootstrap the first database super-admin. |
-| `ADMIN_PASSWORD` | `change-me` | Initial bootstrap super-admin password. |
-| `TURNSTILE_SITE_KEY` | Empty | Public Cloudflare Turnstile site key; set with the secret key to protect signup and login. |
-| `TURNSTILE_SECRET_KEY` | Empty | Private Turnstile Siteverify secret; never expose it to browsers. |
-| `TURNSTILE_VERIFY_TIMEOUT` | `5` | Server-side Turnstile verification timeout in seconds. |
-| `COURT_DATABASE` | `instance/courts.sqlite` | SQLite database location. |
-| `GOOGLE_MAPS_API_KEY` | Empty | Enables Google Places hall autocomplete. |
-| `WEB_PUSH_PUBLIC_KEY` | Empty | Public VAPID application-server key shown to browsers. |
-| `WEB_PUSH_PRIVATE_KEY` | Empty | Secret VAPID private key value or PEM-file path. |
-| `WEB_PUSH_SUBJECT` | Empty | Operator contact URI used in VAPID claims, such as `mailto:admin@example.com`. |
-| `WEB_PUSH_TIMEOUT` | `5` | Per-recipient push delivery timeout in seconds. |
-| `FCM_SERVICE_ACCOUNT_FILE` | Empty | Path to a Firebase service account key JSON. Enables Android app notifications through Firebase Cloud Messaging. |
-| `FCM_TIMEOUT` | `5` | Per-recipient FCM delivery timeout in seconds. |
-| `SOCIAL_THUMBNAIL_FFMPEG` | Bundled executable | Optional FFmpeg executable override used to extract the preview frame when the first event-media item is a video. |
-| `SOCIAL_THUMBNAIL_FONT` | Bundled Noto Sans TC | Optional path to a TrueType/OpenType font that overrides the bundled font used for generated information thumbnails. |
-| `SESSION_COOKIE_SECURE` | `0` | Set to `1` when the site is served exclusively over HTTPS. |
-| `TRUST_PROXY_HEADERS` | `0` | Trust forwarded client-IP and URL-scheme headers. Enable only behind a trusted proxy that replaces them. |
-| `GEOIP_COUNTRY_DB` | Empty | Optional local MaxMind GeoIP2/GeoLite2 country database. |
-| `DEFAULT_COUNTRY_CODE` | Empty | Optional two-letter fallback country. Unknown visitors otherwise use English. |
-| `PRIVACY_OPERATOR_NAME` | Empty | Public name of the person or organization operating this deployment, displayed on `/privacy` and `/contact`. |
-| `PRIVACY_DATA_REGION` | Empty | Public description of the primary hosting/data region displayed on `/privacy`. |
-| `PRIVACY_CONTACT` | Empty | Optional public `mailto:` or HTTP(S) contact displayed on `/privacy`. |
-| `ADMIN_CONTACT` | Empty | Optional public `mailto:` or HTTP(S) administrator/support contact displayed on `/contact`. |
-| `ADMIN_CONTACT_DISCORD` | Empty | Optional Discord invite code; `/contact` automatically builds its official `discord.gg` link. |
-| `ADMIN_CONTACT_LINE` | Empty | Optional LINE Official Account ID, with or without `@`; `/contact` automatically builds its official `line.me` link. |
-| `ADMIN_CONTACT_TELEGRAM` | Empty | Optional Telegram public username, with or without `@`; `/contact` automatically builds its official `t.me` link. |
-| `CONTACT_DISCORD_WEBHOOK_URL` | Empty | Secret Discord incoming-webhook URL used for new-message alerts after an administrator enables them. |
-| `CONTACT_TELEGRAM_BOT_TOKEN` | Empty | Secret Telegram Bot API token. With `CONTACT_TELEGRAM_CHAT_ID`, every new contact message is reported to Telegram. |
-| `CONTACT_TELEGRAM_CHAT_ID` | Empty | Telegram numeric chat ID or public `@channel` username that receives contact reports. |
-| `CONTACT_NOTIFICATION_TIMEOUT` | `5` | Per-service Discord/Telegram delivery timeout in seconds. |
-| `ANDROID_APP_URL` | Empty | Optional HTTPS download link (for example a Google Play listing) shown on the `/android` page. Without it, the page asks visitors to get in touch. |
-| `LOGIN_MAX_ATTEMPTS` | `5` | Failed sign-ins allowed before temporary lockout. |
-| `LOGIN_LOCKOUT_SECONDS` | `900` | Lockout duration in seconds. |
-| `LEAVE_MAX_ATTEMPTS` | `5` | Incorrect nickname/PIN leave attempts allowed per court, nickname, and client IP before temporary lockout. |
-| `LEAVE_LOCKOUT_SECONDS` | `900` | Leave-attempt lockout duration in seconds. |
-| `API_TOKEN_TTL_DAYS` | `90` | Lifetime in days of bearer tokens issued by the JSON API. |
+| `SECRET_KEY` | Development value | Signs sessions and CSRF tokens. Use a long random value in production. |
+| `ADMIN_USERNAME` | `admin` | Username of the first super-admin. |
+| `ADMIN_PASSWORD` | `change-me` | Initial password of the first super-admin. |
+| `COURT_DATABASE` | `instance/courts.sqlite` | SQLite database path. |
+| `SESSION_COOKIE_SECURE` | `0` | Set to `1` when the site is served only over HTTPS. |
+| `TRUST_PROXY_HEADERS` | `0` | Trust forwarded client-IP and scheme headers. Enable only behind a trusted proxy that replaces them. |
+| `TURNSTILE_SITE_KEY` | Empty | Cloudflare Turnstile site key. |
+| `TURNSTILE_SECRET_KEY` | Empty | Cloudflare Turnstile secret key. Never sent to browsers. |
+| `TURNSTILE_VERIFY_TIMEOUT` | `5` | Turnstile verification timeout, in seconds. |
+| `GOOGLE_MAPS_API_KEY` | Empty | Enables Google Places hall search on the court form. |
+| `WEB_PUSH_PUBLIC_KEY` | Empty | VAPID application-server key shown to browsers. |
+| `WEB_PUSH_PRIVATE_KEY` | Empty | VAPID private key, as a value or a PEM file path. |
+| `WEB_PUSH_SUBJECT` | Empty | VAPID contact URI, such as `mailto:admin@example.com`. |
+| `WEB_PUSH_TIMEOUT` | `5` | Web Push delivery timeout per recipient, in seconds. |
+| `FCM_SERVICE_ACCOUNT_FILE` | Empty | Firebase service account JSON path. Enables Android app notifications. |
+| `FCM_TIMEOUT` | `5` | FCM delivery timeout per recipient, in seconds. |
+| `SOCIAL_THUMBNAIL_FFMPEG` | Bundled executable | FFmpeg override, used to take a preview frame from a video. |
+| `SOCIAL_THUMBNAIL_FONT` | Bundled Noto Sans TC | Font override for generated preview images. |
+| `GEOIP_COUNTRY_DB` | Empty | Local MaxMind GeoIP2/GeoLite2 country database, used to pick the default language. |
+| `DEFAULT_COUNTRY_CODE` | Empty | Two-letter fallback country when the visitor's country is unknown. |
+| `PRIVACY_OPERATOR_NAME` | Empty | Operator name shown on `/privacy` and `/contact`. |
+| `PRIVACY_DATA_REGION` | Empty | Hosting region shown on `/privacy`. |
+| `PRIVACY_CONTACT` | Empty | `mailto:` or HTTP(S) contact shown on `/privacy`. |
+| `ADMIN_CONTACT` | Empty | `mailto:` or HTTP(S) support contact shown on `/contact`. |
+| `ADMIN_CONTACT_DISCORD` | Empty | Discord invite code; `/contact` links to `discord.gg`. |
+| `ADMIN_CONTACT_LINE` | Empty | LINE Official Account ID, with or without `@`. |
+| `ADMIN_CONTACT_TELEGRAM` | Empty | Telegram public username, with or without `@`. |
+| `CONTACT_DISCORD_WEBHOOK_URL` | Empty | Discord incoming webhook for new contact messages. An administrator turns it on in `/admin/messages`. |
+| `CONTACT_TELEGRAM_BOT_TOKEN` | Empty | Telegram bot token. With the chat ID, every new contact message is reported to Telegram. |
+| `CONTACT_TELEGRAM_CHAT_ID` | Empty | Telegram numeric chat ID or public `@channel` that receives reports. |
+| `CONTACT_NOTIFICATION_TIMEOUT` | `5` | Discord/Telegram delivery timeout, in seconds. |
+| `ANDROID_APP_URL` | Empty | HTTPS download link (such as a Google Play listing) shown on `/android`. |
+| `LOGIN_MAX_ATTEMPTS` | `5` | Failed sign-ins allowed before a temporary lockout. |
+| `LOGIN_LOCKOUT_SECONDS` | `900` | Sign-in lockout length, in seconds. |
+| `LEAVE_MAX_ATTEMPTS` | `5` | Wrong nickname/PIN leave attempts allowed per court, nickname, and IP before a lockout. |
+| `LEAVE_LOCKOUT_SECONDS` | `900` | Leave lockout length, in seconds. |
+| `API_TOKEN_TTL_DAYS` | `90` | Lifetime of JSON API bearer tokens, in days. |
+| `APP_VERSION` | Newest date in `data/update_history.json` | Version string reported by the API. |
 
-Values already present in the process environment take precedence over `.env`.
+## Optional integrations
 
-## Cloudflare Turnstile
+Every integration is off until it is configured. The site works without any of them.
 
-Create a [Turnstile widget](https://developers.cloudflare.com/turnstile/get-started/). Allow the deployed hostname. Set both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. These settings protect `/signup`, the shared `/login` page, and the `/contact` message form. The widget uses the `signup`, `login`, or `contact_message` action, and the server validates both the token and matching action before processing the request.
+### Cloudflare Turnstile
 
-Missing, rejected, expired, reused, oversized, malformed, action-mismatched, and unverifiable tokens are denied. If either key is empty or Flask debug mode is active, Turnstile is disabled. The secret key is used only for server-to-server verification and is never rendered into HTML. Cloudflare provides [dedicated test sitekeys and secret keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) for automated testing and localhost; never deploy those test credentials to production.
+Create a [Turnstile widget](https://developers.cloudflare.com/turnstile/get-started/) for your hostname and set both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. Turnstile then protects sign-up, sign-in, and the contact form. The server checks each token and its action (`signup`, `login`, or `contact_message`) before handling the request, and rejects missing, expired, reused, or mismatched tokens. Turnstile is off when either key is empty or Flask debug mode is on. Cloudflare's [test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) are for testing only; never deploy them.
 
-## Contact message notifications
+### Google hall search
 
-Public messages are always committed to SQLite before optional external delivery. When both Telegram settings are valid, every new message from the website or the Android app is reported to that Telegram chat. The report lists the subject, message, sender name, reply contact, signed-in account, source (website with a broad device type, or the Android app with its version, Android version, and device model), language, time, and inbox link. Discord is optional: configure `CONTACT_DISCORD_WEBHOOK_URL`, then an administrator or super-administrator turns it on from `/admin/messages`. Discord URLs must be official HTTPS incoming-webhook endpoints, and Telegram bot tokens and chat IDs are validated before use. Webhook URLs and bot tokens remain server-side and are never rendered in the inbox. A timeout or provider error is logged without its secret endpoint and does not discard the stored message.
-
-## Google hall search
-
-Set `GOOGLE_MAPS_API_KEY` to a browser key with **Maps JavaScript API** and **Places API (New)** enabled. The Google Cloud project must have billing enabled.
-
-Configure **Websites (HTTP referrers)** for the deployed domain. For local development, allow:
+Set `GOOGLE_MAPS_API_KEY` to a browser key with **Maps JavaScript API** and **Places API (New)** enabled, in a Google Cloud project with billing. Restrict it by **Websites (HTTP referrers)** to your domain, plus these for local development:
 
 ```text
 http://127.0.0.1:5000/*
 http://localhost:5000/*
 ```
 
-Without a key, the court form remains usable and provides a live Google Maps search link.
+Without a key, the court form still works and offers a Google Maps search link instead.
 
-## Section navigation and form controls
+### Browser notifications (Web Push)
 
-Court detail pages and new/edit forms have expandable sections, including the court-information importer. Sections start expanded and remember their state in cookies for one year. Form sections with validation errors reopen automatically. Date and time inputs keep their format hints below the controls so the inputs stay aligned.
+Each court page has a notification switch. Notifications go out when the organizer edits, archives, restores, locks, unlocks, or deletes the court; when a player joins, joins the waiting list, or leaves; and for new messages and replies on the message board (to the organizer, and to the author of the thread). Failed join or leave attempts and roll-call changes do not send notifications.
 
-The floating section navigator shows the current section as you scroll. Choose a section to expand it and jump to its heading. Its default position is below the page header at the top-left on desktop and top-right on tablets/phones (viewport width up to 1024px).
-
-Drag the navigator with a mouse or touch toward any screen edge to partially hide it; a 44px handle remains available. Drag it back or click it to reveal the navigator. Its menu fits the available space, supports keyboard navigation and Escape, and respects reduced-motion preferences.
-
-## Court information import and export
-
-From a court’s organizer action menu, choose **Export** to download a file named `yyyy-MM-dd_HHmm_HHmm_<name>.md`, where the two times are the event’s start and end times. The final name uses the event name when present and otherwise uses the hall name. If collapsed, open the **Court information file** section at the top of `/courts/new`. Choose that file to prefill a new event. Importing only fills the form; the organizer must review and save it before a court is created. The section automatically opens when an import error needs attention.
-
-The versioned Markdown file contains reusable court fields and reserved-player nicknames in a readable JSON block. It intentionally excludes registrations, participant PINs, join/leave history, media files, ownership, and the original public GUID. Imports are limited to 64 KB and pass through the normal court validation before saving.
-
-Administrators can also choose **Export all courts (CSV)** on `/admin`. The file uses UTF-8 with a BOM. It contains one row per existing event, including archived and expired courts. Each row includes event configuration, organizer/status information, counts, reserved nicknames, media count, and the public URL. Participant PINs and join/leave history are not exported.
-
-## System push notifications
-
-Each court page includes an opt-in switch for browser/system notifications. The app sends notifications when an organizer edits, archives, restores, locks/unlocks, or deletes that court. It also sends notifications when a player successfully joins, enters the waiting list, or leaves. Failed join/leave attempts and individual roll-call checkbox changes do not send pushes.
-
-Generate one persistent VAPID key pair:
+Generate one VAPID key pair and keep it:
 
 ```bash
 mkdir -p instance/web-push
@@ -210,7 +165,7 @@ cd instance/web-push
 ../../.venv/bin/vapid --gen --applicationServerKey
 ```
 
-The command prints the application-server key and creates `private_key.pem`. Set:
+The command prints the application-server key and writes `private_key.pem`. Then set:
 
 ```text
 WEB_PUSH_PUBLIC_KEY=<printed application-server key>
@@ -218,35 +173,42 @@ WEB_PUSH_PRIVATE_KEY=instance/web-push/private_key.pem
 WEB_PUSH_SUBJECT=mailto:your-contact@example.com
 ```
 
-Keep the private key and the entire `instance` directory persistent across deployments. Changing the VAPID key pair invalidates existing browser subscriptions. Production push requires HTTPS and browser permission; localhost is treated as a secure development context by supporting browsers.
-
-If any required VAPID setting is missing, the court-page switch remains disabled. Expired push-service endpoints are removed automatically after a `404` or `410` delivery response.
+Replacing the key pair cancels every existing browser subscription. Browsers require HTTPS for push, except on localhost. If any VAPID setting is missing, the switch stays disabled. Subscriptions that the push service reports as gone (`404` or `410`) are removed automatically.
 
 ### Android app notifications (FCM)
 
-The Android app receives the same court notifications through Firebase Cloud Messaging. In the Firebase console, open **Project settings → Service accounts**, generate a private key, store it somewhere persistent (for example `instance/firebase-service-account.json`), and set:
+The Android app receives the same notifications through Firebase Cloud Messaging. In the Firebase console, open **Project settings → Service accounts**, generate a private key, save it somewhere persistent, and point the server at it:
 
 ```text
 FCM_SERVICE_ACCOUNT_FILE=instance/firebase-service-account.json
 ```
 
-With Docker, put the file in the `/instance` volume and set `FCM_SERVICE_ACCOUNT_FILE=/instance/firebase-service-account.json`. Without it, the app hides the notification switch. Tokens FCM reports as unregistered are removed automatically.
+With Docker, put the file in the `/instance` volume and use `/instance/firebase-service-account.json`. Without this setting, the app hides its notification switch. Tokens that FCM reports as unregistered are removed automatically.
 
-## JSON API
+### Contact message alerts
 
-`/api/v1` exposes the player, organizer, account, and administrator functions as JSON for the Android app and other clients. Clients sign in with `POST /api/v1/auth/login` and send the returned token as `Authorization: Bearer <token>`. API requests never use the browser session cookie, so they need no CSRF token. The API and the HTML pages share the same validation, throttling, and permission rules. See [API.md](API.md) for the endpoint reference.
+Contact messages are always saved to the database first; alerts are extra. With both Telegram variables set, every new message from the website or the Android app is reported to that chat, including the sender, reply contact, account, source (website and device type, or app version, Android version, and device model), language, and an inbox link. Discord is optional: set `CONTACT_DISCORD_WEBHOOK_URL`, then turn it on in `/admin/messages`. Webhook URLs and bot tokens are validated, stay on the server, and are never shown in the inbox. A delivery failure is logged without the secret and never loses the stored message.
 
-## Docker
+## Deployment with Docker
 
-Start the application with Docker Compose:
+The image runs the app with uWSGI behind Nginx on port `8080`, as UID `1654` by default.
 
 ```bash
-docker compose -f docker/compose.yaml up -d --build
+docker compose -f docker/compose.yaml up -d --build   # start
+docker compose -f docker/compose.yaml down            # stop, keeping data
 ```
 
-Compose loads the project-root `.env`, publishes port `8080`, and mounts the named volume `badminton-court-control-data` at `/instance`. The image links `/app/instance` to this directory, so the SQLite database, avatars, and court media persist when containers are recreated. The image runs as UID `1654` by default; set `APP_UID` when building if the persistent volume must use another numeric owner.
+Compose loads `Web/.env`, publishes port `8080`, and mounts the named volume `badminton-court-control-data` at `/instance`, so the database, avatars, and court media survive container rebuilds. Set the `APP_UID` build argument if the volume needs another owner.
 
-An older image that ran as root might have created the named volume. In that case, update its ownership once before starting the new image. Replace `1654` if you build with another `APP_UID`:
+To build and run without Compose:
+
+```bash
+docker build --build-arg APP_UID=1654 -f docker/Dockerfile -t badminton-court-control-panel .
+docker run --rm --name badminton-court-control-panel --env-file .env \
+  -p 8080:8080 -v badminton-court-control-data:/instance badminton-court-control-panel
+```
+
+If an older image that ran as root created the volume, fix its ownership once before starting the new image (replace `1654` if you changed `APP_UID`):
 
 ```bash
 docker run --rm --user 0 --entrypoint chown \
@@ -254,45 +216,18 @@ docker run --rm --user 0 --entrypoint chown \
   badminton-court-control-panel:local -R 1654:0 /instance
 ```
 
-Stop the service without deleting its data:
-
-```bash
-docker compose -f docker/compose.yaml down
-```
-
-Build the image from the project root:
-
-```bash
-docker build --build-arg APP_UID=1654 -f docker/Dockerfile -t badminton-court-control-panel .
-```
-
-Run it on port `8080`, load the production environment, and persist the SQLite database and uploads:
-
-```bash
-docker run --rm \
-  --name badminton-court-control-panel \
-  --env-file .env \
-  -p 8080:8080 \
-  -v badminton-court-control-data:/instance \
-  badminton-court-control-panel
-```
-
-The image uses `app.py` as the uWSGI module and serves it through Nginx on port `8080`.
-
 ### Health check
 
-The image defines a `HEALTHCHECK` that requests `/healthz` every 30 seconds, with a 5-second timeout, a 20-second start period, and 3 retries. The endpoint runs a `SELECT 1` database probe and returns `{"status": "ok"}`. The container becomes unhealthy when the application or its SQLite database stops responding. Inspect the current state with:
+The image's `HEALTHCHECK` requests `/healthz` every 30 seconds (5-second timeout, 20-second start period, 3 retries). The endpoint runs `SELECT 1` against the database, needs no sign-in, and returns no personal data, so uptime monitors and proxies can use it too.
 
 ```bash
 docker compose -f docker/compose.yaml ps
 docker inspect --format '{{.State.Health.Status}}' <container>
 ```
 
-External uptime monitors and reverse-proxy checks can poll the same `/healthz` path; it requires no authentication and returns no personal data.
+### Behind a reverse proxy
 
-### Nginx reverse proxy and client IP addresses
-
-When another Nginx instance proxies to the published Docker port, the container sees the Docker bridge gateway (often `172.18.0.1`) as the direct peer. To record the visitor address, set `TRUST_PROXY_HEADERS=1` in `.env`. Configure the public-facing trusted proxy to replace forwarded headers. It must not append untrusted input:
+Behind another Nginx, the container sees the Docker gateway (often `172.18.0.1`) instead of the visitor. To record real client addresses, set `TRUST_PROXY_HEADERS=1` and have the public-facing proxy replace, not append, the forwarded headers:
 
 ```nginx
 location / {
@@ -305,70 +240,73 @@ location / {
 }
 ```
 
-Validate and reload Nginx, then recreate the app container so Compose reloads `.env`:
+Reload Nginx and recreate the container so it picks up `.env`:
 
 ```bash
-sudo nginx -t
-sudo systemctl reload nginx
+sudo nginx -t && sudo systemctl reload nginx
 docker compose -f docker/compose.yaml up -d --force-recreate app
-docker compose -f docker/compose.yaml exec app printenv TRUST_PROXY_HEADERS
+docker compose -f docker/compose.yaml exec app printenv TRUST_PROXY_HEADERS   # must print 1
 ```
 
-The final command must print `1`. Enable this setting only when the application is reachable exclusively through a trusted proxy that overwrites these headers. If a proxy is in front of Nginx, first configure Nginx’s real-IP module with the provider’s trusted address ranges. This includes Cloudflare.
+Enable this only when the app is reachable exclusively through that proxy. If another proxy, such as Cloudflare, sits in front of Nginx, configure Nginx's real-IP module with that provider's address ranges first.
+
+### Production checklist
+
+- Set a strong `SECRET_KEY` and the bootstrap administrator credentials before the first start.
+- Serve over HTTPS and set `SESSION_COOKIE_SECURE=1`.
+- Set `TRUST_PROXY_HEADERS=1` only behind a trusted proxy that replaces forwarded headers.
+- Persist and back up the `instance` directory, including the VAPID private key and Firebase service account file.
+- Add the deployed domain to the Google Maps key's allowed referrers.
+- Review `/privacy` and set `PRIVACY_OPERATOR_NAME`, `PRIVACY_DATA_REGION`, and `PRIVACY_CONTACT`.
+- Point monitoring at `/healthz`.
+
+FFmpeg and the Noto Sans TC font used for preview images are bundled, both in and outside Docker.
+
+## Data and storage
+
+- Courts expire after their date and end time. Expired courts are read-only and hidden from default listings. A leave deadline, if set, applies earlier: players can still join but can no longer leave on their own.
+- Archived courts stay reachable by direct link and from the organizer and administrator dashboards, but their message boards accept no new posts.
+- Everything is stored under `instance/`: the SQLite database (`courts.sqlite`, unless `COURT_DATABASE` is set), avatars (`avatars/`), court media (`court_media/`), and cached preview images (`social_thumbnails/`). Replacing or deleting records removes their files.
+- `court_info.md` exports hold reusable court settings and reserved nicknames as a JSON block. They exclude registrations, PINs, history, messages, media, ownership, and the original GUID. Imports are limited to 64 KB, only prefill the form, and pass normal validation on save.
+- The administrator CSV export (UTF-8 with BOM) has one row per court, including archived and expired ones. It excludes PINs and join/leave history.
 
 ## Security and privacy
 
-- The public bilingual policy at `/privacy` describes the application’s built-in data handling. Self-hosting operators must review it, configure `PRIVACY_OPERATOR_NAME`, `PRIVACY_DATA_REGION`, and `PRIVACY_CONTACT`, and disclose hosting logs, backups, custom services, or other deployment-specific processing.
-- Account passwords and participant PINs are stored using secure password hashes.
-- Member and administrator sign-ins are temporarily locked after repeated failures from the same username and IP address.
-- When configured, Cloudflare Turnstile is verified before signup, sign-in, or contact-message submission is processed.
-- Contact messages are stored in SQLite and visible only to administrator and super-administrator accounts; optional reply details are not public.
-- Successful member sign-ins record the local timestamp and validated client IP.
-- Successful court joins and leaves record the nickname, action, and timestamp. Administrators additionally see the validated IP and a broad device category.
-- Push subscription endpoints and encryption keys are stored only to deliver opted-in court updates and are never displayed publicly.
-- Complete browser User-Agent strings and device fingerprints are not retained.
-- Failed join/leave attempts are not added to participation history.
-- Banning a member blocks account sign-in and member-only organizer access without deleting courts. Public nickname/PIN registration remains login-free.
-- CSRF protection is applied to state-changing forms.
+- Passwords and PINs are stored as password hashes. Repeated failed sign-ins, leave attempts, and message-board PIN attempts lock that username and IP temporarily.
+- Message-board posts are 1–500 characters and limited to five per IP per court every 10 minutes. Only players who joined the court, its organizer, and administrators can post.
+- State-changing forms are protected against CSRF. API requests use bearer tokens and never the session cookie.
+- Join/leave history records the nickname, action, and time. Administrators also see the validated IP and a broad device type (iOS, Android, Mobile, Web). Full User-Agent strings and device fingerprints are not kept. Failed attempts are not added to the history.
+- Push endpoints, keys, and FCM tokens are stored only to deliver the notifications people turned on, and are never shown.
+- Contact messages and their reply details are visible only to administrators.
+- Banning a member blocks their sign-in and organizer tools without deleting their courts. Joining courts by nickname and PIN stays open to everyone.
+- The public policy at `/privacy` covers the app's own data handling. Self-hosting operators must add anything deployment-specific, such as server logs, backups, or extra services.
 
-## Event lifecycle and storage
+## Development
 
-- Events expire automatically after their configured date and end time. Expired events become read-only and are hidden from default listings.
-- The app enforces an enabled leave deadline independently before event expiry. Players can still join. They cannot remove themselves at or after the configured local minute.
-- Archived events remain available through direct links and organizer or administrator dashboards.
-- SQLite data is stored in `instance/courts.sqlite` unless `COURT_DATABASE` is configured.
-- Avatars are stored under `instance/avatars`.
-- Court photos and videos are stored under `instance/court_media`.
-- Versioned social-sharing thumbnails are cached under `instance/social_thumbnails`; detail-page downloads reuse the same generated images.
-- Replacing or deleting records cleans up associated uploaded files where applicable.
-
-## Production
-
-- Set a strong `SECRET_KEY`, bootstrap administrator username, and bootstrap password before the first startup.
-- Serve the application over HTTPS and set `SESSION_COOKIE_SECURE=1`.
-- Set `TRUST_PROXY_HEADERS=1` only when a trusted reverse proxy replaces the forwarded client-IP and URL-scheme headers.
-- Persist and back up the configured SQLite database and `instance` upload directories.
-- The project bundles the FFmpeg executable and Noto Sans TC variable font required to generate media and information thumbnails, both inside and outside Docker.
-- Configure the deployed domain as an allowed Google Maps browser-key referrer.
-- Point container orchestration or uptime monitoring at `/healthz`; the Docker image already polls it through its built-in health check.
-
-## Tests
-
-Run the Python tests inside the virtual environment:
+### Tests
 
 ```bash
 .venv/bin/pytest -q
-```
-
-Run the browser-control logic tests with Node.js (no extra packages required):
-
-```bash
-node tests/test_court_controls.cjs
+node tests/test_court_controls.cjs     # browser-control logic, no packages needed
 node tests/test_court_navigation.cjs
 ```
 
+### JSON API
+
+`/api/v1` exposes player, organizer, account, and administrator functions as JSON. Clients sign in with `POST /api/v1/auth/login` and send `Authorization: Bearer <token>`. The API shares validation, throttling, and permission rules with the HTML pages. See [API.md](API.md) for the endpoint reference. When the API changes, update `api.py`, `API.md`, and `tests/test_api.py` together.
+
+### Translations
+
+All interface text lives in the `TRANSLATIONS` table in `app.py`, with matching `en-us` and `zh-tw` keys. The Android app generates its string resources from this table, so run `python3 tools/gen_strings.py` in `Android/` after changing shared wording.
+
+### Update history
+
+The `/updates` timeline comes from `data/update_history.json`, newest entry first. Each entry needs `date`, `date_label`, `title`, `summary`, and a non-empty `items` list, each in both `en-us` and `zh-tw`. The app validates the file at startup and refuses to start if it is malformed, incomplete, or out of order.
+
 ## Attribution and licenses
 
-The website favicon uses [`static/shuttlecock.png`](static/shuttlecock.png), based on the [Shuttlecock icon by Flaticon](https://www.flaticon.com/free-icon/shuttlecock_9719863?term=badminton&page=1&position=51&origin=search&related_id=9719863). Generated information thumbnails use the bundled [Noto Sans TC](https://github.com/notofonts/noto-cjk) variable font under the SIL Open Font License 1.1. Public attribution and license links are available at `/licenses`.
+The source code is released under the [MIT License](../LICENSE). Bundled third-party assets keep their own licenses.
+
+The favicon, [`static/shuttlecock.png`](static/shuttlecock.png), is based on the [Shuttlecock icon by Flaticon](https://www.flaticon.com/free-icon/shuttlecock_9719863). Preview images use the bundled [Noto Sans TC](https://github.com/notofonts/noto-cjk) font under the SIL Open Font License 1.1. Attribution and license links are also shown at `/licenses`.
 
 Badminton Court Control Panel was developed with support from [OpenAI Codex](https://openai.com/codex/) for implementation, review, and testing. Responsibility for the website, its operation, and its content remains with the project owner; this acknowledgment does not imply OpenAI endorsement or ownership.
