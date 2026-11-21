@@ -295,7 +295,7 @@ def create_court(
     save_location=False,
     leave_deadline_enabled="0",
     leave_deadline_at="",
-    court_date="2026-08-20",
+    court_date="2099-08-20",
 ):
     token = csrf(client, "/courts/new")
     data = {
@@ -458,7 +458,7 @@ def test_leave_deadline_is_disabled_by_default_and_requires_valid_datetime(
 
     data = {
         "csrf_token": csrf(client, "/courts/new"),
-        "court_date": "2026-08-20",
+        "court_date": "2099-08-20",
         "start_time": "19:00",
         "end_time": "21:00",
         "hall_name": "Taipei Sports Center",
@@ -472,7 +472,7 @@ def test_leave_deadline_is_disabled_by_default_and_requires_valid_datetime(
         "female_level_min": "1",
         "female_level_max": "18",
         "leave_deadline_enabled": "1",
-        "leave_deadline_date": "2026-08-20",
+        "leave_deadline_date": "2099-08-20",
         "leave_deadline_time": "07:00 PM",
     }
     invalid = client.post("/courts/new", data=data, follow_redirects=True)
@@ -504,7 +504,7 @@ def test_organizer_can_export_and_import_court_info_markdown(client, app):
     export_path = f"/{guid}/court_info.md"
     assert export_path.encode() in detail.data
     assert (
-        'download="2026-08-20_1900_2100_Friday Night 羽球.md"'.encode()
+        'download="2099-08-20_1900_2100_Friday Night 羽球.md"'.encode()
         in detail.data
     )
     assert "匯出".encode() in detail.data
@@ -513,7 +513,7 @@ def test_organizer_can_export_and_import_court_info_markdown(client, app):
     assert exported.status_code == 200
     assert exported.mimetype == "text/markdown"
     assert (
-        "filename*=UTF-8''2026-08-20_1900_2100_"
+        "filename*=UTF-8''2099-08-20_1900_2100_"
         "Friday%20Night%20%E7%BE%BD%E7%90%83.md"
         in exported.headers["Content-Disposition"]
     )
@@ -548,7 +548,7 @@ def test_organizer_can_export_and_import_court_info_markdown(client, app):
     hall_guid = hall_location.rsplit("/", 1)[-1]
     hall_export = client.get(f"/{hall_guid}/court_info.md")
     assert hall_export.headers["Content-Disposition"] == (
-        'attachment; filename="2026-08-20_1900_2100_'
+        'attachment; filename="2099-08-20_1900_2100_'
         'Taipei Sports Center.md"'
     )
 
@@ -743,7 +743,7 @@ def test_court_change_sends_localized_push_and_removes_stale_endpoint(
             "csrf_token": csrf(client, f"/admin/courts/{guid}/edit"),
             "event_name": "Updated Event",
             "badminton_name": "",
-            "court_date": "2026-08-21",
+            "court_date": "2099-08-21",
             "start_time": "20:00",
             "end_time": "22:00",
             "hall_name": "Updated Badminton Hall",
@@ -957,7 +957,7 @@ def test_court_media_gallery_card_cover_and_file_cleanup(client, app):
         f"/admin/courts/{guid}/edit",
         data={
             "csrf_token": token,
-            "court_date": "2026-08-20",
+            "court_date": "2099-08-20",
             "start_time": "19:00",
             "end_time": "21:00",
             "hall_name": "Taipei Sports Center",
@@ -1134,7 +1134,7 @@ def test_court_thumbnail_can_be_downloaded_from_detail_page(client, app):
     assert downloaded.mimetype == "image/jpeg"
     assert "attachment" in downloaded.headers["Content-Disposition"]
     assert (
-        "filename*=UTF-8''2026-08-20_1900_2100_"
+        "filename*=UTF-8''2099-08-20_1900_2100_"
         "Friday%20Night%20%E7%BE%BD%E7%90%83.jpg"
         in downloaded.headers["Content-Disposition"]
     )
@@ -1213,7 +1213,7 @@ def test_invalid_court_media_is_rejected(client, app):
         "/courts/new",
         data={
             "csrf_token": token,
-            "court_date": "2026-08-20",
+            "court_date": "2099-08-20",
             "start_time": "19:00",
             "end_time": "21:00",
             "hall_name": "Taipei Sports Center",
@@ -1261,7 +1261,7 @@ def create_member_court(client, hall_name="Member Hall"):
         "/courts/new",
         data={
             "csrf_token": token,
-            "court_date": "2026-09-10",
+            "court_date": "2099-09-10",
             "start_time": "18:30",
             "end_time": "20:30",
             "hall_name": hall_name,
@@ -1296,7 +1296,7 @@ def test_member_can_save_reuse_and_delete_a_court_location(client, app):
         "/courts/new",
         data={
             "csrf_token": token,
-            "court_date": "2026-09-10",
+            "court_date": "2099-09-10",
             "start_time": "18:30",
             "end_time": "20:30",
             "hall_name": "Saved Shuttle Hall",
@@ -1518,7 +1518,7 @@ def test_admin_can_create_archive_restore_and_delete(client, app):
         f"/admin/courts/{guid}/edit",
         data={
             "csrf_token": token,
-            "court_date": "2026-08-21",
+            "court_date": "2099-08-21",
             "start_time": "20:00",
             "end_time": "22:00",
             "hall_name": "Updated Badminton Hall",
@@ -1804,7 +1804,7 @@ def test_edit_court_can_reorder_and_delete_a_reserved_nickname(client, app):
     token = csrf(client, edit_url)
     form_data = {
         "csrf_token": token,
-        "court_date": "2026-08-20",
+        "court_date": "2099-08-20",
         "start_time": "19:00",
         "end_time": "21:00",
         "hall_name": "Taipei Sports Center",
@@ -3188,7 +3188,7 @@ def test_admin_can_export_every_court_as_utf8_csv(client, app):
     with app.app_context():
         db = get_db()
         db.execute(
-            "UPDATE courts SET archived = 1, court_date = '2026-09-12' "
+            "UPDATE courts SET archived = 1, court_date = '2099-09-12' "
             "WHERE guid = ?",
             (archived_guid,),
         )
@@ -3245,13 +3245,13 @@ def test_admin_can_filter_all_courts(client, app):
         db.execute(
             "UPDATE courts SET event_name = 'Morning Training', "
             "badminton_name = 'North Club', creator_name = 'manager', "
-            "court_date = '2026-08-20' WHERE guid = ?",
+            "court_date = '2099-08-20' WHERE guid = ?",
             (first_guid,),
         )
         db.execute(
             "UPDATE courts SET event_name = 'Archived Social', "
             "badminton_name = 'South Club', creator_name = 'alice', "
-            "court_date = '2026-09-12', archived = 1 WHERE guid = ?",
+            "court_date = '2099-09-12', archived = 1 WHERE guid = ?",
             (second_guid,),
         )
         db.commit()
@@ -3277,11 +3277,11 @@ def test_admin_can_filter_all_courts(client, app):
     assert b'value="alice"' in by_creator.data
 
     by_date = client.get(
-        "/admin?date_from=2026%2F08%2F01&date_to=2026%2F08%2F31"
+        "/admin?date_from=2099%2F08%2F01&date_to=2099%2F08%2F31"
     )
     assert b"Morning Training" in by_date.data
     assert b"Archived Social" not in by_date.data
-    assert b'value="2026/08/01"' in by_date.data
+    assert b'value="2099/08/01"' in by_date.data
 
     archived = client.get("/admin?status=archived")
     assert b"Archived Social" in archived.data
@@ -3324,12 +3324,12 @@ def test_public_court_filters_and_creator_display(client):
     assert b'<details class="panel court-filter-panel" open>' not in by_creator.data
 
     by_date_and_level = client.get(
-        "/courts?date_from=2026-09-01&date_to=2026-09-30"
+        "/courts?date_from=2099-09-01&date_to=2099-09-30"
         "&level=12&gender=male&status=open"
     )
     assert b"Alice Badminton Hall" in by_date_and_level.data
-    assert b'value="2026/09/01"' in by_date_and_level.data
-    assert b'value="2026/09/30"' in by_date_and_level.data
+    assert b'value="2099/09/01"' in by_date_and_level.data
+    assert b'value="2099/09/30"' in by_date_and_level.data
     assert b'value="12" selected' in by_date_and_level.data
     assert b'value="male" selected' in by_date_and_level.data
     assert b'value="open" selected' in by_date_and_level.data
@@ -3342,7 +3342,7 @@ def test_public_court_filters_and_creator_display(client):
     assert b'value="both" selected' in both_match.data
 
     no_match = client.get(
-        "/courts?date_from=2026-09-11&date_to=2026-09-30&level=18"
+        "/courts?date_from=2099-09-11&date_to=2099-09-30&level=18"
     )
     assert b"Alice Badminton Hall" not in no_match.data
     assert "目前沒有開放場次".encode() in no_match.data
@@ -3410,7 +3410,7 @@ def test_admin_form_enforces_24_hour_time_and_loads_places_widget(client, app):
         "/courts/new",
         data={
             "csrf_token": token,
-            "court_date": "2026-08-20",
+            "court_date": "2099-08-20",
             "start_time": "9:00",
             "end_time": "21:00",
             "hall_name": "Taipei Sports Center",
@@ -4043,7 +4043,7 @@ def test_admin_duplicate_copies_information_without_participants(client, app):
         duplicated.headers["Location"],
         data={
             "csrf_token": token,
-            "court_date": "2026-08-20",
+            "court_date": "2099-08-20",
             "start_time": "19:00",
             "end_time": "21:00",
             "hall_name": "Taipei Sports Center",
