@@ -29,7 +29,7 @@
     <form class="court-message-form" method="post" action="{{ url_for('post_court_message', guid=court.guid) }}" data-court-message-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       {% if not can_manage_court %}
-        <p class="court-message-hint">{{ t('court_message_join_required') }}{% if web_push_enabled %} {{ t('court_message_notify_hint') }}{% endif %}</p>
+        <p class="court-message-hint">{{ t('court_message_join_required') }}{% if web_push_enabled %}{% if lang != 'zh-tw' %} {% endif %}{{ t('court_message_notify_hint') }}{% endif %}</p>
       {% endif %}
       {% set top_draft = message_draft if message_draft and not message_draft.parent_id else none %}
       {{ court_message_identity_fields(top_draft) }}
