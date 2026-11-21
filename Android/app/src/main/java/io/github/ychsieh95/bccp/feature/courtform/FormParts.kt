@@ -58,6 +58,7 @@ internal fun FormSection(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     PanelCard(modifier) {
+        // The description goes under the row, so a long one cannot push the badge away from the title.
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primaryContainer) {
                 Text(
@@ -68,12 +69,10 @@ internal fun FormSection(
                     fontWeight = FontWeight.Bold,
                 )
             }
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-                if (description != null) {
-                    Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
+        }
+        if (description != null) {
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         content()
     }
@@ -101,14 +100,17 @@ internal fun ReservedNicknameEditor(state: CourtFormUiState, vm: CourtFormViewMo
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = { vm.moveNickname(index, -1) }, enabled = index > 0) {
-                    Icon(Icons.Outlined.ArrowUpward, "${stringResource(R.string.move_up)} $label ${index + 1}")
-                }
-                IconButton(onClick = { vm.moveNickname(index, 1) }, enabled = index < state.nicknames.lastIndex) {
-                    Icon(Icons.Outlined.ArrowDownward, "${stringResource(R.string.move_down)} $label ${index + 1}")
-                }
-                IconButton(onClick = { vm.removeNickname(index) }) {
-                    Icon(Icons.Outlined.Delete, "${stringResource(R.string.delete)} $label ${index + 1}", tint = MaterialTheme.colorScheme.error)
+                // OutlinedTextField reserves 8.dp above its box for the floating label; match it so the icons centre on the box.
+                Row(Modifier.padding(top = 8.dp)) {
+                    IconButton(onClick = { vm.moveNickname(index, -1) }, enabled = index > 0) {
+                        Icon(Icons.Outlined.ArrowUpward, "${stringResource(R.string.move_up)} $label ${index + 1}")
+                    }
+                    IconButton(onClick = { vm.moveNickname(index, 1) }, enabled = index < state.nicknames.lastIndex) {
+                        Icon(Icons.Outlined.ArrowDownward, "${stringResource(R.string.move_down)} $label ${index + 1}")
+                    }
+                    IconButton(onClick = { vm.removeNickname(index) }) {
+                        Icon(Icons.Outlined.Delete, "${stringResource(R.string.delete)} $label ${index + 1}", tint = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }

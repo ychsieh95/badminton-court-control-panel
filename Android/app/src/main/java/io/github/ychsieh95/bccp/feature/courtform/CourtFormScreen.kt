@@ -227,8 +227,9 @@ private fun EventSection(state: CourtFormUiState, vm: CourtFormViewModel, modifi
             val date = at.take(10).takeIf { it.length == 10 }.orEmpty()
             val time = at.drop(11).take(5)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                DateField(date, { vm.setLeaveDeadline(it, time) }, stringResource(R.string.leave_deadline), Modifier.weight(1f), error = state.error(F.DEADLINE_AT))
-                TimeField(time, { vm.setLeaveDeadline(date.ifBlank { state[F.DATE] }, it) }, stringResource(R.string.time), Modifier.weight(1f))
+                // The date label is longer than "Time" and needs the room to stay on one line.
+                DateField(date, { vm.setLeaveDeadline(it, time) }, stringResource(R.string.leave_deadline), Modifier.weight(3f), error = state.error(F.DEADLINE_AT))
+                TimeField(time, { vm.setLeaveDeadline(date.ifBlank { state[F.DATE] }, it) }, stringResource(R.string.time), Modifier.weight(2f))
             }
             state.error(F.DEADLINE_ON)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
@@ -320,17 +321,23 @@ private fun PriceSection(state: CourtFormUiState, vm: CourtFormViewModel, modifi
 
 @Composable
 private fun LevelSection(state: CourtFormUiState, vm: CourtFormViewModel, modifier: Modifier) {
-    val levels = (1..18).map { Choice(it.toString(), "$it · ${levelLabel(it)}") }
+    // "18 · Professional" does not fit a half-width field: show the number, with the name below it.
+    val levels = (1..18).map { Choice(it.toString(), "$it · ${levelLabel(it)}", short = it.toString()) }
+    @Composable
+    fun LevelField(label: Int, key: String, modifier: Modifier) = DropdownField(
+        stringResource(label), levels, state[key], { vm.set(key, it) }, modifier, state.error(key),
+        supporting = state[key].toIntOrNull()?.let { levelLabel(it) },
+    )
     FormSection("05", stringResource(R.string.level), stringResource(R.string.level_guide_text), modifier) {
         Text("♂ " + stringResource(R.string.male), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DropdownField(stringResource(R.string.male_min), levels, state[F.MALE_MIN], { vm.set(F.MALE_MIN, it) }, Modifier.weight(1f), state.error(F.MALE_MIN))
-            DropdownField(stringResource(R.string.male_max), levels, state[F.MALE_MAX], { vm.set(F.MALE_MAX, it) }, Modifier.weight(1f), state.error(F.MALE_MAX))
+            LevelField(R.string.male_min, F.MALE_MIN, Modifier.weight(1f))
+            LevelField(R.string.male_max, F.MALE_MAX, Modifier.weight(1f))
         }
         Text("♀ " + stringResource(R.string.female), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DropdownField(stringResource(R.string.female_min), levels, state[F.FEMALE_MIN], { vm.set(F.FEMALE_MIN, it) }, Modifier.weight(1f), state.error(F.FEMALE_MIN))
-            DropdownField(stringResource(R.string.female_max), levels, state[F.FEMALE_MAX], { vm.set(F.FEMALE_MAX, it) }, Modifier.weight(1f), state.error(F.FEMALE_MAX))
+            LevelField(R.string.female_min, F.FEMALE_MIN, Modifier.weight(1f))
+            LevelField(R.string.female_max, F.FEMALE_MAX, Modifier.weight(1f))
         }
     }
 }

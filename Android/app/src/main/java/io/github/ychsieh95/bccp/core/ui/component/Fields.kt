@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.ychsieh95.bccp.R
 import io.github.ychsieh95.bccp.core.ui.format.Formats
@@ -73,7 +74,7 @@ fun TextInput(
     OutlinedTextField(
         value = value,
         onValueChange = { if (maxLength == null || it.length <= maxLength) onValueChange(it) },
-        label = { Text(label) },
+        label = { FieldLabel(label) },
         placeholder = placeholder?.let { { Text(it) } },
         isError = error != null,
         supportingText = (error ?: supporting)?.let { { Text(it) } },
@@ -101,7 +102,7 @@ fun SecretInput(
         onValueChange = { new ->
             if (!numeric) onValueChange(new) else if (new.length <= 6 && new.all(Char::isDigit)) onValueChange(new)
         },
-        label = { Text(label) },
+        label = { FieldLabel(label) },
         isError = error != null,
         supportingText = (error ?: supporting)?.let { { Text(it) } },
         singleLine = true,
@@ -124,7 +125,12 @@ fun SecretInput(
     )
 }
 
-data class Choice<T>(val value: T, val label: String)
+/** A label that never wraps: an empty field shows it in the body, where a second line would make it taller than its neighbours. */
+@Composable
+private fun FieldLabel(text: String) = Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+/** [short] replaces [label] in the closed field when the full label is too long for it (the menu still shows [label]). */
+data class Choice<T>(val value: T, val label: String, val short: String? = null)
 
 @Composable
 fun <T> DropdownField(
@@ -135,19 +141,22 @@ fun <T> DropdownField(
     modifier: Modifier = Modifier,
     error: String? = null,
     enabled: Boolean = true,
+    supporting: String? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { if (enabled) expanded = it }, modifier = modifier) {
         OutlinedTextField(
-            value = choices.firstOrNull { it.value == selected }?.label.orEmpty(),
+            value = choices.firstOrNull { it.value == selected }?.let { it.short ?: it.label }.orEmpty(),
             onValueChange = {},
             readOnly = true,
             enabled = enabled,
-            label = { Text(label) },
+            label = { FieldLabel(label) },
             isError = error != null,
-            supportingText = error?.let { { Text(it) } },
+            supportingText = (error ?: supporting)?.let { { Text(it) } },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            singleLine = true,
+            // Read-only, so wrap a long choice instead of clipping it mid-word.
+            singleLine = false,
+            maxLines = 2,
             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled).fillMaxWidth(),
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -181,7 +190,7 @@ private fun PickerField(
         value = value,
         onValueChange = {},
         readOnly = true,
-        label = { Text(label) },
+        label = { FieldLabel(label) },
         isError = error != null,
         supportingText = (error ?: supporting)?.let { { Text(it) } },
         leadingIcon = { Icon(icon, null) },
