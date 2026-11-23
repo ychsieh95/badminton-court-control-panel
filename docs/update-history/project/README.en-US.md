@@ -10,7 +10,7 @@ Generates both `strings.xml` files with `Android/tools/gen_strings.py` from the 
 
 ### Coding-agent instructions
 
-Adds `Android/AGENTS.md` and `Android/CLAUDE.md`, covering the app's architecture and API-only rule, generated strings, secrets and fictional test data, verification, and release handling, and a root `CLAUDE.md` for commit message rules. Repeats the commit message rule in `Android/CLAUDE.md`. Records the Android Claude Code skills in `Android/.claude/skills.lock.json` with a script that downloads them, instead of committing them.
+Adds `Android/AGENTS.md` and `Android/CLAUDE.md`, covering the app's architecture and API-only rule, generated strings, secrets and fictional test data, verification, and release handling (including one `Android/build/outputs/version-<versionCode> (<versionName>)/` folder per release instead of per track), and a root `CLAUDE.md` for commit message rules. Repeats the commit message rule in `Android/CLAUDE.md`. Records the Android Claude Code skills in `Android/.claude/skills.lock.json` with a script that downloads them, instead of committing them.
 
 ### Continuous integration
 
@@ -26,7 +26,7 @@ Moves the website into `Web/` next to the new `Android/` directory, and ignores 
 
 ### Play Store screenshots
 
-Adds tooling under `Android/docs/store-listing/screenshots/` that builds the debug app, runs the website against a throwaway database seeded with fictional data, captures each scenario on an emulator in English and Traditional Chinese, and frames the captures as store panels. Its README documents every `capture.sh` option.
+Adds tooling under `Android/docs/store-listing/screenshots/` that builds the debug app, runs the website against a throwaway database seeded with fictional data, captures each scenario on an emulator in English and Traditional Chinese, and frames the captures as store panels. Screenshots are stored per app version in `version-<versionCode> (<versionName>)/`, read from `Android/app/build.gradle.kts`, rather than per Google Play track. Its README documents every `capture.sh` option.
 
 ### READMEs and license
 

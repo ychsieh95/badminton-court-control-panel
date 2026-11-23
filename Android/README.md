@@ -64,7 +64,7 @@ keyPassword=…
 ./gradlew :app:bundleRelease        # AAB in app/build/outputs/bundle/release/
 ```
 
-Without `keystore.properties`, the release build is unsigned and cannot be uploaded to Google Play. Set `versionCode` and `versionName` in `app/build.gradle.kts` before each release.
+Without `keystore.properties`, the release build is unsigned and cannot be uploaded to Google Play. Set `versionCode` and `versionName` in `app/build.gradle.kts` before each release. Keep each release's signed AAB, APK, and `mapping.txt` together in `build/outputs/version-<versionCode> (<versionName>)/`, for example `build/outputs/version-1 (1.0.0)/`. One folder serves every Google Play track (closed testing, open testing, and production), because the same build is promoted between them.
 
 ## Project layout
 

@@ -10,7 +10,7 @@
 
 ### 程式開發代理指示
 
-新增 `Android/AGENTS.md` 與 `Android/CLAUDE.md`，內容涵蓋應用程式架構與僅使用 API 的規則、產生的字串、機密資料與虛構測試資料、驗證方式及發行流程，並新增根目錄的 `CLAUDE.md` 說明提交訊息規則。`Android/CLAUDE.md` 也加入同一條提交訊息規則。Android 的 Claude Code 技能改記錄於 `Android/.claude/skills.lock.json`，並提供下載腳本，不再直接提交。
+新增 `Android/AGENTS.md` 與 `Android/CLAUDE.md`，內容涵蓋應用程式架構與僅使用 API 的規則、產生的字串、機密資料與虛構測試資料、驗證方式及發行流程（包括每個版本使用一個 `Android/build/outputs/version-<versionCode> (<versionName>)/` 資料夾，而非依測試軌區分），並新增根目錄的 `CLAUDE.md` 說明提交訊息規則。`Android/CLAUDE.md` 也加入同一條提交訊息規則。Android 的 Claude Code 技能改記錄於 `Android/.claude/skills.lock.json`，並提供下載腳本，不再直接提交。
 
 ### 持續整合
 
@@ -26,7 +26,7 @@
 
 ### Play 商店螢幕截圖
 
-在 `Android/docs/store-listing/screenshots/` 新增工具，會建置偵錯版應用程式、以填入虛構資料的暫時資料庫執行網站、在模擬器上以英文與繁體中文擷取各情境畫面，再將擷取畫面排版成商店展示圖。其 README 說明 `capture.sh` 的所有選項。
+在 `Android/docs/store-listing/screenshots/` 新增工具，會建置偵錯版應用程式、以填入虛構資料的暫時資料庫執行網站、在模擬器上以英文與繁體中文擷取各情境畫面，再將擷取畫面排版成商店展示圖。截圖依 `Android/app/build.gradle.kts` 中的版本存放於 `version-<versionCode> (<versionName>)/`，而非依 Google Play 測試軌存放。其 README 說明 `capture.sh` 的所有選項。
 
 ### README 與授權
 

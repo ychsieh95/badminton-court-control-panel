@@ -43,7 +43,7 @@ Android/docs/store-listing/screenshots/capture.sh --avd Pixel_7_API_36d0
 Android/docs/store-listing/screenshots/capture.sh --serial emulator-5560 --no-start
 ```
 
-預設會將兩種語系寫入 `closed-testing/alpha/app/en-US/` 與 `closed-testing/alpha/app/zh-TW/`。使用 `--locale en-US` 或 `--locale zh-TW` 只擷取一種語言，`--scenarios join,messages` 只擷取部分情境，`--output DIR` 用於其他測試軌，`--no-build` 重新安裝現有 APK，若 5055 已被占用則使用 `--port`。由腳本啟動的模擬器會在結束時關閉，傳入 `--keep-emulator` 可讓它繼續執行。`--timeout` 設定開機與就緒的等待時間，預設為 180 秒。執行 `capture.sh --help` 查看所有選項。
+截圖依 App 版本存放，而非依 Google Play 測試軌，位於 `version-<versionCode> (<versionName>)/`（例如 `version-1 (1.0.0)/`）；封閉測試、開放測試與正式版共用同一組截圖。預設會依 `app/build.gradle.kts` 中的 `versionCode` 與 `versionName`，將兩種語系寫入 `version-<versionCode> (<versionName>)/app/en-US/` 與 `.../app/zh-TW/`，因此擷取前請先在該檔設定新版本。使用 `--locale en-US` 或 `--locale zh-TW` 只擷取一種語言，`--scenarios join,messages` 只擷取部分情境，`--output DIR` 指定其他目錄，`--no-build` 重新安裝現有 APK，若 5055 已被占用則使用 `--port`。由腳本啟動的模擬器會在結束時關閉，傳入 `--keep-emulator` 可讓它繼續執行。`--timeout` 設定開機與就緒的等待時間，預設為 180 秒。執行 `capture.sh --help` 查看所有選項。
 
 擷取時會清除模擬器上的 App 資料（它與正式版使用相同的應用程式 ID），結束時會再清除一次，不會留下 fixture 登入狀態或本機伺服器位址。若之後要用該模擬器進行其他測試，請重新登入。
 
@@ -51,11 +51,11 @@ Android/docs/store-listing/screenshots/capture.sh --serial emulator-5560 --no-st
 
 ```bash
 python3 Android/docs/store-listing/screenshots/render_store.py \
-  --input  Android/docs/store-listing/screenshots/closed-testing/alpha/app \
-  --output Android/docs/store-listing/screenshots/closed-testing/alpha/store
+  --input  "Android/docs/store-listing/screenshots/version-1 (1.0.0)/app" \
+  --output "Android/docs/store-listing/screenshots/version-1 (1.0.0)/store"
 ```
 
-每種視覺風格在 `closed-testing/alpha/store/` 下各有一個目錄，內含 `en-US/`、`zh-TW/` 與 `source/`（以程式繪製、半尺寸的背景全景圖，七張圖由此裁切）。背景都以程式繪製，未使用任何第三方圖像。
+每種視覺風格在 `version-<versionCode> (<versionName>)/store/` 下各有一個目錄，內含 `en-US/`、`zh-TW/` 與 `source/`（以程式繪製、半尺寸的背景全景圖，七張圖由此裁切）。背景都以程式繪製，未使用任何第三方圖像。
 
 | 風格 | 外觀 |
 | --- | --- |

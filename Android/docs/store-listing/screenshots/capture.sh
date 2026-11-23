@@ -8,7 +8,11 @@ APP_ID="cc.holey.badmintoncourtcontrolpanel"
 ALL_SCENARIOS="courts,court-detail,members-levels,join,messages,organize,court-form"
 SCENARIOS="$ALL_SCENARIOS"
 LOCALE="all"
-OUTPUT="$HERE/closed-testing/alpha/app"
+# Default PNG root: version-<versionCode> (<versionName>)/app, read from app/build.gradle.kts.
+VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$ANDROID_DIR/app/build.gradle.kts" | head -n 1)"
+VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$ANDROID_DIR/app/build.gradle.kts" | head -n 1)"
+[[ -n "$VERSION_CODE" && -n "$VERSION_NAME" ]] || { printf 'ERROR: cannot read versionCode/versionName from app/build.gradle.kts\n' >&2; exit 1; }
+OUTPUT="$HERE/version-$VERSION_CODE ($VERSION_NAME)/app"
 AVD=""
 SERIAL=""
 NO_START=false
@@ -29,7 +33,8 @@ usage() {
 Usage: Android/docs/store-listing/screenshots/capture.sh [options]
   --avd NAME             Start or select this existing AVD.
   --serial SERIAL        Use this already-running emulator (never a phone).
-  --output DIRECTORY     PNG root (default: .../screenshots/closed-testing/alpha/app).
+  --output DIRECTORY     PNG root (default: .../screenshots/version-<versionCode>
+                         (<versionName>)/app, from app/build.gradle.kts).
                          Each locale is written to its own subdirectory.
   --locale all|zh-TW|en-US
                          Capture both languages or one locale (default: all).

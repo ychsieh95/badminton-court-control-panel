@@ -6,8 +6,8 @@ panels and saved to <style>/source/. Each 1080 x 2400 panel then gets a numbered
 eyebrow, a feature-led title and subtitle, and the real capture in a rounded frame.
 
     python3 Android/docs/store-listing/screenshots/render_store.py \
-        --input  Android/docs/store-listing/screenshots/closed-testing/alpha/app \
-        --output Android/docs/store-listing/screenshots/closed-testing/alpha/store
+        --input  "Android/docs/store-listing/screenshots/version-1 (1.0.0)/app" \
+        --output "Android/docs/store-listing/screenshots/version-1 (1.0.0)/store"
 """
 from __future__ import annotations
 

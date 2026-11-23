@@ -64,7 +64,7 @@ keyPassword=…
 ./gradlew :app:bundleRelease        # AAB 位於 app/build/outputs/bundle/release/
 ```
 
-沒有 `keystore.properties` 時，正式版不會簽署，也無法上傳至 Google Play。每次發布前，請先在 `app/build.gradle.kts` 設定 `versionCode` 與 `versionName`。
+沒有 `keystore.properties` 時，正式版不會簽署，也無法上傳至 Google Play。每次發布前，請先在 `app/build.gradle.kts` 設定 `versionCode` 與 `versionName`。每個版本的已簽署 AAB、APK 與 `mapping.txt` 統一放在 `build/outputs/version-<versionCode> (<versionName>)/`，例如 `build/outputs/version-1 (1.0.0)/`。封閉測試、開放測試與正式版等 Google Play 測試軌共用同一個資料夾，因為同一個版本會在各測試軌之間升級。
 
 ## 專案結構
 

@@ -43,7 +43,7 @@ To use a running emulator:
 Android/docs/store-listing/screenshots/capture.sh --serial emulator-5560 --no-start
 ```
 
-By default both locales are written to `closed-testing/alpha/app/en-US/` and `closed-testing/alpha/app/zh-TW/`. Use `--locale en-US` or `--locale zh-TW` for one language, `--scenarios join,messages` for a subset, `--output DIR` for another track, `--no-build` to reinstall the existing APK, and `--port` if 5055 is taken. An emulator that the script started shuts down at the end unless you pass `--keep-emulator`. `--timeout` sets the boot and readiness wait, 180 seconds by default. Run `capture.sh --help` for every option.
+Screenshots are kept per app version, not per Google Play track, in `version-<versionCode> (<versionName>)/` (for example `version-1 (1.0.0)/`); the same set serves closed testing, open testing, and production. By default both locales are written to `version-<versionCode> (<versionName>)/app/en-US/` and `.../app/zh-TW/`, using the `versionCode` and `versionName` in `app/build.gradle.kts`, so set the new version there before capturing. Use `--locale en-US` or `--locale zh-TW` for one language, `--scenarios join,messages` for a subset, `--output DIR` for another directory, `--no-build` to reinstall the existing APK, and `--port` if 5055 is taken. An emulator that the script started shuts down at the end unless you pass `--keep-emulator`. `--timeout` sets the boot and readiness wait, 180 seconds by default. Run `capture.sh --help` for every option.
 
 The capture clears the app's data on the emulator (it shares the release application ID), and clears it again at the end so no fixture sign-in or local server address is left behind. Sign in again afterwards if you use that emulator for other testing.
 
@@ -51,11 +51,11 @@ The capture clears the app's data on the emulator (it shares the release applica
 
 ```bash
 python3 Android/docs/store-listing/screenshots/render_store.py \
-  --input  Android/docs/store-listing/screenshots/closed-testing/alpha/app \
-  --output Android/docs/store-listing/screenshots/closed-testing/alpha/store
+  --input  "Android/docs/store-listing/screenshots/version-1 (1.0.0)/app" \
+  --output "Android/docs/store-listing/screenshots/version-1 (1.0.0)/store"
 ```
 
-Each visual treatment has its own directory under `closed-testing/alpha/store/`, with `en-US/`, `zh-TW/`, and `source/` (the procedurally drawn background panorama, at half size, that the seven panels are cut from). The backgrounds are drawn in code; no third-party artwork is used.
+Each visual treatment has its own directory under `version-<versionCode> (<versionName>)/store/`, with `en-US/`, `zh-TW/`, and `source/` (the procedurally drawn background panorama, at half size, that the seven panels are cut from). The backgrounds are drawn in code; no third-party artwork is used.
 
 | Style | Look |
 | --- | --- |
