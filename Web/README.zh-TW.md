@@ -281,7 +281,11 @@ docker compose -f docker/compose.yaml exec app printenv TRUST_PROXY_HEADERS   # 
 - 停權會封鎖會員登入與主揪功能，但不會刪除其場次。以暱稱與 PIN 碼加入場次仍對所有人開放。
 - `/privacy` 的公開政策說明應用程式本身的資料處理方式。自行架設者須補充部署環境特有的處理，例如伺服器紀錄、備份或其他服務。
 
+完整的儲存資料與第三方服務清單請見 [docs/PRIVACY.md](../docs/PRIVACY.md)。回報漏洞時，請依 [docs/SECURITY.md](../docs/SECURITY.md) 說明的方式私下回報。
+
 ## 開發
+
+發出 Pull Request 前，請先閱讀 [docs/CONTRIBUTING.md](../docs/CONTRIBUTING.md)。
 
 ### 測試
 
@@ -290,6 +294,8 @@ docker compose -f docker/compose.yaml exec app printenv TRUST_PROXY_HEADERS   # 
 node tests/test_court_controls.cjs     # 瀏覽器控制邏輯，不需額外套件
 node tests/test_court_navigation.cjs
 ```
+
+`Web/` 有變更時，[`web.yml`](../.github/workflows/web.yml) 工作流程會在 Python 3.10 與 3.13 上執行這些測試。
 
 ### JSON API
 

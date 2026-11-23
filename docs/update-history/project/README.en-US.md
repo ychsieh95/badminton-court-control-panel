@@ -10,7 +10,7 @@ Generates both `strings.xml` files with `Android/tools/gen_strings.py` from the 
 
 ### Coding-agent instructions
 
-Adds `Android/AGENTS.md` and `Android/CLAUDE.md`, covering the app's architecture and API-only rule, generated strings, secrets and fictional test data, verification, and release handling, and a root `CLAUDE.md` for commit message rules. Records the Android Claude Code skills in `Android/.claude/skills.lock.json` with a script that downloads them, instead of committing them.
+Adds `Android/AGENTS.md` and `Android/CLAUDE.md`, covering the app's architecture and API-only rule, generated strings, secrets and fictional test data, verification, and release handling, and a root `CLAUDE.md` for commit message rules. Repeats the commit message rule in `Android/CLAUDE.md`. Records the Android Claude Code skills in `Android/.claude/skills.lock.json` with a script that downloads them, instead of committing them.
 
 ### Continuous integration
 
@@ -26,11 +26,11 @@ Moves the website into `Web/` next to the new `Android/` directory, and ignores 
 
 ### Play Store screenshots
 
-Adds tooling under `Android/docs/store-listing/screenshots/` that builds the debug app, runs the website against a throwaway database seeded with fictional data, captures each scenario on an emulator in English and Traditional Chinese, and frames the captures as store panels.
+Adds tooling under `Android/docs/store-listing/screenshots/` that builds the debug app, runs the website against a throwaway database seeded with fictional data, captures each scenario on an emulator in English and Traditional Chinese, and frames the captures as store panels. Its README documents every `capture.sh` option.
 
 ### READMEs and license
 
-Rewrites the root, `Web/`, and `Android/` READMEs, each in English and Traditional Chinese, with status badges, and licenses the project under MIT. Bundled third-party assets keep their own licenses.
+Rewrites the root, `Web/`, and `Android/` READMEs, each in English and Traditional Chinese, with status badges, and licenses the project under MIT. Bundled third-party assets keep their own licenses. The READMEs link the contributor, privacy, security, and UI docs and the update history, and describe what each CI workflow checks.
 
 ### Release signing
 

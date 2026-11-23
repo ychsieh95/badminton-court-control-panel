@@ -109,6 +109,10 @@ Launcher and notification icons are generated from `Web/static/shuttlecock.png` 
 
 [`docs/store-listing/screenshots/`](docs/store-listing/screenshots/README.md) captures Google Play screenshots from an emulator against a local server seeded with fictional data, then frames them as store panels.
 
+## Contributing
+
+Follow [AGENTS.md](AGENTS.md) and [docs/CONTRIBUTING.md](../docs/CONTRIBUTING.md). Read [docs/UI_BRIEF.md](../docs/UI_BRIEF.md) before you change screens. The [`android.yml`](../.github/workflows/android.yml) workflow checks the generated strings, runs the unit tests, and builds a debug APK when `Android/` or `Web/app.py` changes.
+
 ## License
 
 Released under the [MIT License](../LICENSE). The launcher icon is derived from the website's shuttlecock icon; see [Web/README.md](../Web/README.md#attribution-and-licenses) for its attribution.

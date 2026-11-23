@@ -109,6 +109,10 @@ python3 tools/gen_strings.py
 
 [`docs/store-listing/screenshots/`](docs/store-listing/screenshots/README.zh-TW.md) 會在模擬器上連線至含虛構資料的本機伺服器擷取 Google Play 截圖，再將其排版為商店圖片。
 
+## 參與開發
+
+請遵循 [AGENTS.md](AGENTS.md) 與 [docs/CONTRIBUTING.md](../docs/CONTRIBUTING.md)。變更畫面前，請先閱讀 [docs/UI_BRIEF.md](../docs/UI_BRIEF.md)。`Android/` 或 `Web/app.py` 有變更時，[`android.yml`](../.github/workflows/android.yml) 工作流程會檢查產生的字串、執行單元測試並建置偵錯版 APK。
+
 ## 授權
 
 本專案以 [MIT 授權條款](../LICENSE)釋出。啟動器圖示改作自網站的羽毛球圖示，其來源說明請見 [Web/README.zh-TW.md](../Web/README.zh-TW.md#素材來源與授權)。

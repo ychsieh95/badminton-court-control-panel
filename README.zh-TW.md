@@ -58,6 +58,17 @@ cd Android
 - Android App 只使用 JSON API。API 變更時，請同時更新 `Web/api.py`、`Web/API.md` 與 `Web/tests/test_api.py`，再更新 App 的模型類別與測試範例資料。
 - 介面文字為共用。來源是 `Web/app.py` 中網站的 `TRANSLATIONS` 表，Android 字串資源則在 `Android/` 中以 `python3 tools/gen_strings.py` 產生。
 - `.env`、Firebase 檔案與簽署金鑰等機密只保留在本機，並已被 Git 忽略。
+- 每項變更都要記錄在 [`docs/update-history/`](docs/update-history/) 下對應的雙語檔案：使用網站或 App 的人能察覺的變更記錄在 `app/`，工具、測試、CI 與文件的變更記錄在 `project/`。
+
+## 文件
+
+| 文件 | 內容 |
+| --- | --- |
+| [CONTRIBUTING.md](docs/CONTRIBUTING.md) | 環境需求、要執行的檢查、API 與翻譯規則，以及機密資料。 |
+| [PRIVACY.md](docs/PRIVACY.md) | 伺服器、瀏覽器與 App 儲存的資料，以及涉及的第三方服務。 |
+| [SECURITY.md](docs/SECURITY.md) | 支援的版本、私下回報漏洞的方式與信任邊界。 |
+| [UI_BRIEF.md](docs/UI_BRIEF.md) | Android App 的分層、狀態約定、畫面與主題。 |
+| [更新紀錄](docs/update-history/) | 自上次發行以來的 App 與專案變更。 |
 
 ## 授權
 

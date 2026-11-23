@@ -43,7 +43,7 @@ To use a running emulator:
 Android/docs/store-listing/screenshots/capture.sh --serial emulator-5560 --no-start
 ```
 
-By default both locales are written to `closed-testing/alpha/app/en-US/` and `closed-testing/alpha/app/zh-TW/`. Use `--locale en-US` or `--locale zh-TW` for one language, `--scenarios join,messages` for a subset, `--output DIR` for another track, `--no-build` to reinstall the existing APK, and `--port` if 5055 is taken. Run `capture.sh --help` for every option.
+By default both locales are written to `closed-testing/alpha/app/en-US/` and `closed-testing/alpha/app/zh-TW/`. Use `--locale en-US` or `--locale zh-TW` for one language, `--scenarios join,messages` for a subset, `--output DIR` for another track, `--no-build` to reinstall the existing APK, and `--port` if 5055 is taken. An emulator that the script started shuts down at the end unless you pass `--keep-emulator`. `--timeout` sets the boot and readiness wait, 180 seconds by default. Run `capture.sh --help` for every option.
 
 The capture clears the app's data on the emulator (it shares the release application ID), and clears it again at the end so no fixture sign-in or local server address is left behind. Sign in again afterwards if you use that emulator for other testing.
 

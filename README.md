@@ -58,6 +58,17 @@ GitHub Actions runs the same checks on pushes and pull requests to `main`: [`web
 - The Android app uses only the JSON API. When the API changes, update `Web/api.py`, `Web/API.md`, and `Web/tests/test_api.py` together, then the app's model classes and test fixtures.
 - Interface text is shared. The website's `TRANSLATIONS` table in `Web/app.py` is the source; the Android string resources are generated from it with `python3 tools/gen_strings.py` in `Android/`.
 - Secrets such as `.env`, Firebase files, and signing keys stay local and are ignored by Git.
+- Record every change in the matching bilingual pair under [`docs/update-history/`](docs/update-history/): `app/` for changes people using the website or app can notice, `project/` for tooling, tests, CI, and documentation.
+
+## Documentation
+
+| Document | Covers |
+| --- | --- |
+| [CONTRIBUTING.md](docs/CONTRIBUTING.md) | Requirements, checks to run, API and translation rules, and secrets. |
+| [PRIVACY.md](docs/PRIVACY.md) | The data the server, browser, and app store, and the third-party services involved. |
+| [SECURITY.md](docs/SECURITY.md) | Supported versions, private vulnerability reporting, and the trust boundary. |
+| [UI_BRIEF.md](docs/UI_BRIEF.md) | The Android app's layers, state contract, screens, and theme. |
+| [Update history](docs/update-history/) | App changes and project changes since the last release. |
 
 ## License
 

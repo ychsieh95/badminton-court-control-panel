@@ -281,7 +281,11 @@ FFmpeg and the Noto Sans TC font used for preview images are bundled, both in an
 - Banning a member blocks their sign-in and organizer tools without deleting their courts. Joining courts by nickname and PIN stays open to everyone.
 - The public policy at `/privacy` covers the app's own data handling. Self-hosting operators must add anything deployment-specific, such as server logs, backups, or extra services.
 
+See [docs/PRIVACY.md](../docs/PRIVACY.md) for the full list of stored data and third-party services. Report vulnerabilities privately as described in [docs/SECURITY.md](../docs/SECURITY.md).
+
 ## Development
+
+Read [docs/CONTRIBUTING.md](../docs/CONTRIBUTING.md) before you open a pull request.
 
 ### Tests
 
@@ -290,6 +294,8 @@ FFmpeg and the Noto Sans TC font used for preview images are bundled, both in an
 node tests/test_court_controls.cjs     # browser-control logic, no packages needed
 node tests/test_court_navigation.cjs
 ```
+
+The [`web.yml`](../.github/workflows/web.yml) workflow runs these tests on Python 3.10 and 3.13 when `Web/` changes.
 
 ### JSON API
 
