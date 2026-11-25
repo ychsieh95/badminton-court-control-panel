@@ -1,6 +1,6 @@
 # 應用程式更新記錄
 
-網站或 Android 應用程式使用者可察覺的變更。2026 年 11 月以前發行的網站變更，請見網站的 `/updates` 頁面（資料來自 `Web/data/update_history.json`）。
+網站或 Android 應用程式使用者可察覺的變更。2026 年 11 月以前發行的網站變更，請見網站的 `/updates` 頁面（資料來自 `web/data/update_history.json`）。
 
 ## 未發行
 

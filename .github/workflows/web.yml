@@ -4,11 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "Web/**"
+      - "web/**"
       - ".github/workflows/web.yml"
   pull_request:
     paths:
-      - "Web/**"
+      - "web/**"
       - ".github/workflows/web.yml"
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
         python: ["3.10", "3.13"]
     defaults:
       run:
-        working-directory: Web
+        working-directory: web
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-          cache-dependency-path: Web/requirements.txt
+          cache-dependency-path: web/requirements.txt
 
       - uses: actions/setup-node@v4
         with:

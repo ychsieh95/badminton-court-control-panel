@@ -1,6 +1,6 @@
 # Claude Code instructions
 
-These instructions apply to the entire repository. Instructions in `Android/CLAUDE.md` (which imports `Android/AGENTS.md`) also apply to work under `Android/`.
+These instructions apply to the entire repository. Instructions in `android/CLAUDE.md` (which imports `android/AGENTS.md`) also apply to work under `android/`.
 
 ## Git commits
 

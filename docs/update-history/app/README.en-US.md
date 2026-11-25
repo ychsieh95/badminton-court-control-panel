@@ -1,6 +1,6 @@
 # App update history
 
-Changes that people using the website or the Android app can notice. Website changes released before November 2026 are listed on the site's `/updates` page, from `Web/data/update_history.json`.
+Changes that people using the website or the Android app can notice. Website changes released before November 2026 are listed on the site's `/updates` page, from `web/data/update_history.json`.
 
 ## Unreleased
 

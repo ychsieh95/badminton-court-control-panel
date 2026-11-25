@@ -1,10 +1,10 @@
 # UI brief — Badminton Court Control Panel (Android)
 
-This brief is for anyone changing the Android app's screens: what the app is, which layer owns what, the state contract screens build on, and the visual rules that keep the app consistent with the website. Read [Android/AGENTS.md](../Android/AGENTS.md) first for build, string, and verification rules.
+This brief is for anyone changing the Android app's screens: what the app is, which layer owns what, the state contract screens build on, and the visual rules that keep the app consistent with the website. Read [android/AGENTS.md](../android/AGENTS.md) first for build, string, and verification rules.
 
 ## What the app is
 
-A native client for the court system's `/api/v1` JSON API (see [Web/API.md](../Web/API.md)). It offers what the website offers through that API, in English and Traditional Chinese (Taiwan).
+A native client for the court system's `/api/v1` JSON API (see [web/API.md](../web/API.md)). It offers what the website offers through that API, in English and Traditional Chinese (Taiwan).
 
 - **Players** browse and filter courts, open a court from a shared or pasted link, join or leave with a nickname and 6-digit PIN (no account), land on the waiting list when a court is full, read and post on the message board, and follow a court for notifications.
 - **Organizers** sign in to create, edit, duplicate, archive, restore, and delete their courts, reply to messages, and run roll call and payment clearing.
@@ -24,7 +24,7 @@ The app is one `:app` module under `io.github.ychsieh95.bccp`.
 | Resources | `res/` | Yes, except `values*/strings.xml` and generated launcher and notification icons |
 | Data | `core/data/`, `core/network/`, `core/model/`, `core/push/`, `core/di/` | Only when the screen needs data the layer does not yet expose |
 
-If a screen needs something the API does not provide, say so rather than working around it. The API is extended only on request, together with `Web/api.py`, `Web/API.md`, `Web/tests/test_api.py`, the app's models, and the test fixtures.
+If a screen needs something the API does not provide, say so rather than working around it. The API is extended only on request, together with `web/api.py`, `web/API.md`, `web/tests/test_api.py`, the app's models, and the test fixtures.
 
 ## Contract to build against
 
@@ -50,15 +50,15 @@ Every screen handles loading (`LoadingPane`), error with retry (`ErrorPane`), an
 
 ## Visual direction
 
-- **Match the website.** `core/ui/theme/Palettes.kt` copies the website stylesheet's CSS variables for each palette in light and dark (`WebTokens`), and `Theme.kt` maps them onto the Material 3 color scheme. Change colors there, in step with `Web/static/css/styles.css`, never inline in a screen. The **Dynamic** palette uses the device's colors on Android 12 and later and falls back to the Mono tokens.
+- **Match the website.** `core/ui/theme/Palettes.kt` copies the website stylesheet's CSS variables for each palette in light and dark (`WebTokens`), and `Theme.kt` maps them onto the Material 3 color scheme. Change colors there, in step with `web/static/css/styles.css`, never inline in a screen. The **Dynamic** palette uses the device's colors on Android 12 and later and falls back to the Mono tokens.
 - **Extra roles.** The website's warning color (expired courts) and lime accent highlight have no Material slot; read them from `LocalExtraColors`.
 - **Shapes.** Use the theme's shape scale (6, 10, 18, 24, and 28 dp corners) rather than custom radii.
 - **Shared components first.** Use `PanelCard`, `SectionHeader`, `PrimaryActionButton`, `TextInput`, `SecretInput` (PINs and passwords), `DropdownField`, `DateField`, `TimeField`, `SwitchRow`, `ConfirmDialog`, `CourtCard`, `StatusBadge`, `Pill`, `CountBadge`, `DateChip`, `IconLine`, and `UserAvatar` before adding a new one. Keep field labels to one line so neighbouring fields keep the same height.
 - **Status is never color-only.** Court status, waiting-list position, and expired or archived states carry a label or icon as well as color.
 - **Layout.** The app is edge-to-edge and uses `adjustResize` for forms. Confirm destructive actions (leave, delete, remove a player) with `ConfirmDialog`.
-- **Text.** Every user-visible string, including content descriptions, comes from string resources. Shared wording is generated from `TRANSLATIONS` in `Web/app.py`; app-only wording goes in `Android/tools/extra_strings.json`. Regenerate with `python3 tools/gen_strings.py` and never edit `strings.xml` by hand. Check long Traditional Chinese and English strings at narrow widths.
+- **Text.** Every user-visible string, including content descriptions, comes from string resources. Shared wording is generated from `TRANSLATIONS` in `web/app.py`; app-only wording goes in `android/tools/extra_strings.json`. Regenerate with `python3 tools/gen_strings.py` and never edit `strings.xml` by hand. Check long Traditional Chinese and English strings at narrow widths.
 - **Previews.** If you add `@Preview`s, use fictional courts, nicknames, and messages only.
 
 ## Done means
 
-From `Android/`, `./gradlew :app:testDebugUnitTest` and `./gradlew :app:assembleDebug` succeed, and the generated strings are up to date. When a device or emulator is available, the changed screens have been checked in English and Traditional Chinese and in light and dark themes against a local server at `http://10.0.2.2:5000`.
+From `android/`, `./gradlew :app:testDebugUnitTest` and `./gradlew :app:assembleDebug` succeed, and the generated strings are up to date. When a device or emulator is available, the changed screens have been checked in English and Traditional Chinese and in light and dark themes against a local server at `http://10.0.2.2:5000`.
